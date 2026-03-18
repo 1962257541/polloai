@@ -1,0 +1,107 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum GenerationType {
+  text_to_image
+  image_to_video
+}
+
+enum TaskStatus {
+  queued
+  running
+  succeeded
+  failed
+  cancelled
+}
+
+enum AssetRole {
+  input
+  output
+}
+
+enum MediaType {
+  image
+  video
+}
+
+enum UserRole {
+  admin
+  salesperson
+}
+
+model User {
+  id           String           @id @default(uuid())
+  email        String           @unique
+  name         String?
+  passwordHash String
+  role         UserRole         @default(salesperson)
+  apiKey       String?
+  apiUrl       String?
+  imageModel      String?
+  imageApiType    String?   @default("openai-images")
+  videoModel   String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  tasks        GenerationTask[]
+  auditLogs    ApiAuditLog[]
+}
+
+model GenerationTask {
+  id             String            @id @default(uuid())
+  userId         String
+  type           GenerationType
+  status         TaskStatus        @default(queued)
+  provider       String            @default("gemini")
+  model          String
+  prompt         String
+  negativePrompt String?
+  parameters     Json
+  providerJobId  String?
+  errorCode      String?
+  errorMessage   String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  startedAt      DateTime?
+  finishedAt     DateTime?
+  user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assets         GenerationAsset[]
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+}
+
+model GenerationAsset {
+  id         String         @id @default(uuid())
+  taskId      String
+  role        AssetRole
+  mediaType   MediaType
+  url         String
+  storageKey  String
+  mimeType    String?
+  sizeBytes   Int?
+  createdAt   DateTime       @default(now())
+  task        GenerationTask  @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId, role])
+}
+
+model ApiAuditLog {
+  id          String    @id @default(uuid())
+  userId       String?
+  method       String
+  path         String
+  statusCode   Int
+  requestId    String
+  details      Json?
+  createdAt    DateTime  @default(now())
+  user         User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([path, createdAt])
+  @@index([userId, createdAt])
+}
