@@ -29,7 +29,6 @@ export default function VideoGenerator({ onCreated, generating = false }: VideoG
   const [duration, setDuration] = useState(4);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const fileInputId = "video-image-file";
 
   const canSubmit = Boolean(imageUrl || file);
 
@@ -131,7 +130,6 @@ export default function VideoGenerator({ onCreated, generating = false }: VideoG
           style={{ marginBottom: 8 }}
         />
         <label
-          htmlFor={fileInputId}
           onDragEnter={(e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -149,6 +147,8 @@ export default function VideoGenerator({ onCreated, generating = false }: VideoG
           }}
           onDrop={handleDrop}
           style={{
+            display: "block",
+            width: "100%",
             border: `1px dashed ${dragActive || file ? "var(--accent)" : "var(--border)"}`,
             borderRadius: 6,
             padding: "12px",
@@ -159,23 +159,23 @@ export default function VideoGenerator({ onCreated, generating = false }: VideoG
             transition: "border-color 0.15s, background 0.15s",
           }}
         >
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            onChange={handleFileChange}
+            style={{
+              position: "absolute",
+              inset: 0,
+              width: "100%",
+              height: "100%",
+              opacity: 0,
+              cursor: "pointer",
+            }}
+          />
           <span style={{ fontSize: "0.8rem", color: file ? "var(--accent)" : "var(--text-muted)" }}>
             {file ? file.name : "点击或拖入图片文件"}
           </span>
         </label>
-        <input
-          id={fileInputId}
-          type="file"
-          accept="image/png,image/jpeg,image/webp"
-          onChange={handleFileChange}
-          style={{
-            marginTop: 8,
-            width: "100%",
-            fontSize: "0.8rem",
-            color: "var(--text-secondary)",
-            cursor: "pointer",
-          }}
-        />
       </div>
 
       {/* 比例 */}
