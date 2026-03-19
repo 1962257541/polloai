@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { getToken } from "../lib/auth";
 
@@ -24,6 +24,7 @@ export default function VideoGenerator({ onCreated, generating = false }: VideoG
   const [prompt, setPrompt] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [file, setFile] = useState<File | undefined>();
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const [size, setSize] = useState("1280x720");
   const [duration, setDuration] = useState(4);
@@ -32,15 +33,31 @@ export default function VideoGenerator({ onCreated, generating = false }: VideoG
 
   const canSubmit = Boolean(imageUrl || file);
 
+  useEffect(() => {
+    if (!file) {
+      setPreviewUrl(null);
+      return;
+    }
+
+    const nextPreviewUrl = URL.createObjectURL(file);
+    setPreviewUrl(nextPreviewUrl);
+
+    return () => {
+      URL.revokeObjectURL(nextPreviewUrl);
+    };
+  }, [file]);
+
   const applyFile = (nextFile?: File) => {
     if (!nextFile) return;
     if (!["image/png", "image/jpeg", "image/webp"].includes(nextFile.type)) {
       setError("请上传 PNG、JPEG 或 WebP 图片文件");
       return;
     }
+
     setFile(nextFile);
     setImageUrl("");
     setError("");
+    setDragActive(false);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -51,8 +68,13 @@ export default function VideoGenerator({ onCreated, generating = false }: VideoG
   const handleDrop = (e: React.DragEvent<HTMLLabelElement>) => {
     e.preventDefault();
     e.stopPropagation();
-    setDragActive(false);
     applyFile(e.dataTransfer.files?.[0]);
+  };
+
+  const handleClearFile = () => {
+    setFile(undefined);
+    setDragActive(false);
+    setError("");
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -104,7 +126,16 @@ export default function VideoGenerator({ onCreated, generating = false }: VideoG
       </h2>
 
       <div>
-        <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "JetBrains Mono, monospace", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
+        <label
+          style={{
+            display: "block",
+            fontSize: "0.7rem",
+            fontFamily: "JetBrains Mono, monospace",
+            color: "var(--text-muted)",
+            letterSpacing: "0.08em",
+            marginBottom: 8,
+          }}
+        >
           PROMPT
         </label>
         <textarea
@@ -118,69 +149,175 @@ export default function VideoGenerator({ onCreated, generating = false }: VideoG
       </div>
 
       <div>
-        <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "JetBrains Mono, monospace", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
+        <label
+          style={{
+            display: "block",
+            fontSize: "0.7rem",
+            fontFamily: "JetBrains Mono, monospace",
+            color: "var(--text-muted)",
+            letterSpacing: "0.08em",
+            marginBottom: 8,
+          }}
+        >
           INPUT IMAGE
         </label>
         <input
           className="input-field"
           type="url"
           value={imageUrl}
-          onChange={(e) => { setImageUrl(e.target.value); if (e.target.value) setFile(undefined); }}
+          onChange={(e) => {
+            setImageUrl(e.target.value);
+            if (e.target.value) {
+              setFile(undefined);
+            }
+          }}
           placeholder="图片 URL（与上传文件二选一）"
           style={{ marginBottom: 8 }}
         />
-        <label
-          onDragEnter={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            setDragActive(true);
-          }}
-          onDragOver={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            setDragActive(true);
-          }}
-          onDragLeave={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            setDragActive(false);
-          }}
-          onDrop={handleDrop}
-          style={{
-            display: "block",
-            width: "100%",
-            border: `1px dashed ${dragActive || file ? "var(--accent)" : "var(--border)"}`,
-            borderRadius: 6,
-            padding: "12px",
-            textAlign: "center",
-            cursor: "pointer",
-            position: "relative",
-            background: dragActive ? "var(--accent-glow)" : "transparent",
-            transition: "border-color 0.15s, background 0.15s",
-          }}
-        >
-          <input
-            type="file"
-            accept="image/png,image/jpeg,image/webp"
-            onChange={handleFileChange}
+
+        {file && previewUrl ? (
+          <div
             style={{
-              position: "absolute",
-              inset: 0,
-              width: "100%",
-              height: "100%",
-              opacity: 0,
-              cursor: "pointer",
+              border: "1px solid var(--border)",
+              borderRadius: 10,
+              background: "var(--bg-raised)",
+              padding: 10,
+              display: "flex",
+              flexDirection: "column",
+              gap: 10,
             }}
-          />
-          <span style={{ fontSize: "0.8rem", color: file ? "var(--accent)" : "var(--text-muted)" }}>
-            {file ? file.name : "点击或拖入图片文件"}
-          </span>
-        </label>
+          >
+            <div
+              style={{
+                overflow: "hidden",
+                borderRadius: 8,
+                border: "1px solid var(--border)",
+                background: "var(--bg-base)",
+                aspectRatio: "16 / 10",
+              }}
+            >
+              <img
+                src={previewUrl}
+                alt="Uploaded preview"
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
+                  display: "block",
+                }}
+              />
+            </div>
+
+            <div style={{ display: "flex", gap: 8 }}>
+              <label
+                style={{
+                  position: "relative",
+                  flex: 1,
+                  border: "1px solid var(--border)",
+                  borderRadius: 6,
+                  padding: "10px 12px",
+                  textAlign: "center",
+                  cursor: "pointer",
+                  color: "var(--text-secondary)",
+                  fontSize: "0.8rem",
+                }}
+              >
+                更换图片
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  onChange={handleFileChange}
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    width: "100%",
+                    height: "100%",
+                    opacity: 0,
+                    cursor: "pointer",
+                  }}
+                />
+              </label>
+
+              <button
+                type="button"
+                onClick={handleClearFile}
+                style={{
+                  flex: 1,
+                  border: "1px solid rgba(239,68,68,0.25)",
+                  borderRadius: 6,
+                  padding: "10px 12px",
+                  cursor: "pointer",
+                  color: "var(--error)",
+                  fontSize: "0.8rem",
+                  background: "rgba(239,68,68,0.08)",
+                }}
+              >
+                删除图片
+              </button>
+            </div>
+          </div>
+        ) : (
+          <label
+            onDragEnter={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setDragActive(true);
+            }}
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setDragActive(true);
+            }}
+            onDragLeave={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setDragActive(false);
+            }}
+            onDrop={handleDrop}
+            style={{
+              display: "block",
+              width: "100%",
+              border: `1px dashed ${dragActive ? "var(--accent)" : "var(--border)"}`,
+              borderRadius: 6,
+              padding: "12px",
+              textAlign: "center",
+              cursor: "pointer",
+              position: "relative",
+              background: dragActive ? "var(--accent-glow)" : "transparent",
+              transition: "border-color 0.15s, background 0.15s",
+            }}
+          >
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              onChange={handleFileChange}
+              style={{
+                position: "absolute",
+                inset: 0,
+                width: "100%",
+                height: "100%",
+                opacity: 0,
+                cursor: "pointer",
+              }}
+            />
+            <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>
+              点击或拖入图片文件
+            </span>
+          </label>
+        )}
       </div>
 
-      {/* 比例 */}
       <div>
-        <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "JetBrains Mono, monospace", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
+        <label
+          style={{
+            display: "block",
+            fontSize: "0.7rem",
+            fontFamily: "JetBrains Mono, monospace",
+            color: "var(--text-muted)",
+            letterSpacing: "0.08em",
+            marginBottom: 8,
+          }}
+        >
           ASPECT RATIO
         </label>
         <div style={{ display: "flex", gap: 8 }}>
@@ -207,9 +344,17 @@ export default function VideoGenerator({ onCreated, generating = false }: VideoG
         </div>
       </div>
 
-      {/* 时长 */}
       <div>
-        <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "JetBrains Mono, monospace", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
+        <label
+          style={{
+            display: "block",
+            fontSize: "0.7rem",
+            fontFamily: "JetBrains Mono, monospace",
+            color: "var(--text-muted)",
+            letterSpacing: "0.08em",
+            marginBottom: 8,
+          }}
+        >
           DURATION
         </label>
         <div style={{ display: "flex", gap: 8 }}>
@@ -237,7 +382,16 @@ export default function VideoGenerator({ onCreated, generating = false }: VideoG
       </div>
 
       {error && (
-        <div style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: 6, padding: "10px 12px", fontSize: "0.8rem", color: "var(--error)" }}>
+        <div
+          style={{
+            background: "rgba(239,68,68,0.1)",
+            border: "1px solid rgba(239,68,68,0.2)",
+            borderRadius: 6,
+            padding: "10px 12px",
+            fontSize: "0.8rem",
+            color: "var(--error)",
+          }}
+        >
           {error}
         </div>
       )}
