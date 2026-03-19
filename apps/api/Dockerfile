@@ -6,16 +6,16 @@ FROM base AS builder
 WORKDIR /app
 
 # Copy workspace manifests first for layer caching
-COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml tsconfig.base.json ./
 COPY apps/api/package.json ./apps/api/
 COPY packages/shared/package.json ./packages/shared/
+COPY prisma ./prisma
 
-RUN pnpm install --no-frozen-lockfile
+RUN pnpm install --frozen-lockfile
 
 # Copy source
 COPY packages/shared ./packages/shared
 COPY apps/api ./apps/api
-COPY prisma ./prisma
 
 # Build
 RUN pnpm --filter @packages/shared build
@@ -28,15 +28,15 @@ WORKDIR /app
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY apps/api/package.json ./apps/api/
 COPY packages/shared/package.json ./packages/shared/
+COPY prisma ./prisma
 
-RUN pnpm install --prod --no-frozen-lockfile
+RUN pnpm install --prod --frozen-lockfile
 
 COPY --from=builder /app/apps/api/dist ./apps/api/dist
 COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
-COPY prisma ./prisma
 
-RUN npx prisma generate
+RUN pnpm exec prisma generate
 
 EXPOSE 3001
 
-CMD ["sh", "-c", "npx prisma migrate deploy && node apps/api/dist/main.js"]
+CMD ["sh", "-c", "pnpm exec prisma migrate deploy && node apps/api/dist/main.js"]

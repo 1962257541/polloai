@@ -5,15 +5,15 @@ RUN corepack enable && corepack prepare pnpm@10.6.3 --activate
 FROM base AS builder
 WORKDIR /app
 
-COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml tsconfig.base.json ./
 COPY apps/worker/package.json ./apps/worker/
 COPY packages/shared/package.json ./packages/shared/
+COPY prisma ./prisma
 
-RUN pnpm install --no-frozen-lockfile
+RUN pnpm install --frozen-lockfile
 
 COPY packages/shared ./packages/shared
 COPY apps/worker ./apps/worker
-COPY prisma ./prisma
 
 RUN pnpm --filter @packages/shared build
 RUN pnpm --filter @apps/worker build
@@ -25,13 +25,13 @@ WORKDIR /app
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY apps/worker/package.json ./apps/worker/
 COPY packages/shared/package.json ./packages/shared/
+COPY prisma ./prisma
 
-RUN pnpm install --prod --no-frozen-lockfile
+RUN pnpm install --prod --frozen-lockfile
 
 COPY --from=builder /app/apps/worker/dist ./apps/worker/dist
 COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
-COPY prisma ./prisma
 
-RUN npx prisma generate
+RUN pnpm exec prisma generate
 
 CMD ["node", "apps/worker/dist/main.js"]
