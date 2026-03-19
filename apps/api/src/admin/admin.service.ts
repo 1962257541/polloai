@@ -5,7 +5,7 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateSalespersonDto, SalespersonInfo } from "@packages/shared";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 
 @Injectable()
 export class AdminService {
