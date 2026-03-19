@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { api } from "../lib/api";
 import { getToken } from "../lib/auth";
 
@@ -24,12 +24,12 @@ export default function VideoGenerator({ onCreated, generating = false }: VideoG
   const [prompt, setPrompt] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [file, setFile] = useState<File | undefined>();
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const [size, setSize] = useState("1280x720");
   const [duration, setDuration] = useState(4);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const fileInputId = "video-image-file";
 
   const canSubmit = Boolean(imageUrl || file);
 
@@ -44,16 +44,12 @@ export default function VideoGenerator({ onCreated, generating = false }: VideoG
     setError("");
   };
 
-  const handlePickFile = () => {
-    fileInputRef.current?.click();
-  };
-
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     applyFile(e.target.files?.[0]);
     e.target.value = "";
   };
 
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+  const handleDrop = (e: React.DragEvent<HTMLLabelElement>) => {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
@@ -134,16 +130,8 @@ export default function VideoGenerator({ onCreated, generating = false }: VideoG
           placeholder="图片 URL（与上传文件二选一）"
           style={{ marginBottom: 8 }}
         />
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={handlePickFile}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              handlePickFile();
-            }
-          }}
+        <label
+          htmlFor={fileInputId}
           onDragEnter={(e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -171,17 +159,23 @@ export default function VideoGenerator({ onCreated, generating = false }: VideoG
             transition: "border-color 0.15s, background 0.15s",
           }}
         >
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/png,image/jpeg,image/webp"
-            onChange={handleFileChange}
-            style={{ display: "none" }}
-          />
           <span style={{ fontSize: "0.8rem", color: file ? "var(--accent)" : "var(--text-muted)" }}>
             {file ? file.name : "点击或拖入图片文件"}
           </span>
-        </div>
+        </label>
+        <input
+          id={fileInputId}
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          onChange={handleFileChange}
+          style={{
+            marginTop: 8,
+            width: "100%",
+            fontSize: "0.8rem",
+            color: "var(--text-secondary)",
+            cursor: "pointer",
+          }}
+        />
       </div>
 
       {/* 比例 */}
