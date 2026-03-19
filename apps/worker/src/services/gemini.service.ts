@@ -88,7 +88,7 @@ export class GeminiService {
     apiKey: string,
     apiUrl?: string,
   ) {
-    const path = `/v1beta/models/${encodeURIComponent(model)}:generateContent`;
+    const path = `/models/${encodeURIComponent(model)}:generateContent`;
     const body = await this.requestJson(
       path,
       {
