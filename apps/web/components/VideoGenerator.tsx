@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { api } from "../lib/api";
 import { getToken } from "../lib/auth";
 
@@ -24,12 +24,41 @@ export default function VideoGenerator({ onCreated, generating = false }: VideoG
   const [prompt, setPrompt] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [file, setFile] = useState<File | undefined>();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [dragActive, setDragActive] = useState(false);
   const [size, setSize] = useState("1280x720");
   const [duration, setDuration] = useState(4);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   const canSubmit = Boolean(imageUrl || file);
+
+  const applyFile = (nextFile?: File) => {
+    if (!nextFile) return;
+    if (!["image/png", "image/jpeg", "image/webp"].includes(nextFile.type)) {
+      setError("请上传 PNG、JPEG 或 WebP 图片文件");
+      return;
+    }
+    setFile(nextFile);
+    setImageUrl("");
+    setError("");
+  };
+
+  const handlePickFile = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    applyFile(e.target.files?.[0]);
+    e.target.value = "";
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    applyFile(e.dataTransfer.files?.[0]);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -106,21 +135,48 @@ export default function VideoGenerator({ onCreated, generating = false }: VideoG
           style={{ marginBottom: 8 }}
         />
         <div
+          role="button"
+          tabIndex={0}
+          onClick={handlePickFile}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              handlePickFile();
+            }
+          }}
+          onDragEnter={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setDragActive(true);
+          }}
+          onDragOver={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setDragActive(true);
+          }}
+          onDragLeave={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setDragActive(false);
+          }}
+          onDrop={handleDrop}
           style={{
-            border: `1px dashed ${file ? "var(--accent)" : "var(--border)"}`,
+            border: `1px dashed ${dragActive || file ? "var(--accent)" : "var(--border)"}`,
             borderRadius: 6,
             padding: "12px",
             textAlign: "center",
             cursor: "pointer",
             position: "relative",
-            transition: "border-color 0.15s",
+            background: dragActive ? "var(--accent-glow)" : "transparent",
+            transition: "border-color 0.15s, background 0.15s",
           }}
         >
           <input
+            ref={fileInputRef}
             type="file"
             accept="image/png,image/jpeg,image/webp"
-            onChange={(e) => { setFile(e.target.files?.[0]); if (e.target.files?.[0]) setImageUrl(""); }}
-            style={{ position: "absolute", inset: 0, opacity: 0, cursor: "pointer" }}
+            onChange={handleFileChange}
+            style={{ display: "none" }}
           />
           <span style={{ fontSize: "0.8rem", color: file ? "var(--accent)" : "var(--text-muted)" }}>
             {file ? file.name : "点击或拖入图片文件"}
