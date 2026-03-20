@@ -8,7 +8,15 @@ import {
   Put,
   UseGuards,
 } from "@nestjs/common";
-import { IsEmail, IsOptional, IsString, MinLength } from "class-validator";
+import {
+  ArrayMaxSize,
+  ArrayUnique,
+  IsArray,
+  IsEmail,
+  IsOptional,
+  IsString,
+  MinLength,
+} from "class-validator";
 import { AdminService } from "./admin.service";
 import { JwtAuthGuard } from "../common/jwt-auth.guard";
 import { RolesGuard } from "../common/roles.guard";
@@ -37,18 +45,20 @@ class UpdateApiKeyBody {
   @IsString()
   @MinLength(1)
   apiUrl!: string;
+}
 
-  @IsOptional()
-  @IsString()
-  imageModel?: string;
+class UpdateModelConfigBody {
+  @IsArray()
+  @ArrayUnique()
+  @ArrayMaxSize(200)
+  @IsString({ each: true })
+  imageModels!: string[];
 
-  @IsOptional()
-  @IsString()
-  imageApiType?: string;
-
-  @IsOptional()
-  @IsString()
-  videoModel?: string;
+  @IsArray()
+  @ArrayUnique()
+  @ArrayMaxSize(200)
+  @IsString({ each: true })
+  videoModels!: string[];
 }
 
 @Controller("admin")
@@ -56,7 +66,6 @@ class UpdateApiKeyBody {
 export class AdminController {
   constructor(private readonly adminService: AdminService) {}
 
-  // 仅 admin 可访问
   @Get("salespersons")
   @Roles("admin")
   listSalespersons() {
@@ -82,10 +91,21 @@ export class AdminController {
   @Put("salespersons/:id/apikey")
   @Roles("admin")
   updateSalespersonApiKey(@Param("id") id: string, @Body() body: UpdateApiKeyBody) {
-    return this.adminService.updateApiConfig(id, body.apiKey, body.apiUrl, body.imageModel, body.imageApiType, body.videoModel);
+    return this.adminService.updateApiConfig(id, body.apiKey, body.apiUrl);
   }
 
-  // 所有登录用户可访问（管理自身）
+  @Get("users/:id/models/catalog")
+  @Roles("admin")
+  getUserModelCatalog(@Param("id") id: string) {
+    return this.adminService.listRemoteModels(id);
+  }
+
+  @Put("users/:id/models")
+  @Roles("admin")
+  updateUserModelConfig(@Param("id") id: string, @Body() body: UpdateModelConfigBody) {
+    return this.adminService.updateModelConfig(id, body.imageModels, body.videoModels);
+  }
+
   @Get("me")
   getMyInfo(@CurrentUser() user: JwtUser) {
     return this.adminService.getMyInfo(user.sub);
@@ -93,6 +113,6 @@ export class AdminController {
 
   @Put("me/apikey")
   updateMyApiKey(@CurrentUser() user: JwtUser, @Body() body: UpdateApiKeyBody) {
-    return this.adminService.updateApiConfig(user.sub, body.apiKey, body.apiUrl, body.imageModel, body.imageApiType, body.videoModel);
+    return this.adminService.updateApiConfig(user.sub, body.apiKey, body.apiUrl);
   }
 }

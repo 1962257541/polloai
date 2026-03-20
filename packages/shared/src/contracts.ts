@@ -24,14 +24,19 @@ export type ImageQuality = (typeof imageQualityValues)[number];
 export const videoQualityValues = ["standard", "high"] as const;
 export type VideoQuality = (typeof videoQualityValues)[number];
 
+export const imageApiTypeValues = ["openai-images", "gemini-native"] as const;
+export type ImageApiType = (typeof imageApiTypeValues)[number];
+
 export const textToImageSchema = z.object({
   prompt: z.string().trim().min(1).max(4000),
   negativePrompt: z.string().trim().max(1000).optional(),
   model: z.string().trim().optional(),
-  size: z.enum(["1024x1024", "1024x1536", "1536x1024"]).default("1024x1024"),
+  size: z.enum(["1024x1024", "1024x1536", "1536x1024", "1024x1792"]).default("1024x1024"),
   quality: z.enum(imageQualityValues).default("auto"),
   background: z.enum(["transparent", "opaque", "auto"]).default("auto"),
   outputFormat: z.enum(["png", "jpeg", "webp"]).default("png"),
+  imageApiType: z.enum(imageApiTypeValues).default("gemini-native"),
+  referenceImageUrl: z.string().url().optional(),
 });
 
 export const imageToVideoSchema = z.object({
@@ -62,11 +67,7 @@ export interface GenerationEvent {
   assetUrl?: string;
 }
 
-// 角色与用户管理类型
 export type UserRole = "admin" | "salesperson";
-
-export const imageApiTypeValues = ["openai-images", "gemini-native"] as const;
-export type ImageApiType = (typeof imageApiTypeValues)[number];
 
 export interface SalespersonInfo {
   id: string;
@@ -77,8 +78,9 @@ export interface SalespersonInfo {
   hasApiUrl: boolean;
   apiUrl?: string | null;
   imageModel?: string | null;
-  imageApiType?: ImageApiType | null;
+  imageModels?: string[];
   videoModel?: string | null;
+  videoModels?: string[];
 }
 
 export interface CreateSalespersonDto {

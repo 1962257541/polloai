@@ -43,9 +43,11 @@ model User {
   role         UserRole         @default(salesperson)
   apiKey       String?
   apiUrl       String?
-  imageModel      String?
-  imageApiType    String?   @default("openai-images")
+  imageModel   String?
+  imageModels  String[]         @default([])
+  imageApiType String?          @default("openai-images")
   videoModel   String?
+  videoModels  String[]         @default([])
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
   tasks        GenerationTask[]
@@ -78,29 +80,29 @@ model GenerationTask {
 
 model GenerationAsset {
   id         String         @id @default(uuid())
-  taskId      String
-  role        AssetRole
-  mediaType   MediaType
-  url         String
-  storageKey  String
-  mimeType    String?
-  sizeBytes   Int?
-  createdAt   DateTime       @default(now())
-  task        GenerationTask  @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  taskId     String
+  role       AssetRole
+  mediaType  MediaType
+  url        String
+  storageKey String
+  mimeType   String?
+  sizeBytes  Int?
+  createdAt  DateTime       @default(now())
+  task       GenerationTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
   @@index([taskId, role])
 }
 
 model ApiAuditLog {
-  id          String    @id @default(uuid())
-  userId       String?
-  method       String
-  path         String
-  statusCode   Int
-  requestId    String
-  details      Json?
-  createdAt    DateTime  @default(now())
-  user         User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  id         String   @id @default(uuid())
+  userId     String?
+  method     String
+  path       String
+  statusCode Int
+  requestId  String
+  details    Json?
+  createdAt  DateTime @default(now())
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([path, createdAt])
   @@index([userId, createdAt])

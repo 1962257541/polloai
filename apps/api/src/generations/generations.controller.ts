@@ -1,5 +1,6 @@
-﻿import {
+import {
   BadRequestException,
+  Body,
   Controller,
   Delete,
   Get,
@@ -9,7 +10,6 @@
   UploadedFile,
   UseGuards,
   UseInterceptors,
-  Body,
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { memoryStorage } from "multer";
@@ -25,8 +25,18 @@ export class GenerationsController {
   constructor(private readonly generationsService: GenerationsService) {}
 
   @Post("image")
-  async createImage(@CurrentUser() user: JwtUser, @Body() body: CreateImageDto) {
-    return this.generationsService.createImageTask(user.sub, body);
+  @UseInterceptors(
+    FileInterceptor("referenceImage", {
+      storage: memoryStorage(),
+      limits: { fileSize: 20 * 1024 * 1024 },
+    }),
+  )
+  async createImage(
+    @CurrentUser() user: JwtUser,
+    @Body() body: CreateImageDto,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    return this.generationsService.createImageTask(user.sub, body, file);
   }
 
   @Post("video-from-image")

@@ -1,10 +1,10 @@
-﻿import { Controller, MessageEvent, Sse, UseGuards } from "@nestjs/common";
+import { Controller, MessageEvent, Sse, UseGuards } from "@nestjs/common";
 import { JwtAuthGuard } from "../common/jwt-auth.guard";
 import { CurrentUser, JwtUser } from "../common/current-user.decorator";
 import { NotificationsService } from "./notifications.service";
 import { map, Observable } from "rxjs";
 
-@Controller("generations")
+@Controller("notifications")
 export class NotificationsController {
   constructor(private readonly notificationsService: NotificationsService) {}
 

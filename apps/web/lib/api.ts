@@ -1,6 +1,7 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:3001/api/v1";
 
 export type UserRole = "admin" | "salesperson";
+export type ImageApiType = "openai-images" | "gemini-native";
 
 export type AuthPayload = {
   token: string;
@@ -12,8 +13,6 @@ export type AuthPayload = {
   };
 };
 
-export type ImageApiType = "openai-images" | "gemini-native";
-
 export type SalespersonInfo = {
   id: string;
   email: string;
@@ -23,8 +22,9 @@ export type SalespersonInfo = {
   hasApiUrl: boolean;
   apiUrl?: string | null;
   imageModel?: string | null;
-  imageApiType?: ImageApiType | null;
+  imageModels?: string[];
   videoModel?: string | null;
+  videoModels?: string[];
 };
 
 export type MyInfo = {
@@ -35,7 +35,9 @@ export type MyInfo = {
   hasApiKey: boolean;
   hasApiUrl: boolean;
   imageModel?: string | null;
+  imageModels?: string[];
   videoModel?: string | null;
+  videoModels?: string[];
 };
 
 async function request(path: string, init: RequestInit = {}, token?: string) {
@@ -61,28 +63,65 @@ async function request(path: string, init: RequestInit = {}, token?: string) {
 }
 
 export const api = {
-  // Auth
   login: (email: string, password: string) =>
     request("/auth/login", {
       method: "POST",
       body: JSON.stringify({ email, password }),
     }) as Promise<AuthPayload>,
 
-  // Generation
-  createImage: (
+  createImage: async (
     token: string,
-    payload: { prompt: string; model?: string; size?: string; quality?: string; outputFormat?: string },
-  ) =>
-    request("/generations/image", { method: "POST", body: JSON.stringify(payload) }, token),
-
-  createVideoFromImage: async (
-    token: string,
-    payload: { prompt: string; imageUrl?: string; size?: string; durationSec?: number },
+    payload: {
+      prompt: string;
+      model?: string;
+      size?: string;
+      quality?: string;
+      outputFormat?: string;
+      imageApiType?: ImageApiType;
+    },
     file?: File,
   ) => {
     const form = new FormData();
     form.append("prompt", payload.prompt);
+    if (payload.model) form.append("model", payload.model);
+    if (payload.size) form.append("size", payload.size);
+    if (payload.quality) form.append("quality", payload.quality);
+    if (payload.outputFormat) form.append("outputFormat", payload.outputFormat);
+    if (payload.imageApiType) form.append("imageApiType", payload.imageApiType);
+    if (file) form.append("referenceImage", file);
+
+    const response = await fetch(`${API_BASE}/generations/image`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
+    });
+
+    const text = await response.text();
+    const data = text ? JSON.parse(text) : null;
+    if (!response.ok) {
+      const msg = Array.isArray(data?.message) ? data.message.join("; ") : data?.message;
+      throw new Error(msg || `Request failed (${response.status})`);
+    }
+    return data;
+  },
+
+  createVideoFromImage: async (
+    token: string,
+    payload: {
+      prompt: string;
+      model?: string;
+      imageUrl?: string;
+      aspectRatio?: string;
+      size?: string;
+      durationSec?: number;
+    },
+    file?: File,
+  ) => {
+    const form = new FormData();
+    form.append("prompt", payload.prompt);
+    if (payload.model) form.append("model", payload.model);
     if (payload.imageUrl) form.append("imageUrl", payload.imageUrl);
+    if (payload.aspectRatio) form.append("aspectRatio", payload.aspectRatio);
     if (payload.size) form.append("size", payload.size);
     if (payload.durationSec) form.append("durationSec", String(payload.durationSec));
     if (file) form.append("image", file);
@@ -96,7 +135,8 @@ export const api = {
     const text = await response.text();
     const data = text ? JSON.parse(text) : null;
     if (!response.ok) {
-      throw new Error(data?.message || `Request failed (${response.status})`);
+      const msg = Array.isArray(data?.message) ? data.message.join("; ") : data?.message;
+      throw new Error(msg || `Request failed (${response.status})`);
     }
     return data;
   },
@@ -124,7 +164,6 @@ export const api = {
     return () => es.close();
   },
 
-  // Admin
   listSalespersons: (token: string) =>
     request("/admin/salespersons", {}, token) as Promise<SalespersonInfo[]>,
 
@@ -134,11 +173,29 @@ export const api = {
   deleteSalesperson: (token: string, userId: string) =>
     request(`/admin/salespersons/${userId}`, { method: "DELETE" }, token),
 
-  updateSalespersonApiConfig: (token: string, userId: string, apiKey: string | undefined, apiUrl: string, imageModel?: string, imageApiType?: string, videoModel?: string) =>
-    request(`/admin/salespersons/${userId}/apikey`, { method: "PUT", body: JSON.stringify({ ...(apiKey ? { apiKey } : {}), apiUrl, imageModel, imageApiType, videoModel }) }, token),
+  updateSalespersonApiConfig: (token: string, userId: string, apiKey: string | undefined, apiUrl: string) =>
+    request(
+      `/admin/salespersons/${userId}/apikey`,
+      { method: "PUT", body: JSON.stringify({ ...(apiKey ? { apiKey } : {}), apiUrl }) },
+      token,
+    ),
 
-  updateMyApiConfig: (token: string, apiKey: string | undefined, apiUrl: string, imageModel?: string, imageApiType?: string, videoModel?: string) =>
-    request("/admin/me/apikey", { method: "PUT", body: JSON.stringify({ ...(apiKey ? { apiKey } : {}), apiUrl, imageModel, imageApiType, videoModel }) }, token),
+  updateMyApiConfig: (token: string, apiKey: string | undefined, apiUrl: string) =>
+    request(
+      "/admin/me/apikey",
+      { method: "PUT", body: JSON.stringify({ ...(apiKey ? { apiKey } : {}), apiUrl }) },
+      token,
+    ),
+
+  getUserModelCatalog: (token: string, userId: string) =>
+    request(`/admin/users/${userId}/models/catalog`, {}, token) as Promise<{ models: string[] }>,
+
+  updateUserModelConfig: (
+    token: string,
+    userId: string,
+    payload: { imageModels: string[]; videoModels: string[] },
+  ) =>
+    request(`/admin/users/${userId}/models`, { method: "PUT", body: JSON.stringify(payload) }, token),
 
   getMyInfo: (token: string) =>
     request("/admin/me", {}, token) as Promise<MyInfo>,

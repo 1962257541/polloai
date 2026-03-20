@@ -72,7 +72,6 @@ export default function Sidebar() {
         flexShrink: 0,
       }}
     >
-      {/* Logo */}
       <div style={{ padding: "20px 20px 16px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span
@@ -102,7 +101,6 @@ export default function Sidebar() {
 
       <div style={{ height: "1px", background: "var(--border)", margin: "0 20px" }} />
 
-      {/* 导航 */}
       <nav style={{ flex: 1, padding: "12px 10px" }}>
         {visibleItems.map((item) => {
           const active = pathname === item.href || pathname.startsWith(item.href + "/");
@@ -133,7 +131,6 @@ export default function Sidebar() {
         })}
       </nav>
 
-      {/* 底部用户信息 */}
       <div style={{ padding: "12px 20px", borderTop: "1px solid var(--border)" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
           <div style={{ minWidth: 0 }}>

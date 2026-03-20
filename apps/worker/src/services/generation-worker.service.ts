@@ -16,6 +16,12 @@ class TaskCancelledError extends Error {
   }
 }
 
+class RetryableGenerationError extends Error {
+  constructor(message: string) {
+    super(message);
+  }
+}
+
 @Injectable()
 export class GenerationWorkerService implements OnModuleInit, OnModuleDestroy {
   private worker?: Worker;
@@ -90,16 +96,32 @@ export class GenerationWorkerService implements OnModuleInit, OnModuleDestroy {
       if (error instanceof TaskCancelledError) return;
 
       const message = error instanceof Error ? error.message : String(error);
-      await this.markFailed(task.id, "WORKER_EXECUTION_FAILED", message);
+      if (this.shouldRetry(job, error)) {
+        console.warn(
+          `Retrying task ${task.id} after transient failure (${this.currentAttempt(job)}/${this.maxAttempts(job)}): ${message}`,
+        );
+        await this.markQueuedForRetry(task.id, task.userId, task.type as GenerationType);
+        throw error;
+      }
+
+      const finalMessage =
+        error instanceof RetryableGenerationError
+          ? `Generation failed after ${this.currentAttempt(job)} attempts: ${message}`
+          : message;
+      await this.markFailed(task.id, "WORKER_EXECUTION_FAILED", finalMessage);
       throw error;
     }
   }
 
   private async handleTextToImage(taskId: string, apiKey: string, apiUrl?: string, imageApiType?: string) {
-    const task = await this.prisma.generationTask.findUnique({ where: { id: taskId } });
+    const task = await this.prisma.generationTask.findUnique({
+      where: { id: taskId },
+      include: { assets: true },
+    });
     if (!task) return;
 
     const params = task.parameters as any;
+    const inputAsset = task.assets.find((asset) => asset.role === "input" && asset.mediaType === "image");
     const image = await this.gemini.generateImage({
       model: task.model,
       prompt: task.prompt,
@@ -109,7 +131,8 @@ export class GenerationWorkerService implements OnModuleInit, OnModuleDestroy {
       outputFormat: params.outputFormat,
       apiKey,
       apiUrl,
-      imageApiType,
+      imageApiType: params.imageApiType || imageApiType,
+      referenceImageUrl: params.referenceImageUrl || inputAsset?.url,
     });
 
     const latest = await this.prisma.generationTask.findUnique({
@@ -247,6 +270,9 @@ export class GenerationWorkerService implements OnModuleInit, OnModuleDestroy {
       const state = String(status?.status || "").toLowerCase();
 
       if (["failed", "error", "video_generation_failed", "video_upsampling_failed"].includes(state)) {
+        if (!this.extractVideoFailureDetail(status)) {
+          throw new RetryableGenerationError(`Video generation failed: ${JSON.stringify(status)}`);
+        }
         throw new Error(`Video generation failed: ${JSON.stringify(status)}`);
       }
 
@@ -256,6 +282,34 @@ export class GenerationWorkerService implements OnModuleInit, OnModuleDestroy {
 
       // 其他状态（pending、processing、video_generating 等）继续轮询
     }
+  }
+
+  private async markQueuedForRetry(taskId: string, userId: string, type: GenerationType) {
+    const updated = await this.prisma.generationTask.updateMany({
+      where: {
+        id: taskId,
+        status: {
+          notIn: ["cancelled", "succeeded"],
+        },
+      },
+      data: {
+        status: "queued",
+        providerJobId: null,
+        errorCode: null,
+        errorMessage: null,
+        startedAt: null,
+        finishedAt: null,
+      },
+    });
+
+    if (updated.count === 0) return;
+
+    await this.publish({
+      taskId,
+      userId,
+      status: "queued",
+      type,
+    });
   }
 
   private async markFailed(taskId: string, errorCode: string, errorMessage: string) {
@@ -290,5 +344,29 @@ export class GenerationWorkerService implements OnModuleInit, OnModuleDestroy {
 
   private sleep(ms: number) {
     return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  private shouldRetry(
+    job: Job<{ taskId: string; apiKey: string; apiUrl?: string; imageApiType?: string }>,
+    error: unknown,
+  ) {
+    return error instanceof RetryableGenerationError && this.currentAttempt(job) < this.maxAttempts(job);
+  }
+
+  private currentAttempt(
+    job: Job<{ taskId: string; apiKey: string; apiUrl?: string; imageApiType?: string }>,
+  ) {
+    return job.attemptsMade + 1;
+  }
+
+  private maxAttempts(
+    job: Job<{ taskId: string; apiKey: string; apiUrl?: string; imageApiType?: string }>,
+  ) {
+    return Math.max(job.opts.attempts ?? 1, 1);
+  }
+
+  private extractVideoFailureDetail(status: any) {
+    const candidates = [status?.error, status?.message, status?.detail];
+    return candidates.find((value) => typeof value === "string" && value.trim()) as string | undefined;
   }
 }

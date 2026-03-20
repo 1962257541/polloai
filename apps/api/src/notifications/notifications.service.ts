@@ -1,4 +1,4 @@
-﻿import { Injectable, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
+import { Injectable, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { filter, Observable, Subject } from "rxjs";
 import Redis from "ioredis";
 import { EnvService } from "../config/env.service";
@@ -14,11 +14,12 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
 
   constructor(private readonly env: EnvService) {
     this.publisher = new Redis(env.redisUrl);
-    this.subscriber = new Redis(env.redisUrl);
+    this.subscriber = new Redis(env.redisUrl, {
+      enableReadyCheck: false,
+    });
   }
 
   async onModuleInit() {
-    await this.subscriber.subscribe(CHANNEL);
     this.subscriber.on("message", (channel, payload) => {
       if (channel !== CHANNEL) {
         return;
@@ -30,6 +31,8 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
         // ignore malformed payloads
       }
     });
+
+    await this.subscriber.subscribe(CHANNEL);
   }
 
   async onModuleDestroy() {
@@ -44,4 +47,3 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
     await this.publisher.publish(CHANNEL, JSON.stringify(event));
   }
 }
-

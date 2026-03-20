@@ -9,12 +9,11 @@ import { Queue } from "bullmq";
 import { PrismaService } from "../prisma/prisma.service";
 import { StorageService } from "../storage/storage.service";
 import { NotificationsService } from "../notifications/notifications.service";
-import { EnvService } from "../config/env.service";
 import {
-  imageToVideoSchema,
-  textToImageSchema,
   GenerationType,
   TaskStatus,
+  imageToVideoSchema,
+  textToImageSchema,
 } from "@packages/shared";
 import { ZodError } from "zod";
 import { CreateImageDto } from "./dto/create-image.dto";
@@ -25,16 +24,43 @@ import { GENERATION_QUEUE } from "./constants";
 export class GenerationsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly env: EnvService,
     private readonly storageService: StorageService,
     private readonly notificationsService: NotificationsService,
     @InjectQueue(GENERATION_QUEUE) private readonly queue: Queue,
   ) {}
 
-  async createImageTask(userId: string, payload: CreateImageDto) {
+  async createImageTask(
+    userId: string,
+    payload: CreateImageDto,
+    file?: Express.Multer.File,
+  ) {
+    let referenceImage:
+      | {
+          key: string;
+          url: string;
+          sizeBytes: number;
+          mimeType: string;
+        }
+      | undefined;
+
+    if (file) {
+      const uploaded = await this.storageService.uploadBuffer(file.buffer, {
+        prefix: "inputs/images",
+        extension: this.extensionFromMime(file.mimetype),
+        contentType: file.mimetype,
+      });
+      referenceImage = {
+        ...uploaded,
+        mimeType: file.mimetype,
+      };
+    }
+
     let parsed: ReturnType<typeof textToImageSchema.parse>;
     try {
-      parsed = textToImageSchema.parse(payload);
+      parsed = textToImageSchema.parse({
+        ...payload,
+        referenceImageUrl: referenceImage?.url,
+      });
     } catch (error) {
       if (error instanceof ZodError) {
         throw new BadRequestException(error.flatten());
@@ -44,32 +70,60 @@ export class GenerationsService {
 
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { apiKey: true, apiUrl: true, imageModel: true, imageApiType: true },
+      select: { apiKey: true, apiUrl: true, imageModel: true, imageModels: true },
     });
 
     if (!user?.apiKey || !user?.apiUrl) {
-      throw new BadRequestException("API Key 和 API URL 未配置，请在设置中配置。");
+      throw new BadRequestException("API Key 和 API URL 未配置，请先到账号设置中配置。");
     }
 
-    const imageModel = parsed.model || user.imageModel;
+    const availableModels = this.normalizeConfiguredModels(user.imageModels, user.imageModel);
+    if (parsed.model && !availableModels.includes(parsed.model)) {
+      throw new BadRequestException("Selected image model is not enabled for this account");
+    }
+
+    const imageModel = parsed.model || availableModels[0];
     if (!imageModel) {
-      throw new BadRequestException("未配置图片模型，请在设置中配置图片模型。");
+      throw new BadRequestException("No image models are configured for this account");
     }
 
-    const task = await this.prisma.generationTask.create({
-      data: {
-        userId,
-        type: "text_to_image",
-        status: "queued",
-        provider: "gemini",
-        model: imageModel,
-        prompt: parsed.prompt,
-        negativePrompt: parsed.negativePrompt,
-        parameters: parsed,
-      },
+    const task = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.generationTask.create({
+        data: {
+          userId,
+          type: "text_to_image",
+          status: "queued",
+          provider: "gemini",
+          model: imageModel,
+          prompt: parsed.prompt,
+          negativePrompt: parsed.negativePrompt,
+          parameters: parsed,
+        },
+      });
+
+      if (referenceImage) {
+        await tx.generationAsset.create({
+          data: {
+            taskId: created.id,
+            role: "input",
+            mediaType: "image",
+            url: referenceImage.url,
+            storageKey: referenceImage.key,
+            mimeType: referenceImage.mimeType,
+            sizeBytes: referenceImage.sizeBytes,
+          },
+        });
+      }
+
+      return created;
     });
 
-    await this.enqueueTaskOrFail(task.id, user.apiKey, user.apiUrl ?? undefined, user.imageApiType ?? "openai-images");
+    await this.enqueueTaskOrFail(
+      task.id,
+      user.apiKey,
+      user.apiUrl ?? undefined,
+      parsed.imageApiType ?? "gemini-native",
+    );
 
     await this.notificationsService.publish({
       taskId: task.id,
@@ -109,16 +163,21 @@ export class GenerationsService {
 
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { apiKey: true, apiUrl: true, videoModel: true },
+      select: { apiKey: true, apiUrl: true, videoModel: true, videoModels: true },
     });
 
     if (!user?.apiKey || !user?.apiUrl) {
-      throw new BadRequestException("API Key 和 API URL 未配置，请在设置中配置。");
+      throw new BadRequestException("API Key 和 API URL 未配置，请先到账号设置中配置。");
     }
 
-    const videoModel = parsed.model || user.videoModel;
+    const availableModels = this.normalizeConfiguredModels(user.videoModels, user.videoModel);
+    if (parsed.model && !availableModels.includes(parsed.model)) {
+      throw new BadRequestException("Selected video model is not enabled for this account");
+    }
+
+    const videoModel = parsed.model || availableModels[0];
     if (!videoModel) {
-      throw new BadRequestException("未配置视频模型，请在设置中配置视频模型。");
+      throw new BadRequestException("No video models are configured for this account");
     }
 
     const task = await this.prisma.$transaction(async (tx) => {
@@ -247,7 +306,6 @@ export class GenerationsService {
       throw new NotFoundException("Task not found");
     }
 
-    // 进行中的任务先取消再删除
     if (task.status === "queued" || task.status === "running") {
       const job = await this.queue.getJob(taskId);
       if (job) await job.remove();
@@ -308,5 +366,11 @@ export class GenerationsService {
     if (mime.includes("webp")) return "webp";
     if (mime.includes("jpeg") || mime.includes("jpg")) return "jpg";
     return "bin";
+  }
+
+  private normalizeConfiguredModels(models: string[] | null | undefined, fallback?: string | null) {
+    return Array.from(
+      new Set([...(models ?? []), ...(fallback ? [fallback] : [])].map((model) => model.trim()).filter(Boolean)),
+    );
   }
 }

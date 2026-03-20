@@ -1,4 +1,5 @@
-﻿import { IsIn, IsOptional, IsString, MaxLength, MinLength } from "class-validator";
+import { imageApiTypeValues } from "@packages/shared";
+import { IsIn, IsOptional, IsString, MaxLength, MinLength } from "class-validator";
 
 export class CreateImageDto {
   @IsString()
@@ -16,8 +17,8 @@ export class CreateImageDto {
   model?: string;
 
   @IsOptional()
-  @IsIn(["1024x1024", "1024x1536", "1536x1024"])
-  size?: "1024x1024" | "1024x1536" | "1536x1024";
+  @IsIn(["1024x1024", "1024x1536", "1536x1024", "1024x1792"])
+  size?: "1024x1024" | "1024x1536" | "1536x1024" | "1024x1792";
 
   @IsOptional()
   @IsIn(["low", "medium", "high", "auto"])
@@ -30,4 +31,8 @@ export class CreateImageDto {
   @IsOptional()
   @IsIn(["png", "jpeg", "webp"])
   outputFormat?: "png" | "jpeg" | "webp";
+
+  @IsOptional()
+  @IsIn(imageApiTypeValues)
+  imageApiType?: "openai-images" | "gemini-native";
 }

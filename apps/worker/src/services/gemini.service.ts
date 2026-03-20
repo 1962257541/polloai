@@ -31,6 +31,7 @@ export class GeminiService {
     apiKey: string;
     apiUrl?: string;
     imageApiType?: string;
+    referenceImageUrl?: string;
   }) {
     if (this.env.geminiMock) {
       console.log(`[MOCK] generateImage: prompt="${input.prompt.slice(0, 60)}" size=${input.size}`);
@@ -46,7 +47,19 @@ export class GeminiService {
     if (!model) throw new Error("图片模型未配置，请在账号设置中配置图片模型。");
 
     if (input.imageApiType === "gemini-native") {
-      return this.generateImageNative(model, input.prompt, input.outputFormat, input.apiKey, input.apiUrl);
+      return this.generateImageNative(
+        model,
+        input.prompt,
+        input.size,
+        input.outputFormat,
+        input.apiKey,
+        input.apiUrl,
+        input.referenceImageUrl,
+      );
+    }
+
+    if (input.referenceImageUrl) {
+      throw new Error("Reference images are currently only supported in Gemini mode");
     }
 
     // openai-images（默认）
@@ -84,18 +97,36 @@ export class GeminiService {
   private async generateImageNative(
     model: string,
     prompt: string,
+    size: string,
     outputFormat: "png" | "jpeg" | "webp",
     apiKey: string,
     apiUrl?: string,
+    referenceImageUrl?: string,
   ) {
+    const requestParts: JsonRecord[] = [{ text: prompt }];
+
+    if (referenceImageUrl) {
+      const referenceImage = await this.loadImage(referenceImageUrl);
+      requestParts.push({
+        inlineData: {
+          mimeType: referenceImage.mimeType,
+          data: referenceImage.buffer.toString("base64"),
+        },
+      });
+    }
+
+    const aspectRatio = this.imageAspectRatioFromSize(size);
     const path = `/models/${encodeURIComponent(model)}:generateContent`;
     const body = await this.requestJson(
       path,
       {
         method: "POST",
         body: {
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { responseModalities: ["TEXT", "IMAGE"] },
+          contents: [{ parts: requestParts }],
+          generationConfig: {
+            responseModalities: ["TEXT", "IMAGE"],
+            ...(aspectRatio ? { aspectRatio } : {}),
+          },
         },
       },
       apiKey,
@@ -103,20 +134,24 @@ export class GeminiService {
     );
 
     // 从 parts 中找 inlineData
-    const parts: any[] = body?.candidates?.[0]?.content?.parts ?? [];
-    const imagePart = parts.find((p: any) => p.inlineData?.mimeType?.startsWith("image/"));
+    const responseParts: Array<{ inlineData?: InlineImagePart; text?: string }> =
+      body?.candidates?.[0]?.content?.parts ?? [];
+    const imagePart = responseParts.find((part) => part.inlineData?.mimeType?.startsWith("image/"));
     if (!imagePart) {
       throw new Error(`Gemini native response missing image part: ${JSON.stringify(body).slice(0, 500)}`);
     }
 
-    const b64: string = imagePart.inlineData.data;
+    const b64 = imagePart.inlineData?.data;
+    if (!b64) {
+      throw new Error(`Gemini native response missing image data: ${JSON.stringify(body).slice(0, 500)}`);
+    }
     const mimeType =
       outputFormat === "jpeg" ? "image/jpeg" : outputFormat === "webp" ? "image/webp" : "image/png";
 
     return {
       buffer: Buffer.from(b64, "base64"),
       mimeType,
-      revisedPrompt: parts.find((p: any) => p.text)?.text as string | undefined,
+      revisedPrompt: responseParts.find((part) => part.text)?.text,
     };
   }
 
@@ -139,15 +174,18 @@ export class GeminiService {
     const videoModel = input.model;
     if (!videoModel) throw new Error("视频模型未配置，请在账号设置中配置视频模型。");
 
+    const aspectRatio = input.aspectRatio || this.videoAspectRatioFromSize(input.size);
+    const imageUrl = this.isImageProxyUrl(input.imageUrl)
+      ? input.imageUrl
+      : await this.uploadImageToImageProxy(input.imageUrl, input.apiKey);
+
     const base = new URL(input.apiUrl ?? this.env.geminiBaseUrl);
     const url = `${base.protocol}//${base.host}/v1/video/create`;
-
-    const aspectRatio = input.aspectRatio || this.videoAspectRatioFromSize(input.size);
     const reqBody: JsonRecord = {
       model: videoModel,
       prompt: input.prompt,
       aspect_ratio: aspectRatio,
-      images: [input.imageUrl],
+      images: [imageUrl],
     };
 
     const response = await fetch(url, {
@@ -220,6 +258,51 @@ export class GeminiService {
     }
 
     // video_url 是外部 CDN 直链，直接下载，不带 API Key，走代理（视频文件较大，给120秒超时）
+    return this.downloadVideoByUrl(videoUrl);
+  }
+
+  private async uploadImageToImageProxy(imageUrl: string, apiKey: string) {
+    const referenceImage = await this.loadImage(imageUrl);
+    const url = "https://imageproxy.zhongzhuan.chat/api/upload";
+    const fileName = `reference.${this.extensionFromMimeType(referenceImage.mimeType)}`;
+    const multipart = this.buildMultipartFileBody("file", fileName, referenceImage.mimeType, referenceImage.buffer);
+
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": multipart.contentType,
+          "Content-Length": String(multipart.body.byteLength),
+        },
+        body: multipart.body,
+        dispatcher: this.dispatcherFor(url),
+      });
+
+      const text = await response.text();
+      let data: any;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        throw new Error(`Image proxy upload non-JSON response (${response.status}): ${text.slice(0, 500)}`);
+      }
+
+      if (!response.ok) {
+        throw new Error(`Image proxy upload failed (${response.status}): ${JSON.stringify(data).slice(0, 500)}`);
+      }
+
+      const publicUrl = data?.url as string | undefined;
+      if (!publicUrl) {
+        throw new Error(`Image proxy upload response missing url: ${JSON.stringify(data).slice(0, 500)}`);
+      }
+
+      return publicUrl;
+    } catch (error) {
+      throw this.wrapFetchError(error, `POST ${url}`);
+    }
+  }
+
+  private async downloadVideoByUrl(videoUrl: string) {
     try {
       const response = await fetch(videoUrl, {
         method: "GET",
@@ -250,9 +333,16 @@ export class GeminiService {
         throw new Error(`Input image fetch failed (${response.status}): ${text.slice(0, 500)}`);
       }
 
-      const mimeType = this.normalizeMimeType(
-        response.headers.get("content-type") || this.mimeFromPath(url) || "image/png",
-      );
+      const headerMimeType = this.normalizeMimeType(response.headers.get("content-type") || "");
+      const mimeType = headerMimeType.startsWith("image/")
+        ? headerMimeType
+        : this.mimeFromPath(url) || headerMimeType;
+
+      if (!mimeType.startsWith("image/")) {
+        throw new Error(
+          `Input image URL did not return an image. URL must be a direct image link: ${url}`,
+        );
+      }
 
       return {
         buffer: Buffer.from(await response.arrayBuffer()),
@@ -401,9 +491,15 @@ export class GeminiService {
   }
 
   private shouldBypassProxy(url: string) {
+    return this.isLocalOrPrivateUrl(url);
+  }
+
+  private isLocalOrPrivateUrl(url: string) {
     try {
       const hostname = new URL(url).hostname.toLowerCase();
-      if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1") return true;
+      if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1" || hostname.endsWith(".local")) {
+        return true;
+      }
       if (
         /^10\./.test(hostname) ||
         /^192\.168\./.test(hostname) ||
@@ -412,6 +508,15 @@ export class GeminiService {
         return true;
       }
       return false;
+    } catch {
+      return false;
+    }
+  }
+
+  private isImageProxyUrl(url: string) {
+    try {
+      const parsed = new URL(url);
+      return parsed.hostname === "imageproxy.zhongzhuan.chat" && parsed.pathname.startsWith("/api/proxy/image/");
     } catch {
       return false;
     }
@@ -449,6 +554,14 @@ export class GeminiService {
     return "16:9";
   }
 
+  private imageAspectRatioFromSize(size?: string) {
+    if (size === "1024x1024") return "1:1";
+    if (size === "1024x1536") return "3:4";
+    if (size === "1536x1024") return "4:3";
+    if (size === "1024x1792") return "9:16";
+    return undefined;
+  }
+
   private videoResolutionFromSize(size?: string) {
     if (size === "1280x720" || size === "720x1280") return "720p";
     return this.env.geminiVideoResolution;
@@ -462,6 +575,26 @@ export class GeminiService {
 
   private normalizeMimeType(value: string) {
     return value.split(";")[0].trim().toLowerCase();
+  }
+
+  private extensionFromMimeType(value: string) {
+    if (value === "image/jpeg") return "jpg";
+    if (value === "image/webp") return "webp";
+    return "png";
+  }
+
+  private buildMultipartFileBody(fieldName: string, fileName: string, contentType: string, buffer: Buffer) {
+    const boundary = `----CodexBoundary${Date.now().toString(16)}${Math.random().toString(16).slice(2)}`;
+    const head =
+      `--${boundary}\r\n` +
+      `Content-Disposition: form-data; name="${fieldName}"; filename="${fileName}"\r\n` +
+      `Content-Type: ${contentType}\r\n\r\n`;
+    const tail = `\r\n--${boundary}--\r\n`;
+
+    return {
+      contentType: `multipart/form-data; boundary=${boundary}`,
+      body: Buffer.concat([Buffer.from(head, "utf8"), buffer, Buffer.from(tail, "utf8")]),
+    };
   }
 
   private mimeFromPath(value: string) {
