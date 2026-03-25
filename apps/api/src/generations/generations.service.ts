@@ -435,9 +435,29 @@ export class GenerationsService {
       throw new NotFoundException("Task not found");
     }
 
+    // 如果任务正在进行中，先标记为 cancelled，让 Worker 检测到后自行退出
     if (task.status === "queued" || task.status === "running") {
+      await this.prisma.generationTask.update({
+        where: { id: taskId },
+        data: {
+          status: "cancelled",
+          finishedAt: new Date(),
+          errorCode: "TASK_CANCELLED",
+          errorMessage: "Cancelled by user",
+        },
+      });
+
+      // 同时尝试从队列移除（queued 阶段尚未被 Worker 取走时有效）
       const job = await this.queue.getJob(taskId);
       if (job) await job.remove();
+
+      await this.notificationsService.publish({
+        taskId,
+        userId,
+        status: "cancelled",
+        type: task.type as GenerationType,
+        errorMessage: "Cancelled by user",
+      });
     }
 
     await this.prisma.generationTask.delete({ where: { id: taskId } });

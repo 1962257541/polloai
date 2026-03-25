@@ -99,6 +99,10 @@ export default function VideoPage() {
   const handleDelete = async (taskId: string) => {
     const token = getToken();
     if (!token) return;
+    const task = tasks.find((t) => t.id === taskId);
+    if (task && (task.status === "queued" || task.status === "running")) {
+      await api.cancelTask(token, taskId).catch(() => {});
+    }
     await api.deleteTask(token, taskId);
     await loadTasks();
   };
