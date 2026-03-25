@@ -4,6 +4,77 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { getToken } from "../../../lib/auth";
 import { api, Material } from "../../../lib/api";
 
+/** 预览弹层 */
+function PreviewModal({ material, onClose }: { material: Material; onClose: () => void }) {
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 100,
+        background: "rgba(0,0,0,0.85)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 24,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          position: "relative",
+          maxWidth: "90vw",
+          maxHeight: "90vh",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 12,
+        }}
+      >
+        {material.mediaType === "video" ? (
+          <video
+            src={material.url}
+            controls
+            autoPlay
+            style={{ maxWidth: "85vw", maxHeight: "80vh", borderRadius: 8, display: "block" }}
+          />
+        ) : (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={material.url}
+            alt={material.name}
+            style={{ maxWidth: "85vw", maxHeight: "80vh", borderRadius: 8, display: "block", objectFit: "contain" }}
+          />
+        )}
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <span style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.6)" }}>{material.name}</span>
+          <button
+            onClick={onClose}
+            style={{
+              background: "rgba(255,255,255,0.12)",
+              border: "1px solid rgba(255,255,255,0.2)",
+              borderRadius: 6,
+              padding: "4px 14px",
+              color: "#fff",
+              fontSize: "0.8rem",
+              cursor: "pointer",
+            }}
+          >
+            关闭 (Esc)
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 type TabType = "all" | "image" | "video";
 
 const PAGE_SIZE = 20;
@@ -40,6 +111,10 @@ export default function MaterialsPage() {
   // 勾选状态
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [downloading, setDownloading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  // 预览
+  const [preview, setPreview] = useState<Material | null>(null);
 
   const token = getToken() ?? "";
 
@@ -130,17 +205,23 @@ export default function MaterialsPage() {
     e.target.value = "";
   };
 
-  const handleDelete = async (id: string) => {
+  // 批量删除
+  const handleBatchDelete = async () => {
+    const targets = items.filter((m) => selected.has(m.id));
+    if (targets.length === 0) return;
+    if (!window.confirm(`确定删除选中的 ${targets.length} 个素材？此操作不可恢复。`)) return;
+    setDeleting(true);
+    setMessage(null);
     try {
-      await api.deleteMaterial(token, id);
-      setItems((prev) => prev.filter((m) => m.id !== id));
-      setSelected((prev) => {
-        const next = new Set(prev);
-        next.delete(id);
-        return next;
-      });
+      await Promise.all(targets.map((m) => api.deleteMaterial(token, m.id)));
+      const deletedIds = new Set(targets.map((m) => m.id));
+      setItems((prev) => prev.filter((m) => !deletedIds.has(m.id)));
+      setSelected(new Set());
+      setMessage(`已删除 ${targets.length} 个素材`);
     } catch (e: any) {
       setMessage(e.message ?? "删除失败");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -194,6 +275,8 @@ export default function MaterialsPage() {
 
   return (
     <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+      {/* 预览弹层 */}
+      {preview && <PreviewModal material={preview} onClose={() => setPreview(null)} />}
       {/* 页头 */}
       <div
         style={{
@@ -221,27 +304,60 @@ export default function MaterialsPage() {
         </div>
 
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          {/* 批量下载按钮（有勾选时显示） */}
+          {/* 批量操作按钮（有勾选时显示） */}
           {selected.size > 0 && (
-            <button
-              className="btn-primary"
-              onClick={handleBatchDownload}
-              disabled={downloading}
-              style={{ display: "flex", alignItems: "center", gap: 6 }}
-            >
-              {downloading ? (
-                "下载中..."
-              ) : (
-                <>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                    <polyline points="7 10 12 15 17 10" />
-                    <line x1="12" y1="15" x2="12" y2="3" />
-                  </svg>
-                  下载 ({selected.size})
-                </>
-              )}
-            </button>
+            <>
+              <button
+                onClick={handleBatchDownload}
+                disabled={downloading || deleting}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "7px 14px",
+                  borderRadius: 6,
+                  border: "1px solid var(--border)",
+                  background: "transparent",
+                  color: "var(--text-secondary)",
+                  fontSize: "0.82rem",
+                  cursor: downloading ? "not-allowed" : "pointer",
+                  opacity: downloading ? 0.6 : 1,
+                }}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                {downloading ? "下载中..." : `下载 (${selected.size})`}
+              </button>
+
+              <button
+                onClick={handleBatchDelete}
+                disabled={deleting || downloading}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "7px 14px",
+                  borderRadius: 6,
+                  border: "1px solid rgba(239,68,68,0.4)",
+                  background: "transparent",
+                  color: "#ef4444",
+                  fontSize: "0.82rem",
+                  cursor: deleting ? "not-allowed" : "pointer",
+                  opacity: deleting ? 0.6 : 1,
+                }}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="3 6 5 6 21 6" />
+                  <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                  <path d="M10 11v6M14 11v6" />
+                  <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                </svg>
+                {deleting ? "删除中..." : `删除 (${selected.size})`}
+              </button>
+            </>
           )}
 
           <button
@@ -380,7 +496,7 @@ export default function MaterialsPage() {
               material={material}
               selected={selected.has(material.id)}
               onToggleSelect={toggleSelect}
-              onDelete={handleDelete}
+              onPreview={setPreview}
             />
           ))}
         </div>
@@ -451,12 +567,12 @@ function MaterialCard({
   material,
   selected,
   onToggleSelect,
-  onDelete,
+  onPreview,
 }: {
   material: Material;
   selected: boolean;
   onToggleSelect: (id: string) => void;
-  onDelete: (id: string) => void;
+  onPreview: (material: Material) => void;
 }) {
   const [hovered, setHovered] = useState(false);
 
@@ -471,11 +587,14 @@ function MaterialCard({
         border: "1px solid",
         position: "relative",
         transition: "border-color 0.15s",
-        borderColor: selected ? "var(--accent)" : hovered ? "var(--accent)" : "var(--border)",
+        borderColor: selected ? "var(--accent)" : hovered ? "rgba(255,255,255,0.2)" : "var(--border)",
       }}
     >
-      {/* 预览区 */}
-      <div style={{ width: "100%", paddingBottom: "100%", position: "relative", background: "var(--bg-overlay)" }}>
+      {/* 预览区（点击打开预览） */}
+      <div
+        onClick={() => onPreview(material)}
+        style={{ width: "100%", paddingBottom: "100%", position: "relative", background: "var(--bg-overlay)", cursor: "zoom-in" }}
+      >
         {material.mediaType === "video" ? (
           <video
             src={material.url}
@@ -493,35 +612,39 @@ function MaterialCard({
           />
         )}
 
-        {/* 悬浮操作按钮 */}
+        {/* 悬浮预览提示 */}
         {hovered && (
           <div
             style={{
               position: "absolute",
               inset: 0,
-              background: "rgba(0,0,0,0.5)",
+              background: "rgba(0,0,0,0.35)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              gap: 8,
             }}
           >
-            <button
-              onClick={() => onDelete(material.id)}
-              title="删除"
+            <div
               style={{
-                background: "var(--error)",
+                background: "rgba(0,0,0,0.6)",
+                border: "1px solid rgba(255,255,255,0.2)",
+                borderRadius: 6,
+                padding: "5px 12px",
                 color: "#fff",
-                border: "none",
-                borderRadius: 5,
-                padding: "5px 10px",
-                cursor: "pointer",
                 fontSize: "0.75rem",
-                fontWeight: 600,
+                display: "flex",
+                alignItems: "center",
+                gap: 5,
               }}
             >
-              删除
-            </button>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                <line x1="11" y1="8" x2="11" y2="14" />
+                <line x1="8" y1="11" x2="14" y2="11" />
+              </svg>
+              预览
+            </div>
           </div>
         )}
 
@@ -543,13 +666,9 @@ function MaterialCard({
           {material.source === "generated" ? "AI生成" : "上传"}
         </div>
 
-        {/* 勾选框（右上角） */}
+        {/* 勾选框（右上角，阻止冒泡避免触发预览） */}
         <div
-          style={{
-            position: "absolute",
-            top: 6,
-            right: 6,
-          }}
+          style={{ position: "absolute", top: 6, right: 6 }}
           onClick={(e) => {
             e.stopPropagation();
             onToggleSelect(material.id);
