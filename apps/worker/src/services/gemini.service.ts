@@ -189,9 +189,22 @@ export class GeminiService {
     if (!videoModel) throw new Error("视频模型未配置，请在账号设置中配置视频模型。");
 
     const aspectRatio = input.aspectRatio || this.videoAspectRatioFromSize(input.size);
+
+    // 诊断日志：记录原始 imageUrl 和 isImageProxyUrl 判断结果
+    console.log(`[createVideoFromImage] Original imageUrl: ${input.imageUrl}`);
+    console.log(`[createVideoFromImage] isImageProxyUrl check: ${this.isImageProxyUrl(input.imageUrl)}`);
+
     const imageUrl = this.isImageProxyUrl(input.imageUrl)
       ? input.imageUrl
-      : await this.uploadImageToImageProxy(input.imageUrl, input.apiKey);
+      : await this.withRetry(
+          () => this.uploadImageToImageProxy(input.imageUrl, input.apiKey),
+          3,
+          1000,
+          "uploadImageToImageProxy",
+        );
+
+    // 诊断日志：记录最终使用的 imageUrl
+    console.log(`[createVideoFromImage] Final imageUrl for API: ${imageUrl}`);
 
     const base = new URL(input.apiUrl ?? this.env.geminiBaseUrl);
     const url = `${base.protocol}//${base.host}/v1/video/create`;
@@ -203,6 +216,9 @@ export class GeminiService {
       images: [imageUrl],
       ...(durationSeconds !== undefined ? { duration_seconds: durationSeconds } : {}),
     };
+
+    // 诊断日志：记录完整请求体
+    console.log(`[createVideoFromImage] Request body: ${JSON.stringify(reqBody)}`);
 
     const response = await fetch(url, {
       method: "POST",
@@ -278,7 +294,11 @@ export class GeminiService {
   }
 
   private async uploadImageToImageProxy(imageUrl: string, apiKey: string) {
+    console.log(`[uploadImageToImageProxy] Starting upload for: ${imageUrl}`);
+
     const referenceImage = await this.loadImage(imageUrl);
+    console.log(`[uploadImageToImageProxy] Loaded image: ${referenceImage.mimeType}, ${referenceImage.buffer.byteLength} bytes`);
+
     const url = "https://imageproxy.zhongzhuan.chat/api/upload";
     const fileName = `reference.${this.extensionFromMimeType(referenceImage.mimeType)}`;
     const multipart = this.buildMultipartFileBody("file", fileName, referenceImage.mimeType, referenceImage.buffer);
@@ -296,6 +316,8 @@ export class GeminiService {
       });
 
       const text = await response.text();
+      console.log(`[uploadImageToImageProxy] Response status: ${response.status}, body: ${text.slice(0, 500)}`);
+
       let data: any;
       try {
         data = JSON.parse(text);
@@ -312,6 +334,7 @@ export class GeminiService {
         throw new Error(`Image proxy upload response missing url: ${JSON.stringify(data).slice(0, 500)}`);
       }
 
+      console.log(`[uploadImageToImageProxy] Proxy URL returned: ${publicUrl}`);
       return publicUrl;
     } catch (error) {
       throw this.wrapFetchError(error, `POST ${url}`);
@@ -532,7 +555,8 @@ export class GeminiService {
   private isImageProxyUrl(url: string) {
     try {
       const parsed = new URL(url);
-      return parsed.hostname === "imageproxy.zhongzhuan.chat" && parsed.pathname.startsWith("/api/proxy/image/");
+      // 只检查 hostname，不限制具体路径（上传返回的 URL 可能是 /api/files/xxx 等不同路径）
+      return parsed.hostname === "imageproxy.zhongzhuan.chat";
     } catch {
       return false;
     }
@@ -647,5 +671,28 @@ export class GeminiService {
       0x6d, 0x64, 0x61, 0x74,
     ]);
     return Buffer.concat([ftyp, mdat]);
+  }
+
+  // ── Retry helper ───────────────────────────────────────────────────────────
+
+  private async withRetry<T>(
+    fn: () => Promise<T>,
+    maxAttempts: number,
+    delayMs: number,
+    label: string,
+  ): Promise<T> {
+    let lastError: Error | undefined;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        return await fn();
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        console.warn(`[${label}] Attempt ${attempt}/${maxAttempts} failed: ${lastError.message}`);
+        if (attempt < maxAttempts) {
+          await new Promise((resolve) => setTimeout(resolve, delayMs * attempt));
+        }
+      }
+    }
+    throw lastError;
   }
 }
