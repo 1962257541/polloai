@@ -195,7 +195,7 @@ export default function TaskCard({
         </p>
 
         <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
-          {output && (
+          {output ? (
             <a
               href={output.url}
               download
@@ -220,6 +220,29 @@ export default function TaskCard({
             >
               下载
             </a>
+          ) : (
+            <span
+              title="暂无可下载内容"
+              onClick={(event) => event.stopPropagation()}
+              style={{
+                flex: 1,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 4,
+                padding: "5px 0",
+                borderRadius: 4,
+                border: "1px solid var(--border)",
+                background: "transparent",
+                color: "var(--text-muted)",
+                fontSize: "0.72rem",
+                opacity: 0.4,
+                cursor: "not-allowed",
+                userSelect: "none",
+              }}
+            >
+              下载
+            </span>
           )}
 
           {onDelete && (
@@ -314,8 +337,28 @@ export default function TaskCard({
             background: "var(--bg-raised)",
             padding: "0 20px",
             textAlign: "center",
+            position: "relative",
           }}
         >
+          <span
+            title="暂无可下载内容"
+            style={{
+              position: "absolute",
+              bottom: 12,
+              right: 12,
+              background: "rgba(0,0,0,0.4)",
+              border: "1px solid var(--border)",
+              borderRadius: 6,
+              padding: "6px 12px",
+              color: "var(--text-muted)",
+              fontSize: "0.8rem",
+              opacity: 0.4,
+              cursor: "not-allowed",
+              userSelect: "none",
+            }}
+          >
+            下载
+          </span>
           {isPending ? (
             <>
               <div style={{ width: "60%" }}>
