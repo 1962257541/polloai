@@ -6,53 +6,50 @@ import { api, Material } from "../../../lib/api";
 
 type TabType = "all" | "image" | "video";
 
+const PAGE_SIZE = 20;
+
 function formatFileSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
+/** 通过 fetch + blob 下载单个文件到本地 */
+async function downloadFile(url: string, filename: string) {
+  const res = await fetch(url);
+  const blob = await res.blob();
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
 
 export default function MaterialsPage() {
   const [tab, setTab] = useState<TabType>("all");
   const [items, setItems] = useState<Material[]>([]);
+  // cursor 历史栈：第 i 页的起始 cursor（第 0 页为 undefined）
+  const [cursorStack, setCursorStack] = useState<(string | undefined)[]>([undefined]);
+  const [currentPage, setCurrentPage] = useState(0); // 0-indexed
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const sentinelRef = useRef<HTMLDivElement>(null);
-  const observerRef = useRef<IntersectionObserver | null>(null);
+
+  // 勾选状态
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [downloading, setDownloading] = useState(false);
 
   const token = getToken() ?? "";
 
-  const loadMore = useCallback(
-    async (cursor?: string, reset?: boolean) => {
-      if (loading) return;
+  const fetchPage = useCallback(
+    async (cursor: string | undefined) => {
       setLoading(true);
+      setSelected(new Set());
       try {
         const mediaType = tab === "all" ? undefined : tab;
-        const result = await api.listMaterials(token, { mediaType, cursor, limit: 20 });
-        setItems((prev) => (reset ? result.items : [...prev, ...result.items]));
-        setNextCursor(result.nextCursor);
-      } catch (e: any) {
-        setMessage(e.message ?? "加载失败");
-      } finally {
-        setLoading(false);
-      }
-    },
-    [tab, token, loading],
-  );
-
-  // 切换 tab 时重新加载
-  useEffect(() => {
-    setItems([]);
-    setNextCursor(null);
-    void (async () => {
-      setLoading(true);
-      try {
-        const mediaType = tab === "all" ? undefined : tab;
-        const result = await api.listMaterials(token, { mediaType, limit: 20 });
+        const result = await api.listMaterials(token, { mediaType, cursor, limit: PAGE_SIZE });
         setItems(result.items);
         setNextCursor(result.nextCursor);
       } catch (e: any) {
@@ -60,23 +57,38 @@ export default function MaterialsPage() {
       } finally {
         setLoading(false);
       }
-    })();
+    },
+    [tab, token],
+  );
+
+  // 切换 tab 时重置到第 0 页
+  useEffect(() => {
+    setCursorStack([undefined]);
+    setCurrentPage(0);
+    setNextCursor(null);
+    void fetchPage(undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, token]);
 
-  // 无限滚动
-  useEffect(() => {
-    if (observerRef.current) observerRef.current.disconnect();
-    observerRef.current = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting && nextCursor && !loading) {
-          void loadMore(nextCursor);
-        }
-      },
-      { threshold: 0.1 },
-    );
-    if (sentinelRef.current) observerRef.current.observe(sentinelRef.current);
-    return () => observerRef.current?.disconnect();
-  }, [nextCursor, loading, loadMore]);
+  const goNextPage = async () => {
+    if (!nextCursor) return;
+    const newPage = currentPage + 1;
+    const newStack = [...cursorStack];
+    // 如果是新页（没有缓存的 cursor），推入栈
+    if (newStack.length <= newPage) {
+      newStack.push(nextCursor);
+      setCursorStack(newStack);
+    }
+    setCurrentPage(newPage);
+    await fetchPage(nextCursor);
+  };
+
+  const goPrevPage = async () => {
+    if (currentPage === 0) return;
+    const newPage = currentPage - 1;
+    setCurrentPage(newPage);
+    await fetchPage(cursorStack[newPage]);
+  };
 
   // 全局粘贴上传
   useEffect(() => {
@@ -90,6 +102,7 @@ export default function MaterialsPage() {
     };
     window.addEventListener("paste", handler);
     return () => window.removeEventListener("paste", handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
   const handleUploadFile = async (file: File) => {
@@ -109,7 +122,6 @@ export default function MaterialsPage() {
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
     if (files.length === 0) return;
-    // 串行上传
     (async () => {
       for (const file of files) {
         await handleUploadFile(file);
@@ -122,8 +134,52 @@ export default function MaterialsPage() {
     try {
       await api.deleteMaterial(token, id);
       setItems((prev) => prev.filter((m) => m.id !== id));
+      setSelected((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
     } catch (e: any) {
       setMessage(e.message ?? "删除失败");
+    }
+  };
+
+  // 勾选操作
+  const toggleSelect = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selected.size === items.length) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(items.map((m) => m.id)));
+    }
+  };
+
+  // 批量下载
+  const handleBatchDownload = async () => {
+    const targets = items.filter((m) => selected.has(m.id));
+    if (targets.length === 0) return;
+    setDownloading(true);
+    setMessage(null);
+    try {
+      // 串行下载，避免同时打开大量弹窗
+      for (const m of targets) {
+        await downloadFile(m.url, m.name);
+        // 短暂间隔，防止浏览器拦截
+        await new Promise((r) => setTimeout(r, 300));
+      }
+      setMessage(`已下载 ${targets.length} 个文件`);
+    } catch (e: any) {
+      setMessage(e.message ?? "下载失败");
+    } finally {
+      setDownloading(false);
     }
   };
 
@@ -132,6 +188,9 @@ export default function MaterialsPage() {
     { key: "image", label: "图片" },
     { key: "video", label: "视频" },
   ];
+
+  const allSelected = items.length > 0 && selected.size === items.length;
+  const partialSelected = selected.size > 0 && selected.size < items.length;
 
   return (
     <div style={{ maxWidth: 1100, margin: "0 auto" }}>
@@ -161,24 +220,50 @@ export default function MaterialsPage() {
           </p>
         </div>
 
-        <button
-          className="btn-primary"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={uploading}
-          style={{ display: "flex", alignItems: "center", gap: 6 }}
-        >
-          {uploading ? (
-            "上传中..."
-          ) : (
-            <>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                <line x1="12" y1="5" x2="12" y2="19" />
-                <line x1="5" y1="12" x2="19" y2="12" />
-              </svg>
-              上传素材
-            </>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          {/* 批量下载按钮（有勾选时显示） */}
+          {selected.size > 0 && (
+            <button
+              className="btn-primary"
+              onClick={handleBatchDownload}
+              disabled={downloading}
+              style={{ display: "flex", alignItems: "center", gap: 6 }}
+            >
+              {downloading ? (
+                "下载中..."
+              ) : (
+                <>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                  下载 ({selected.size})
+                </>
+              )}
+            </button>
           )}
-        </button>
+
+          <button
+            className="btn-primary"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+            style={{ display: "flex", alignItems: "center", gap: 6 }}
+          >
+            {uploading ? (
+              "上传中..."
+            ) : (
+              <>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19" />
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+                上传素材
+              </>
+            )}
+          </button>
+        </div>
+
         <input
           ref={fileInputRef}
           type="file"
@@ -230,15 +315,37 @@ export default function MaterialsPage() {
         </div>
       )}
 
-      {/* 提示：可粘贴上传 */}
+      {/* 工具栏：全选 + 提示 */}
       <div
         style={{
-          fontSize: "0.75rem",
-          color: "var(--text-muted)",
-          marginBottom: 16,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: 12,
         }}
       >
-        支持 Ctrl+V 粘贴图片直接上传
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {items.length > 0 && (
+            <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", userSelect: "none" }}>
+              <input
+                type="checkbox"
+                checked={allSelected}
+                ref={(el) => {
+                  if (el) el.indeterminate = partialSelected;
+                }}
+                onChange={toggleSelectAll}
+                style={{ width: 15, height: 15, accentColor: "var(--accent)", cursor: "pointer" }}
+              />
+              <span style={{ fontSize: "0.8rem", color: "var(--text-secondary)" }}>
+                {allSelected ? "取消全选" : "全选本页"}
+                {selected.size > 0 && `（已选 ${selected.size}）`}
+              </span>
+            </label>
+          )}
+        </div>
+        <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
+          支持 Ctrl+V 粘贴图片直接上传
+        </span>
       </div>
 
       {/* 素材网格 */}
@@ -271,18 +378,69 @@ export default function MaterialsPage() {
             <MaterialCard
               key={material.id}
               material={material}
+              selected={selected.has(material.id)}
+              onToggleSelect={toggleSelect}
               onDelete={handleDelete}
             />
           ))}
         </div>
       )}
 
-      {/* 哨兵 div（无限滚动触发点） */}
-      <div ref={sentinelRef} style={{ height: 1 }} />
-
       {loading && (
         <div style={{ textAlign: "center", padding: "20px 0", color: "var(--text-muted)", fontSize: "0.8rem" }}>
           加载中...
+        </div>
+      )}
+
+      {/* 分页控件 */}
+      {!loading && items.length > 0 && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 12,
+            marginTop: 28,
+            paddingBottom: 16,
+          }}
+        >
+          <button
+            onClick={goPrevPage}
+            disabled={currentPage === 0}
+            style={{
+              padding: "6px 18px",
+              borderRadius: 6,
+              border: "1px solid var(--border)",
+              background: "transparent",
+              color: currentPage === 0 ? "var(--text-muted)" : "var(--text-secondary)",
+              cursor: currentPage === 0 ? "not-allowed" : "pointer",
+              fontSize: "0.875rem",
+              transition: "all 0.15s",
+            }}
+          >
+            ← 上一页
+          </button>
+
+          <span style={{ fontSize: "0.8rem", color: "var(--text-muted)", minWidth: 60, textAlign: "center" }}>
+            第 {currentPage + 1} 页
+          </span>
+
+          <button
+            onClick={goNextPage}
+            disabled={!nextCursor}
+            style={{
+              padding: "6px 18px",
+              borderRadius: 6,
+              border: "1px solid var(--border)",
+              background: "transparent",
+              color: !nextCursor ? "var(--text-muted)" : "var(--text-secondary)",
+              cursor: !nextCursor ? "not-allowed" : "pointer",
+              fontSize: "0.875rem",
+              transition: "all 0.15s",
+            }}
+          >
+            下一页 →
+          </button>
         </div>
       )}
     </div>
@@ -291,9 +449,13 @@ export default function MaterialsPage() {
 
 function MaterialCard({
   material,
+  selected,
+  onToggleSelect,
   onDelete,
 }: {
   material: Material;
+  selected: boolean;
+  onToggleSelect: (id: string) => void;
   onDelete: (id: string) => void;
 }) {
   const [hovered, setHovered] = useState(false);
@@ -306,10 +468,10 @@ function MaterialCard({
         borderRadius: 8,
         overflow: "hidden",
         background: "var(--bg-raised)",
-        border: "1px solid var(--border)",
+        border: "1px solid",
         position: "relative",
         transition: "border-color 0.15s",
-        borderColor: hovered ? "var(--accent)" : "var(--border)",
+        borderColor: selected ? "var(--accent)" : hovered ? "var(--accent)" : "var(--border)",
       }}
     >
       {/* 预览区 */}
@@ -379,6 +541,40 @@ function MaterialCard({
           }}
         >
           {material.source === "generated" ? "AI生成" : "上传"}
+        </div>
+
+        {/* 勾选框（右上角） */}
+        <div
+          style={{
+            position: "absolute",
+            top: 6,
+            right: 6,
+          }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleSelect(material.id);
+          }}
+        >
+          <div
+            style={{
+              width: 18,
+              height: 18,
+              borderRadius: 4,
+              border: `2px solid ${selected ? "var(--accent)" : "rgba(255,255,255,0.7)"}`,
+              background: selected ? "var(--accent)" : "rgba(0,0,0,0.3)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              transition: "all 0.12s",
+            }}
+          >
+            {selected && (
+              <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+                <polyline points="2,6 5,9 10,3" stroke="#000" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            )}
+          </div>
         </div>
       </div>
 
