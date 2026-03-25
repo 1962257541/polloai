@@ -28,7 +28,7 @@ export class CreateVideoFromImageDto {
 
   @IsOptional()
   @Transform(({ value }) => (value === "" ? undefined : value))
-  @IsUrl()
+  @IsUrl({ require_tld: false })
   imageUrl?: string;
 
   @IsOptional()

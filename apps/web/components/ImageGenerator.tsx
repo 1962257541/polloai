@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, ImageApiType } from "../lib/api";
 import { getToken } from "../lib/auth";
 
@@ -20,9 +20,17 @@ const FORMAT_OPTIONS = [
 interface ImageGeneratorProps {
   onCreated: () => void;
   generating?: boolean;
+  /** 预填的参考图 URL（上下文模式下传入上轮输出图片） */
+  contextImageUrl?: string;
+  onContextImageUrlConsumed?: () => void;
 }
 
-export default function ImageGenerator({ onCreated, generating = false }: ImageGeneratorProps) {
+export default function ImageGenerator({
+  onCreated,
+  generating = false,
+  contextImageUrl,
+  onContextImageUrlConsumed,
+}: ImageGeneratorProps) {
   const [prompt, setPrompt] = useState("");
   const [size, setSize] = useState("1024x1024");
   const [format, setFormat] = useState("png");
@@ -30,10 +38,39 @@ export default function ImageGenerator({ onCreated, generating = false }: ImageG
   const [availableModels, setAvailableModels] = useState<string[]>([]);
   const [selectedModel, setSelectedModel] = useState("");
   const [configLoading, setConfigLoading] = useState(true);
-  const [file, setFile] = useState<File | undefined>();
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
+  const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // 同步预览 URL
+  useEffect(() => {
+    const urls = files.map((f) => URL.createObjectURL(f));
+    setPreviewUrls(urls);
+    return () => {
+      urls.forEach((u) => URL.revokeObjectURL(u));
+    };
+  }, [files]);
+
+  // Ctrl+V 粘贴图片追加到参考图列表
+  useEffect(() => {
+    const handler = (e: ClipboardEvent) => {
+      const items = Array.from(e.clipboardData?.items ?? []).filter((i) =>
+        i.type.startsWith("image/"),
+      );
+      if (items.length === 0) return;
+      const pasted = items
+        .map((i) => i.getAsFile())
+        .filter((f): f is File => Boolean(f));
+      if (pasted.length > 0) {
+        setFiles((prev) => [...prev, ...pasted].slice(0, 9));
+        setError("");
+      }
+    };
+    window.addEventListener("paste", handler);
+    return () => window.removeEventListener("paste", handler);
+  }, []);
 
   useEffect(() => {
     const token = getToken();
@@ -55,40 +92,27 @@ export default function ImageGenerator({ onCreated, generating = false }: ImageG
         if (!active) return;
         setError((e as Error).message);
       } finally {
-        if (active) {
-          setConfigLoading(false);
-        }
+        if (active) setConfigLoading(false);
       }
     })();
 
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
   }, []);
 
-  useEffect(() => {
-    if (!file) {
-      setPreviewUrl(null);
-      return;
+  const addFiles = (newFiles: File[]) => {
+    const valid = newFiles.filter((f) =>
+      ["image/png", "image/jpeg", "image/webp"].includes(f.type),
+    );
+    if (valid.length < newFiles.length) {
+      setError("仅支持 PNG、JPEG 或 WebP 参考图。");
+    } else {
+      setError("");
     }
+    setFiles((prev) => [...prev, ...valid].slice(0, 9));
+  };
 
-    const nextPreviewUrl = URL.createObjectURL(file);
-    setPreviewUrl(nextPreviewUrl);
-
-    return () => {
-      URL.revokeObjectURL(nextPreviewUrl);
-    };
-  }, [file]);
-
-  const handleFileChange = (nextFile?: File) => {
-    if (!nextFile) return;
-    if (!["image/png", "image/jpeg", "image/webp"].includes(nextFile.type)) {
-      setError("请上传 PNG、JPEG 或 WebP 参考图。");
-      return;
-    }
-
-    setFile(nextFile);
-    setError("");
+  const removeFile = (index: number) => {
+    setFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -103,7 +127,7 @@ export default function ImageGenerator({ onCreated, generating = false }: ImageG
       return;
     }
 
-    if (file && imageApiType !== "gemini-native") {
+    if (files.length > 0 && imageApiType !== "gemini-native") {
       setError("参考图当前仅支持 Gemini 模式，请切换图片接口类型。");
       return;
     }
@@ -120,9 +144,10 @@ export default function ImageGenerator({ onCreated, generating = false }: ImageG
           outputFormat: format,
           imageApiType,
         },
-        file,
+        files.length > 0 ? files : undefined,
       );
       onCreated();
+      onContextImageUrlConsumed?.();
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -155,6 +180,7 @@ export default function ImageGenerator({ onCreated, generating = false }: ImageG
         文字生图
       </h2>
 
+      {/* Prompt */}
       <div>
         <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "JetBrains Mono, monospace", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
           PROMPT
@@ -169,6 +195,7 @@ export default function ImageGenerator({ onCreated, generating = false }: ImageG
         />
       </div>
 
+      {/* Model */}
       <div>
         <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "JetBrains Mono, monospace", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
           MODEL
@@ -183,14 +210,13 @@ export default function ImageGenerator({ onCreated, generating = false }: ImageG
             <option value="">{configLoading ? "加载模型中..." : "未配置可用模型"}</option>
           ) : (
             availableModels.map((model) => (
-              <option key={model} value={model}>
-                {model}
-              </option>
+              <option key={model} value={model}>{model}</option>
             ))
           )}
         </select>
       </div>
 
+      {/* Image API Type */}
       <div>
         <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "JetBrains Mono, monospace", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
           IMAGE API TYPE
@@ -204,61 +230,128 @@ export default function ImageGenerator({ onCreated, generating = false }: ImageG
         </p>
       </div>
 
+      {/* Reference Images */}
       <div>
-        <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "JetBrains Mono, monospace", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
-          REFERENCE IMAGE
-        </label>
-        <label
-          style={{
-            display: "block",
-            width: "100%",
-            border: "1px dashed var(--border)",
-            borderRadius: 8,
-            padding: "14px 12px",
-            textAlign: "center",
-            cursor: "pointer",
-            position: "relative",
-            background: "transparent",
-          }}
-        >
-          <input
-            type="file"
-            accept="image/png,image/jpeg,image/webp"
-            onChange={(e) => handleFileChange(e.target.files?.[0])}
-            style={{
-              position: "absolute",
-              inset: 0,
-              width: "100%",
-              height: "100%",
-              opacity: 0,
-              cursor: "pointer",
-            }}
-          />
-          <span style={{ fontSize: "0.82rem", color: "var(--text-muted)" }}>
-            {file ? file.name : "点击上传参考图（可选）"}
-          </span>
-        </label>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+          <label style={{ fontSize: "0.7rem", fontFamily: "JetBrains Mono, monospace", color: "var(--text-muted)", letterSpacing: "0.08em" }}>
+            REFERENCE IMAGES {files.length > 0 ? `(${files.length}/9)` : ""}
+          </label>
+          {files.length > 0 && (
+            <button
+              type="button"
+              className="btn-ghost"
+              onClick={() => setFiles([])}
+              style={{ fontSize: "0.72rem", padding: "3px 8px" }}
+            >
+              清空全部
+            </button>
+          )}
+        </div>
 
-        {previewUrl && (
+        {/* 已选图片列表 */}
+        {files.length > 0 && (
           <div
             style={{
-              marginTop: 10,
-              border: "1px solid var(--border)",
-              borderRadius: 10,
-              overflow: "hidden",
-              background: "var(--bg-raised)",
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(80px, 1fr))",
+              gap: 8,
+              marginBottom: 10,
             }}
           >
-            <img src={previewUrl} alt="Reference preview" style={{ width: "100%", display: "block", maxHeight: 220, objectFit: "cover" }} />
-            <div style={{ padding: 10, display: "flex", justifyContent: "flex-end" }}>
-              <button type="button" className="btn-ghost" onClick={() => setFile(undefined)}>
-                移除参考图
-              </button>
-            </div>
+            {files.map((f, i) => (
+              <div
+                key={i}
+                style={{
+                  position: "relative",
+                  borderRadius: 6,
+                  overflow: "hidden",
+                  border: "1px solid var(--border)",
+                  background: "var(--bg-raised)",
+                  paddingBottom: "100%",
+                }}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={previewUrls[i]}
+                  alt={f.name}
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => removeFile(i)}
+                  style={{
+                    position: "absolute",
+                    top: 3,
+                    right: 3,
+                    width: 18,
+                    height: 18,
+                    borderRadius: "50%",
+                    background: "rgba(0,0,0,0.6)",
+                    color: "#fff",
+                    border: "none",
+                    cursor: "pointer",
+                    fontSize: "0.65rem",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    lineHeight: 1,
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* 上传区域 */}
+        {files.length < 9 && (
+          <label
+            style={{
+              display: "block",
+              width: "100%",
+              border: "1px dashed var(--border)",
+              borderRadius: 8,
+              padding: "14px 12px",
+              textAlign: "center",
+              cursor: "pointer",
+              position: "relative",
+              background: "transparent",
+            }}
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              multiple
+              onChange={(e) => {
+                const selected = Array.from(e.target.files ?? []);
+                if (selected.length > 0) addFiles(selected);
+                e.target.value = "";
+              }}
+              style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: 0, cursor: "pointer" }}
+            />
+            <span style={{ fontSize: "0.82rem", color: "var(--text-muted)" }}>
+              点击上传或 Ctrl+V 粘贴参考图（可选，最多 9 张）
+            </span>
+          </label>
+        )}
+
+        {/* 上下文提示 */}
+        {contextImageUrl && (
+          <div style={{ marginTop: 8, fontSize: "0.75rem", color: "var(--accent)", display: "flex", alignItems: "center", gap: 6 }}>
+            <span>已自动引用上轮图片作为参考</span>
           </div>
         )}
       </div>
 
+      {/* Size */}
       <div>
         <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "JetBrains Mono, monospace", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
           SIZE
@@ -287,6 +380,7 @@ export default function ImageGenerator({ onCreated, generating = false }: ImageG
         </div>
       </div>
 
+      {/* Format */}
       <div>
         <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "JetBrains Mono, monospace", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
           FORMAT
@@ -321,7 +415,12 @@ export default function ImageGenerator({ onCreated, generating = false }: ImageG
         </div>
       )}
 
-      <button className="btn-primary" type="submit" disabled={loading || generating || !prompt.trim() || !selectedModel} style={{ width: "100%" }}>
+      <button
+        className="btn-primary"
+        type="submit"
+        disabled={loading || generating || !prompt.trim() || !selectedModel}
+        style={{ width: "100%" }}
+      >
         {loading ? "提交中..." : generating ? "生成中..." : "生成图片"}
       </button>
     </form>

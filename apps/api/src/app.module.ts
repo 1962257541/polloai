@@ -8,6 +8,7 @@ import { AdminModule } from "./admin/admin.module";
 import { GenerationsModule } from "./generations/generations.module";
 import { NotificationsModule } from "./notifications/notifications.module";
 import { StorageModule } from "./storage/storage.module";
+import { MaterialsModule } from "./materials/materials.module";
 import { APP_INTERCEPTOR } from "@nestjs/core";
 import { AuditInterceptor } from "./audit/audit.interceptor";
 import { AuditModule } from "./audit/audit.module";
@@ -28,6 +29,7 @@ import { AuditModule } from "./audit/audit.module";
     NotificationsModule,
     StorageModule,
     GenerationsModule,
+    MaterialsModule,
     AuditModule,
   ],
   providers: [

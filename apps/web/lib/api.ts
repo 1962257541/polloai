@@ -40,6 +40,35 @@ export type MyInfo = {
   videoModels?: string[];
 };
 
+export type Material = {
+  id: string;
+  userId: string;
+  name: string;
+  url: string;
+  storageKey: string;
+  mimeType: string;
+  sizeBytes: number;
+  mediaType: "image" | "video";
+  source: "uploaded" | "generated";
+  taskId?: string | null;
+  expiresAt?: string | null;
+  createdAt: string;
+};
+
+export type MaterialListResult = {
+  items: Material[];
+  nextCursor: string | null;
+};
+
+export type SessionSummary = {
+  sessionId: string;
+  title: string;
+  taskCount: number;
+  latestCreatedAt: string;
+  outputUrl: string | null;
+  isLegacy?: boolean;
+};
+
 async function request(path: string, init: RequestInit = {}, token?: string) {
   const response = await fetch(`${API_BASE}${path}`, {
     ...init,
@@ -78,8 +107,9 @@ export const api = {
       quality?: string;
       outputFormat?: string;
       imageApiType?: ImageApiType;
+      sessionId?: string;
     },
-    file?: File,
+    files?: File[],
   ) => {
     const form = new FormData();
     form.append("prompt", payload.prompt);
@@ -88,7 +118,10 @@ export const api = {
     if (payload.quality) form.append("quality", payload.quality);
     if (payload.outputFormat) form.append("outputFormat", payload.outputFormat);
     if (payload.imageApiType) form.append("imageApiType", payload.imageApiType);
-    if (file) form.append("referenceImage", file);
+    if (payload.sessionId) form.append("sessionId", payload.sessionId);
+    if (files && files.length > 0) {
+      for (const f of files) form.append("referenceImages", f);
+    }
 
     const response = await fetch(`${API_BASE}/generations/image`, {
       method: "POST",
@@ -141,8 +174,26 @@ export const api = {
     return data;
   },
 
-  listTasks: (token: string, type?: string) =>
-    request(`/generations?limit=50${type ? `&type=${type}` : ""}`, {}, token),
+  listTasks: (token: string, type?: string, limit = 20, offset = 0, sessionId?: string) =>
+    request(
+      `/generations?limit=${limit}&offset=${offset}${type ? `&type=${type}` : ""}${sessionId ? `&sessionId=${encodeURIComponent(sessionId)}` : ""}`,
+      {},
+      token,
+    ),
+
+  listSessions: (token: string, type?: string, limit = 20, offset = 0) =>
+    request(
+      `/generations/sessions?limit=${limit}&offset=${offset}${type ? `&type=${type}` : ""}`,
+      {},
+      token,
+    ) as Promise<{ items: SessionSummary[] }>,
+
+  renameSession: (token: string, sessionId: string, title: string) =>
+    request(
+      `/generations/sessions/${encodeURIComponent(sessionId)}/title`,
+      { method: "PATCH", body: JSON.stringify({ title }) },
+      token,
+    ),
 
   getTask: (token: string, taskId: string) =>
     request(`/generations/${taskId}`, {}, token),
@@ -199,4 +250,41 @@ export const api = {
 
   getMyInfo: (token: string) =>
     request("/admin/me", {}, token) as Promise<MyInfo>,
+
+  // Materials API
+  listMaterials: (
+    token: string,
+    opts: { mediaType?: string; source?: string; cursor?: string; limit?: number } = {},
+  ) => {
+    const params = new URLSearchParams();
+    if (opts.mediaType) params.set("mediaType", opts.mediaType);
+    if (opts.source) params.set("source", opts.source);
+    if (opts.cursor) params.set("cursor", opts.cursor);
+    if (opts.limit) params.set("limit", String(opts.limit));
+    const qs = params.toString();
+    return request(`/materials${qs ? `?${qs}` : ""}`, {}, token) as Promise<MaterialListResult>;
+  },
+
+  uploadMaterial: async (token: string, file: File): Promise<Material> => {
+    const form = new FormData();
+    form.append("file", file);
+    const response = await fetch(`${API_BASE}/materials/upload`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
+    });
+    const text = await response.text();
+    const data = text ? JSON.parse(text) : null;
+    if (!response.ok) {
+      const msg = Array.isArray(data?.message) ? data.message.join("; ") : data?.message;
+      throw new Error(msg || `Request failed (${response.status})`);
+    }
+    return data as Material;
+  },
+
+  archiveMaterial: (token: string, id: string) =>
+    request(`/materials/${id}/archive`, { method: "POST" }, token) as Promise<Material>,
+
+  deleteMaterial: (token: string, id: string) =>
+    request(`/materials/${id}`, { method: "DELETE" }, token),
 };

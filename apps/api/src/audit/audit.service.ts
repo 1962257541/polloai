@@ -13,15 +13,19 @@ export class AuditService {
     requestId: string;
     details?: unknown;
   }) {
-    await this.prisma.apiAuditLog.create({
-      data: {
-        userId: input.userId,
-        method: input.method,
-        path: input.path,
-        statusCode: input.statusCode,
-        requestId: input.requestId,
-        details: input.details as any,
-      },
-    });
+    try {
+      await this.prisma.apiAuditLog.create({
+        data: {
+          userId: input.userId,
+          method: input.method,
+          path: input.path,
+          statusCode: input.statusCode,
+          requestId: input.requestId,
+          details: input.details as any,
+        },
+      });
+    } catch {
+      // 忽略审计日志写入失败（如外键约束：userId 不存在），不影响主流程
+    }
   }
 }

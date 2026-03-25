@@ -5,13 +5,15 @@ import {
   Delete,
   Get,
   Param,
+  Patch,
   Post,
   Query,
   UploadedFile,
+  UploadedFiles,
   UseGuards,
   UseInterceptors,
 } from "@nestjs/common";
-import { FileInterceptor } from "@nestjs/platform-express";
+import { FileInterceptor, FilesInterceptor } from "@nestjs/platform-express";
 import { memoryStorage } from "multer";
 import { JwtAuthGuard } from "../common/jwt-auth.guard";
 import { CurrentUser, JwtUser } from "../common/current-user.decorator";
@@ -26,7 +28,7 @@ export class GenerationsController {
 
   @Post("image")
   @UseInterceptors(
-    FileInterceptor("referenceImage", {
+    FilesInterceptor("referenceImages", 9, {
       storage: memoryStorage(),
       limits: { fileSize: 20 * 1024 * 1024 },
     }),
@@ -34,9 +36,9 @@ export class GenerationsController {
   async createImage(
     @CurrentUser() user: JwtUser,
     @Body() body: CreateImageDto,
-    @UploadedFile() file?: Express.Multer.File,
+    @UploadedFiles() files?: Express.Multer.File[],
   ) {
-    return this.generationsService.createImageTask(user.sub, body, file);
+    return this.generationsService.createImageTask(user.sub, body, files ?? []);
   }
 
   @Post("video-from-image")
@@ -57,6 +59,29 @@ export class GenerationsController {
     return this.generationsService.createVideoFromImageTask(user.sub, body, file);
   }
 
+  @Get("sessions")
+  async listSessions(
+    @CurrentUser() user: JwtUser,
+    @Query("type") type?: string,
+    @Query("limit") limit = "20",
+    @Query("offset") offset = "0",
+  ) {
+    return this.generationsService.listSessions(user.sub, {
+      type,
+      limit: Number(limit),
+      offset: Number(offset),
+    });
+  }
+
+  @Patch("sessions/:sessionId/title")
+  async renameSession(
+    @CurrentUser() user: JwtUser,
+    @Param("sessionId") sessionId: string,
+    @Body("title") title: string,
+  ) {
+    return this.generationsService.renameSession(user.sub, sessionId, title);
+  }
+
   @Get(":taskId")
   async getTask(@CurrentUser() user: JwtUser, @Param("taskId") taskId: string) {
     return this.generationsService.getTask(user.sub, taskId);
@@ -67,12 +92,14 @@ export class GenerationsController {
     @CurrentUser() user: JwtUser,
     @Query("status") status?: string,
     @Query("type") type?: string,
+    @Query("sessionId") sessionId?: string,
     @Query("limit") limit = "20",
     @Query("offset") offset = "0",
   ) {
     return this.generationsService.listTasks(user.sub, {
       status,
       type,
+      sessionId,
       limit: Number(limit),
       offset: Number(offset),
     });

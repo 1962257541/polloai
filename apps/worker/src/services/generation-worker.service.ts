@@ -133,6 +133,7 @@ export class GenerationWorkerService implements OnModuleInit, OnModuleDestroy {
       apiUrl,
       imageApiType: params.imageApiType || imageApiType,
       referenceImageUrl: params.referenceImageUrl || inputAsset?.url,
+      referenceImageUrls: params.referenceImageUrls ?? [],
     });
 
     const latest = await this.prisma.generationTask.findUnique({
@@ -169,6 +170,22 @@ export class GenerationWorkerService implements OnModuleInit, OnModuleDestroy {
         where: { id: taskId },
         data: { status: "succeeded", finishedAt: new Date() },
       });
+    });
+
+    // 自动存入素材库（24h 后过期，可归档）
+    await this.prisma.material.create({
+      data: {
+        userId: task.userId,
+        name: `generated-${taskId}.${extension}`,
+        url: uploaded.url,
+        storageKey: uploaded.key,
+        mimeType: image.mimeType,
+        sizeBytes: uploaded.sizeBytes,
+        mediaType: "image",
+        source: "generated",
+        taskId,
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      },
     });
 
     await this.publish({
@@ -243,6 +260,22 @@ export class GenerationWorkerService implements OnModuleInit, OnModuleDestroy {
         where: { id: taskId },
         data: { status: "succeeded", finishedAt: new Date() },
       });
+    });
+
+    // 自动存入素材库（24h 后过期，可归档）
+    await this.prisma.material.create({
+      data: {
+        userId: task.userId,
+        name: `generated-${taskId}.mp4`,
+        url: uploaded.url,
+        storageKey: uploaded.key,
+        mimeType: "video/mp4",
+        sizeBytes: uploaded.sizeBytes,
+        mediaType: "video",
+        source: "generated",
+        taskId,
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      },
     });
 
     await this.publish({

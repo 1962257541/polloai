@@ -6,6 +6,7 @@ import {
 } from "@nestjs/common";
 import { InjectQueue } from "@nestjs/bullmq";
 import { Queue } from "bullmq";
+import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { StorageService } from "../storage/storage.service";
 import { NotificationsService } from "../notifications/notifications.service";
@@ -32,34 +33,30 @@ export class GenerationsService {
   async createImageTask(
     userId: string,
     payload: CreateImageDto,
-    file?: Express.Multer.File,
+    files: Express.Multer.File[] = [],
   ) {
-    let referenceImage:
-      | {
-          key: string;
-          url: string;
-          sizeBytes: number;
-          mimeType: string;
-        }
-      | undefined;
-
-    if (file) {
+    // 上传所有参考图到 S3
+    const referenceImages: { key: string; url: string; sizeBytes: number; mimeType: string }[] = [];
+    for (const file of files) {
       const uploaded = await this.storageService.uploadBuffer(file.buffer, {
         prefix: "inputs/images",
         extension: this.extensionFromMime(file.mimetype),
         contentType: file.mimetype,
       });
-      referenceImage = {
-        ...uploaded,
-        mimeType: file.mimetype,
-      };
+      referenceImages.push({ ...uploaded, mimeType: file.mimetype });
     }
+
+    // 合并：文件上传的 URL + DTO 中直接传入的远程 URL（上下文模式）
+    const uploadedUrls = referenceImages.map((r) => r.url);
+    const contextUrls = payload.referenceImageUrls ?? [];
+    const allReferenceUrls = [...uploadedUrls, ...contextUrls];
 
     let parsed: ReturnType<typeof textToImageSchema.parse>;
     try {
       parsed = textToImageSchema.parse({
         ...payload,
-        referenceImageUrl: referenceImage?.url,
+        referenceImageUrl: allReferenceUrls[0],
+        referenceImageUrls: allReferenceUrls,
       });
     } catch (error) {
       if (error instanceof ZodError) {
@@ -98,19 +95,20 @@ export class GenerationsService {
           prompt: parsed.prompt,
           negativePrompt: parsed.negativePrompt,
           parameters: parsed,
+          sessionId: payload.sessionId ?? null,
         },
       });
 
-      if (referenceImage) {
+      for (const ref of referenceImages) {
         await tx.generationAsset.create({
           data: {
             taskId: created.id,
             role: "input",
             mediaType: "image",
-            url: referenceImage.url,
-            storageKey: referenceImage.key,
-            mimeType: referenceImage.mimeType,
-            sizeBytes: referenceImage.sizeBytes,
+            url: ref.url,
+            storageKey: ref.key,
+            mimeType: ref.mimeType,
+            sizeBytes: ref.sizeBytes,
           },
         });
       }
@@ -236,12 +234,13 @@ export class GenerationsService {
 
   async listTasks(
     userId: string,
-    input: { status?: string; type?: string; limit: number; offset: number },
+    input: { status?: string; type?: string; sessionId?: string; limit: number; offset: number },
   ) {
     const where = {
       userId,
       ...(input.status ? { status: input.status as TaskStatus } : {}),
       ...(input.type ? { type: input.type as GenerationType } : {}),
+      ...(input.sessionId !== undefined ? { sessionId: input.sessionId } : {}),
     };
 
     const [items, total] = await Promise.all([
@@ -256,6 +255,131 @@ export class GenerationsService {
     ]);
 
     return { items, total };
+  }
+
+  async listSessions(
+    userId: string,
+    input: { type?: string; limit: number; offset: number },
+  ) {
+    // 查有 sessionId 的任务（按 sessionId 分组）
+    // 旧任务 sessionId 为 null，视为各自独立会话，单独查询并合并
+    const type = input.type as GenerationType | undefined;
+
+    // 1. 有 sessionId 的任务 — 用原生 SQL groupBy（Prisma groupBy 不支持 include）
+    const typeFilter = type ? Prisma.sql`AND "type" = ${type}::"GenerationType"` : Prisma.empty;
+    const groupedRaw = await this.prisma.$queryRaw<
+      { session_id: string; latest_created_at: Date; task_count: bigint }[]
+    >(Prisma.sql`
+      SELECT
+        "sessionId" AS session_id,
+        MAX("createdAt") AS latest_created_at,
+        COUNT(*) AS task_count
+      FROM "GenerationTask"
+      WHERE "userId" = ${userId}
+        AND "sessionId" IS NOT NULL
+        ${typeFilter}
+      GROUP BY "sessionId"
+      ORDER BY latest_created_at DESC
+      LIMIT ${input.limit} OFFSET ${input.offset}
+    `);
+
+    // 2. 旧任务（sessionId = null）— 各自一条记录
+    const nullSessionTasks = await this.prisma.generationTask.findMany({
+      where: {
+        userId,
+        sessionId: null,
+        ...(type ? { type } : {}),
+      },
+      include: { assets: true },
+      orderBy: { createdAt: "desc" },
+      take: input.limit,
+      skip: input.offset,
+    });
+
+    // 3. 为有 sessionId 的组，批量查最新一条任务（含 assets）
+    const sessionIds = groupedRaw.map((r) => r.session_id);
+    const latestTasksPerSession = sessionIds.length > 0
+      ? await Promise.all(
+          sessionIds.map((sid) =>
+            this.prisma.generationTask.findFirst({
+              where: { userId, sessionId: sid },
+              include: { assets: true },
+              orderBy: { createdAt: "desc" },
+            }),
+          ),
+        )
+      : [];
+
+    // 4. 查各 session 第一条任务（取 sessionTitle 和原始 prompt）
+    const firstTasksPerSession = sessionIds.length > 0
+      ? await Promise.all(
+          sessionIds.map((sid) =>
+            this.prisma.generationTask.findFirst({
+              where: { userId, sessionId: sid },
+              orderBy: { createdAt: "asc" },
+              select: { prompt: true, sessionTitle: true },
+            }),
+          ),
+        )
+      : [];
+
+    // 5. 组装有 sessionId 的会话摘要
+    const sessionItems = groupedRaw.map((row, i) => {
+      const latest = latestTasksPerSession[i];
+      const first = firstTasksPerSession[i];
+      const outputUrl = latest?.assets.find((a) => a.role === "output")?.url;
+      return {
+        sessionId: row.session_id,
+        title: first?.sessionTitle || (first?.prompt?.slice(0, 40) ?? ""),
+        taskCount: Number(row.task_count),
+        latestCreatedAt: row.latest_created_at,
+        outputUrl: outputUrl ?? null,
+      };
+    });
+
+    // 6. 组装无 sessionId 的独立任务摘要
+    const nullItems = nullSessionTasks.map((task) => ({
+      sessionId: task.id, // 用 taskId 作为虚拟 sessionId
+      title: task.sessionTitle || task.prompt.slice(0, 40),
+      taskCount: 1,
+      latestCreatedAt: task.createdAt,
+      outputUrl: task.assets.find((a) => a.role === "output")?.url ?? null,
+      isLegacy: true, // 标记为旧任务
+    }));
+
+    // 合并按时间排序
+    const all = [...sessionItems, ...nullItems].sort(
+      (a, b) => new Date(b.latestCreatedAt).getTime() - new Date(a.latestCreatedAt).getTime(),
+    );
+
+    return { items: all.slice(0, input.limit) };
+  }
+
+  async renameSession(userId: string, sessionId: string, title: string) {
+    // 找该 sessionId 最早的任务，更新 sessionTitle
+    const task = await this.prisma.generationTask.findFirst({
+      where: { userId, sessionId },
+      orderBy: { createdAt: "asc" },
+    });
+
+    if (!task) {
+      // 可能是旧任务（用 taskId 作为 sessionId）
+      const legacyTask = await this.prisma.generationTask.findFirst({
+        where: { id: sessionId, userId },
+      });
+      if (!legacyTask) throw new NotFoundException("Session not found");
+      await this.prisma.generationTask.update({
+        where: { id: sessionId },
+        data: { sessionTitle: title },
+      });
+      return { success: true };
+    }
+
+    await this.prisma.generationTask.update({
+      where: { id: task.id },
+      data: { sessionTitle: title },
+    });
+    return { success: true };
   }
 
   async cancelTask(userId: string, taskId: string) {

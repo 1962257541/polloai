@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import * as XLSX from "xlsx";
-import MaterialLibraryModal, { MaterialLibraryMode } from "./MaterialLibraryModal";
-import { api } from "../lib/api";
+import { useEffect, useState } from "react";
+import MaterialLibraryModal from "./MaterialLibraryModal";
+import { api, Material } from "../lib/api";
 import { getToken } from "../lib/auth";
 
 const DURATION_OPTIONS = [
@@ -17,146 +16,24 @@ const SIZE_OPTIONS = [
   { value: "720x1280", label: "9:16", aspectRatio: "9:16" as const },
 ];
 
-const ACCEPTED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp"];
-const PLACEHOLDER_URL_PATTERN = /^https?:\/\/(?:www\.)?example\.(?:com|org|net)(?:\/|$)/i;
-
 type AspectRatioValue = "16:9" | "9:16";
 type GeneratorTab = "single" | "batch";
 
-type BatchVideoRow = {
-  line: number;
-  prompt: string;
-  imageName?: string;
-  imageUrl?: string;
-  model?: string;
-  aspectRatio: AspectRatioValue;
-  durationSec: number;
-};
-
 interface VideoGeneratorProps {
   onCreated: () => void;
-  generating?: boolean;
 }
 
 function sizeToAspectRatio(size: string) {
   return SIZE_OPTIONS.find((item) => item.value === size)?.aspectRatio || "16:9";
 }
 
-function aspectRatioToSize(aspectRatio: AspectRatioValue) {
-  return aspectRatio === "9:16" ? "720x1280" : "1280x720";
-}
-
-function normalizeImageKey(value: string) {
-  return value.trim().replace(/^.*[\\/]/, "").toLowerCase();
-}
-
-function isAcceptedImageFile(file: File) {
-  return ACCEPTED_IMAGE_TYPES.includes(file.type);
-}
-
-function downloadBatchTemplate() {
-  const workbook = XLSX.utils.book_new();
-  const templateRows = [
-    {
-      prompt: "让角色轻轻转头并微笑",
-      imageName: "avatar-01.png",
-      imageUrl: "",
-      model: "",
-      aspectRatio: "16:9",
-      durationSec: 4,
-    },
-    {
-      prompt: "人物向前走一步，衣摆轻微摆动",
-      imageName: "avatar-02.jpg",
-      imageUrl: "",
-      model: "",
-      aspectRatio: "9:16",
-      durationSec: 6,
-    },
-  ];
-  const notesRows = [
-    { field: "prompt", description: "必填，视频提示词。" },
-    { field: "imageName", description: "推荐填写素材文件名，然后在素材库中勾选同名图片。" },
-    { field: "imageUrl", description: "可选，仅用于可直接访问的公网图片直链。" },
-    { field: "model", description: "可选，留空时使用当前页面的默认模型。" },
-    { field: "aspectRatio", description: "可选，仅支持 16:9 或 9:16，默认 16:9。" },
-    { field: "durationSec", description: "可选，仅支持 4 / 6 / 8，默认 4。" },
-  ];
-
-  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(templateRows), "template");
-  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(notesRows), "notes");
-
-  const data = XLSX.write(workbook, { type: "array", bookType: "xlsx" });
-  const blob = new Blob([data], {
-    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = "video-batch-template.xlsx";
-  link.click();
-  URL.revokeObjectURL(url);
-}
-
-function parseBatchRows(rows: Array<Record<string, unknown>>) {
-  const errors: string[] = [];
-  const parsedRows: BatchVideoRow[] = [];
-
-  rows.forEach((row, index) => {
-    const line = index + 2;
-    const prompt = String(row.prompt ?? "").trim();
-    const imageName = String(row.imageName ?? row.imageFile ?? "").trim();
-    const imageUrl = String(row.imageUrl ?? "").trim();
-    const model = String(row.model ?? "").trim() || undefined;
-    const aspectRatio = (String(row.aspectRatio ?? "").trim() || "16:9") as AspectRatioValue;
-    const rawDuration = String(row.durationSec ?? "").trim();
-    const durationSec = rawDuration ? Number(rawDuration) : 4;
-
-    if (!prompt && !imageName && !imageUrl && !model && !rawDuration) return;
-    if (!prompt) errors.push(`第 ${line} 行缺少 prompt`);
-    if (!imageName && !imageUrl) errors.push(`第 ${line} 行缺少 imageName 或 imageUrl`);
-    if (PLACEHOLDER_URL_PATTERN.test(imageUrl)) {
-      errors.push(`第 ${line} 行的 imageUrl 还是模板占位地址，请替换成真实图片地址`);
-    }
-    if (!["16:9", "9:16"].includes(aspectRatio)) {
-      errors.push(`第 ${line} 行的 aspectRatio 仅支持 16:9 或 9:16`);
-    }
-    if (![4, 6, 8].includes(durationSec)) {
-      errors.push(`第 ${line} 行的 durationSec 仅支持 4 / 6 / 8`);
-    }
-
-    if (
-      !prompt ||
-      (!imageName && !imageUrl) ||
-      PLACEHOLDER_URL_PATTERN.test(imageUrl) ||
-      !["16:9", "9:16"].includes(aspectRatio) ||
-      ![4, 6, 8].includes(durationSec)
-    ) {
-      return;
-    }
-
-    parsedRows.push({
-      line,
-      prompt,
-      imageName: imageName || undefined,
-      imageUrl: imageUrl || undefined,
-      model,
-      aspectRatio,
-      durationSec,
-    });
-  });
-
-  if (errors.length > 0) throw new Error(errors.slice(0, 5).join("；"));
-  if (parsedRows.length === 0) throw new Error("Excel 中没有可导入的数据。");
-  return parsedRows;
-}
-
-export default function VideoGenerator({ onCreated, generating = false }: VideoGeneratorProps) {
+export default function VideoGenerator({ onCreated }: VideoGeneratorProps) {
   const [activeTab, setActiveTab] = useState<GeneratorTab>("single");
+
+  // 单个生成状态
   const [prompt, setPrompt] = useState("");
   const [imageUrl, setImageUrl] = useState("");
-  const [file, setFile] = useState<File | undefined>();
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [selectedMaterial, setSelectedMaterial] = useState<Material | null>(null);
   const [size, setSize] = useState("1280x720");
   const [duration, setDuration] = useState(4);
   const [availableModels, setAvailableModels] = useState<string[]>([]);
@@ -165,54 +42,20 @@ export default function VideoGenerator({ onCreated, generating = false }: VideoG
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const [batchRows, setBatchRows] = useState<BatchVideoRow[]>([]);
-  const [batchFileName, setBatchFileName] = useState("");
-  const [batchSelectedKeys, setBatchSelectedKeys] = useState<string[]>([]);
+  // 批量生成状态
+  const [batchPrompt, setBatchPrompt] = useState("");
+  const [batchMaterials, setBatchMaterials] = useState<Material[]>([]);
+  const [batchSize, setBatchSize] = useState("1280x720");
+  const [batchDuration, setBatchDuration] = useState(4);
   const [batchSubmitting, setBatchSubmitting] = useState(false);
-  const [batchError, setBatchError] = useState("");
   const [batchResult, setBatchResult] = useState("");
-  const [batchProgress, setBatchProgress] = useState({ done: 0, total: 0 });
+  const [batchError, setBatchError] = useState("");
 
+  // 素材库弹窗
   const [libraryOpen, setLibraryOpen] = useState(false);
-  const [libraryMode, setLibraryMode] = useState<MaterialLibraryMode>("single");
-  const [libraryFiles, setLibraryFiles] = useState<File[]>([]);
-  const [librarySelection, setLibrarySelection] = useState<string[]>([]);
-  const [libraryMessage, setLibraryMessage] = useState("");
+  const [libraryMode, setLibraryMode] = useState<"single" | "batch">("single");
 
-  const canSubmit = Boolean(imageUrl.trim() || file);
-
-  const libraryFileMap = useMemo(() => {
-    const map = new Map<string, File>();
-    for (const materialFile of libraryFiles) {
-      map.set(normalizeImageKey(materialFile.name), materialFile);
-    }
-    return map;
-  }, [libraryFiles]);
-
-  const batchImageFiles = useMemo(
-    () =>
-      batchSelectedKeys
-        .map((key) => libraryFileMap.get(key))
-        .filter((materialFile): materialFile is File => Boolean(materialFile)),
-    [batchSelectedKeys, libraryFileMap],
-  );
-
-  const batchImageMap = useMemo(() => {
-    const map = new Map<string, File>();
-    for (const imageFile of batchImageFiles) {
-      map.set(normalizeImageKey(imageFile.name), imageFile);
-    }
-    return map;
-  }, [batchImageFiles]);
-
-  const batchMatchedCount = useMemo(
-    () =>
-      batchRows.filter((row) => {
-        if (!row.imageName) return Boolean(row.imageUrl);
-        return batchImageMap.has(normalizeImageKey(row.imageName));
-      }).length,
-    [batchImageMap, batchRows],
-  );
+  const canSubmit = Boolean(imageUrl.trim() || selectedMaterial);
 
   useEffect(() => {
     const token = getToken();
@@ -238,77 +81,21 @@ export default function VideoGenerator({ onCreated, generating = false }: VideoG
       }
     })();
 
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
   }, []);
 
-  useEffect(() => {
-    if (!file) {
-      setPreviewUrl(null);
-      return;
-    }
-    const nextPreviewUrl = URL.createObjectURL(file);
-    setPreviewUrl(nextPreviewUrl);
-    return () => URL.revokeObjectURL(nextPreviewUrl);
-  }, [file]);
-
-  const openMaterialLibrary = (mode: MaterialLibraryMode) => {
+  const openLibrary = (mode: "single" | "batch") => {
     setLibraryMode(mode);
-    setLibrarySelection(mode === "single" ? (file ? [normalizeImageKey(file.name)] : []) : batchSelectedKeys);
-    setLibraryMessage("");
     setLibraryOpen(true);
   };
 
-  const handleLibraryUpload = (fileList: FileList | null) => {
-    if (!fileList) return;
-    const selectedFiles = Array.from(fileList);
-    const invalidFiles = selectedFiles.filter((item) => !isAcceptedImageFile(item));
-    if (invalidFiles.length > 0) {
-      setLibraryMessage("素材库仅支持 PNG、JPEG 或 WebP 图片文件。");
-      return;
-    }
-
-    const fileMap = new Map(libraryFiles.map((materialFile) => [normalizeImageKey(materialFile.name), materialFile]));
-    const overwrittenNames: string[] = [];
-    const addedKeys: string[] = [];
-
-    for (const materialFile of selectedFiles) {
-      const key = normalizeImageKey(materialFile.name);
-      if (fileMap.has(key)) overwrittenNames.push(materialFile.name);
-      fileMap.set(key, materialFile);
-      addedKeys.push(key);
-    }
-
-    setLibraryFiles(Array.from(fileMap.values()).sort((left, right) => left.name.localeCompare(right.name)));
-    setLibrarySelection((current) => {
-      if (libraryMode === "single") {
-        return addedKeys.length > 0 ? [addedKeys[addedKeys.length - 1]] : current;
-      }
-      return Array.from(new Set([...current, ...addedKeys]));
-    });
-    setLibraryMessage(
-      overwrittenNames.length > 0
-        ? `已覆盖同名素材：${overwrittenNames.slice(0, 3).join("、")}${overwrittenNames.length > 3 ? "..." : ""}`
-        : `已加入 ${selectedFiles.length} 个素材。`,
-    );
-  };
-
-  const toggleLibrarySelection = (key: string) => {
-    setLibrarySelection((current) => {
-      if (libraryMode === "single") return current[0] === key ? [] : [key];
-      return current.includes(key) ? current.filter((item) => item !== key) : [...current, key];
-    });
-  };
-
-  const applyLibrarySelection = () => {
+  const handleLibraryApply = (selected: Material[]) => {
     if (libraryMode === "single") {
-      const nextFile = librarySelection[0] ? libraryFileMap.get(librarySelection[0]) : undefined;
-      setFile(nextFile);
-      if (nextFile) setImageUrl("");
+      setSelectedMaterial(selected[0] ?? null);
+      if (selected[0]) setImageUrl("");
       setError("");
     } else {
-      setBatchSelectedKeys(librarySelection);
+      setBatchMaterials(selected);
       setBatchError("");
       setBatchResult("");
     }
@@ -334,12 +121,11 @@ export default function VideoGenerator({ onCreated, generating = false }: VideoG
         {
           prompt: prompt.trim(),
           model: selectedModel,
-          imageUrl: imageUrl || undefined,
+          imageUrl: selectedMaterial ? selectedMaterial.url : imageUrl || undefined,
           aspectRatio: sizeToAspectRatio(size),
           size,
           durationSec: duration,
         },
-        file,
       );
       onCreated();
     } catch (requestError) {
@@ -349,90 +135,41 @@ export default function VideoGenerator({ onCreated, generating = false }: VideoG
     }
   };
 
-  const handleBatchFileChange = async (nextFile?: File) => {
-    if (!nextFile) return;
-    try {
-      const buffer = await nextFile.arrayBuffer();
-      const workbook = XLSX.read(buffer, { type: "array" });
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: "" });
-      const parsedRows = parseBatchRows(rows);
-      setBatchRows(parsedRows);
-      setBatchFileName(nextFile.name);
-      setBatchError("");
-      setBatchResult("");
-      setBatchProgress({ done: 0, total: parsedRows.length });
-    } catch (requestError) {
-      setBatchRows([]);
-      setBatchFileName("");
-      setBatchError((requestError as Error).message);
-      setBatchResult("");
-      setBatchProgress({ done: 0, total: 0 });
-    }
-  };
-
   const handleBatchSubmit = async () => {
     const token = getToken();
-    if (!token || batchRows.length === 0) return;
+    if (!token || batchMaterials.length === 0 || !batchPrompt.trim()) return;
+    if (!selectedModel) {
+      setBatchError("请先选择一个图生视频模型。");
+      return;
+    }
 
     setBatchSubmitting(true);
     setBatchError("");
     setBatchResult("");
-    setBatchProgress({ done: 0, total: batchRows.length });
-
-    let successCount = 0;
-    const failures: string[] = [];
 
     try {
-      for (const [index, row] of batchRows.entries()) {
-        const model = row.model || selectedModel || availableModels[0];
-        if (!model) {
-          failures.push(`第 ${row.line} 行没有可用模型`);
-          setBatchProgress({ done: index + 1, total: batchRows.length });
-          continue;
-        }
-        if (row.model && !availableModels.includes(row.model)) {
-          failures.push(`第 ${row.line} 行指定的模型不在当前账号的可用列表中`);
-          setBatchProgress({ done: index + 1, total: batchRows.length });
-          continue;
-        }
+      // 并发提交所有任务，不串行等待
+      const results = await Promise.allSettled(
+        batchMaterials.map((material) =>
+          api.createVideoFromImage(token, {
+            prompt: batchPrompt.trim(),
+            model: selectedModel,
+            imageUrl: material.url,
+            aspectRatio: sizeToAspectRatio(batchSize),
+            size: batchSize,
+            durationSec: batchDuration,
+          }),
+        ),
+      );
 
-        const localFile = row.imageName ? batchImageMap.get(normalizeImageKey(row.imageName)) : undefined;
-        if (row.imageName && !localFile) {
-          failures.push(`第 ${row.line} 行未找到匹配的本地素材：${row.imageName}`);
-          setBatchProgress({ done: index + 1, total: batchRows.length });
-          continue;
-        }
-        if (!localFile && !row.imageUrl) {
-          failures.push(`第 ${row.line} 行缺少可用图片，需要提供 imageName 或 imageUrl`);
-          setBatchProgress({ done: index + 1, total: batchRows.length });
-          continue;
-        }
+      const succeeded = results.filter((r) => r.status === "fulfilled").length;
+      const failed = results
+        .filter((r): r is PromiseRejectedResult => r.status === "rejected")
+        .map((r) => (r.reason as Error).message);
 
-        try {
-          await api.createVideoFromImage(
-            token,
-            {
-              prompt: row.prompt,
-              model,
-              imageUrl: localFile ? undefined : row.imageUrl,
-              aspectRatio: row.aspectRatio,
-              size: aspectRatioToSize(row.aspectRatio),
-              durationSec: row.durationSec,
-            },
-            localFile,
-          );
-          successCount += 1;
-        } catch (requestError) {
-          failures.push(`第 ${row.line} 行提交失败：${(requestError as Error).message}`);
-        } finally {
-          setBatchProgress({ done: index + 1, total: batchRows.length });
-        }
-      }
-
-      setBatchResult(`已提交 ${successCount}/${batchRows.length} 条任务。`);
-      if (failures.length > 0) setBatchError(failures.slice(0, 5).join("；"));
-      if (successCount > 0) onCreated();
+      setBatchResult(`已提交 ${succeeded}/${batchMaterials.length} 条任务。`);
+      if (failed.length > 0) setBatchError(failed.slice(0, 3).join("；"));
+      if (succeeded > 0) onCreated();
     } finally {
       setBatchSubmitting(false);
     }
@@ -462,12 +199,68 @@ export default function VideoGenerator({ onCreated, generating = false }: VideoG
           <option value="">{configLoading ? "加载模型中..." : "未配置可用模型"}</option>
         ) : (
           availableModels.map((model) => (
-            <option key={model} value={model}>
-              {model}
-            </option>
+            <option key={model} value={model}>{model}</option>
           ))
         )}
       </select>
+    </div>
+  );
+
+  const renderSizeSelect = (value: string, onChange: (v: string) => void) => (
+    <div>
+      <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "JetBrains Mono, monospace", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
+        ASPECT RATIO
+      </label>
+      <div style={{ display: "flex", gap: 8 }}>
+        {SIZE_OPTIONS.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            onClick={() => onChange(option.value)}
+            style={{
+              padding: "6px 14px",
+              borderRadius: 20,
+              border: `1px solid ${value === option.value ? "var(--accent)" : "var(--border)"}`,
+              background: value === option.value ? "var(--accent-glow)" : "transparent",
+              color: value === option.value ? "var(--accent)" : "var(--text-secondary)",
+              fontSize: "0.8rem",
+              cursor: "pointer",
+              fontFamily: "JetBrains Mono, monospace",
+            }}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
+  const renderDurationSelect = (value: number, onChange: (v: number) => void) => (
+    <div>
+      <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "JetBrains Mono, monospace", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
+        DURATION
+      </label>
+      <div style={{ display: "flex", gap: 8 }}>
+        {DURATION_OPTIONS.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            onClick={() => onChange(option.value)}
+            style={{
+              padding: "6px 14px",
+              borderRadius: 20,
+              border: `1px solid ${value === option.value ? "var(--accent)" : "var(--border)"}`,
+              background: value === option.value ? "var(--accent-glow)" : "transparent",
+              color: value === option.value ? "var(--accent)" : "var(--text-secondary)",
+              fontSize: "0.8rem",
+              cursor: "pointer",
+              fontFamily: "JetBrains Mono, monospace",
+            }}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
     </div>
   );
 
@@ -496,11 +289,9 @@ export default function VideoGenerator({ onCreated, generating = false }: VideoG
           >
             图生视频
           </h2>
-          <p style={{ margin: "8px 0 0", fontSize: "0.78rem", color: "var(--text-muted)" }}>
-            单个生成和批量生成已合并到同一个面板，按需切换。
-          </p>
         </div>
 
+        {/* Tab 切换 */}
         <div
           style={{
             display: "grid",
@@ -539,19 +330,11 @@ export default function VideoGenerator({ onCreated, generating = false }: VideoG
           })}
         </div>
 
+        {/* 单个生成 */}
         {activeTab === "single" ? (
           <form onSubmit={handleSingleSubmit} style={{ display: "flex", flexDirection: "column", gap: 18 }}>
             <div>
-              <label
-                style={{
-                  display: "block",
-                  fontSize: "0.7rem",
-                  fontFamily: "JetBrains Mono, monospace",
-                  color: "var(--text-muted)",
-                  letterSpacing: "0.08em",
-                  marginBottom: 8,
-                }}
-              >
+              <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "JetBrains Mono, monospace", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
                 PROMPT
               </label>
               <textarea
@@ -566,51 +349,29 @@ export default function VideoGenerator({ onCreated, generating = false }: VideoG
 
             {renderModelSelect("MODEL")}
 
+            {/* 图片来源 */}
             <div>
-              <label
-                style={{
-                  display: "block",
-                  fontSize: "0.7rem",
-                  fontFamily: "JetBrains Mono, monospace",
-                  color: "var(--text-muted)",
-                  letterSpacing: "0.08em",
-                  marginBottom: 8,
-                }}
-              >
+              <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "JetBrains Mono, monospace", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
                 INPUT IMAGE
               </label>
 
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                <button type="button" className="btn-ghost" onClick={() => openMaterialLibrary("single")}>
-                  素材库
+                <button type="button" className="btn-ghost" onClick={() => openLibrary("single")}>
+                  {selectedMaterial ? "重新选择" : "从素材库选择"}
                 </button>
-                {file && (
+                {selectedMaterial && (
                   <button
                     type="button"
                     className="btn-ghost"
-                    onClick={() => {
-                      setFile(undefined);
-                      setError("");
-                    }}
+                    onClick={() => { setSelectedMaterial(null); setError(""); }}
                   >
-                    清除已选素材
+                    清除
                   </button>
                 )}
               </div>
 
-              <input
-                className="input-field"
-                type="url"
-                value={imageUrl}
-                onChange={(event) => {
-                  setImageUrl(event.target.value);
-                  if (event.target.value) setFile(undefined);
-                }}
-                placeholder="图片 URL，与素材库二选一"
-                style={{ marginTop: 10 }}
-              />
-
-              {file && previewUrl && (
+              {/* 已选素材预览 */}
+              {selectedMaterial && (
                 <div
                   style={{
                     marginTop: 10,
@@ -620,129 +381,36 @@ export default function VideoGenerator({ onCreated, generating = false }: VideoG
                     background: "var(--bg-raised)",
                   }}
                 >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={previewUrl}
-                    alt={file.name}
+                    src={selectedMaterial.url}
+                    alt={selectedMaterial.name}
                     style={{ width: "100%", display: "block", maxHeight: 220, objectFit: "cover" }}
                   />
-                  <div
-                    style={{
-                      padding: "12px 14px",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      gap: 12,
-                    }}
-                  >
-                    <div style={{ minWidth: 0 }}>
-                      <div
-                        style={{
-                          fontSize: "0.8rem",
-                          color: "var(--text-primary)",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
-                        title={file.name}
-                      >
-                        {file.name}
-                      </div>
-                      <div style={{ marginTop: 4, fontSize: "0.72rem", color: "var(--text-muted)" }}>
-                        来自素材库
-                      </div>
-                    </div>
-
-                    <button type="button" className="btn-ghost" onClick={() => openMaterialLibrary("single")}>
-                      重新选择
-                    </button>
+                  <div style={{ padding: "10px 14px", fontSize: "0.78rem", color: "var(--text-muted)" }}>
+                    {selectedMaterial.name}
                   </div>
                 </div>
               )}
+
+              {/* 或输入 URL */}
+              {!selectedMaterial && (
+                <input
+                  className="input-field"
+                  type="url"
+                  value={imageUrl}
+                  onChange={(event) => setImageUrl(event.target.value)}
+                  placeholder="或直接输入图片 URL"
+                  style={{ marginTop: 10 }}
+                />
+              )}
             </div>
 
-            <div>
-              <label
-                style={{
-                  display: "block",
-                  fontSize: "0.7rem",
-                  fontFamily: "JetBrains Mono, monospace",
-                  color: "var(--text-muted)",
-                  letterSpacing: "0.08em",
-                  marginBottom: 8,
-                }}
-              >
-                ASPECT RATIO
-              </label>
-              <div style={{ display: "flex", gap: 8 }}>
-                {SIZE_OPTIONS.map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => setSize(option.value)}
-                    style={{
-                      padding: "6px 14px",
-                      borderRadius: 20,
-                      border: `1px solid ${size === option.value ? "var(--accent)" : "var(--border)"}`,
-                      background: size === option.value ? "var(--accent-glow)" : "transparent",
-                      color: size === option.value ? "var(--accent)" : "var(--text-secondary)",
-                      fontSize: "0.8rem",
-                      cursor: "pointer",
-                      fontFamily: "JetBrains Mono, monospace",
-                    }}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <label
-                style={{
-                  display: "block",
-                  fontSize: "0.7rem",
-                  fontFamily: "JetBrains Mono, monospace",
-                  color: "var(--text-muted)",
-                  letterSpacing: "0.08em",
-                  marginBottom: 8,
-                }}
-              >
-                DURATION
-              </label>
-              <div style={{ display: "flex", gap: 8 }}>
-                {DURATION_OPTIONS.map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => setDuration(option.value)}
-                    style={{
-                      padding: "6px 14px",
-                      borderRadius: 20,
-                      border: `1px solid ${duration === option.value ? "var(--accent)" : "var(--border)"}`,
-                      background: duration === option.value ? "var(--accent-glow)" : "transparent",
-                      color: duration === option.value ? "var(--accent)" : "var(--text-secondary)",
-                      fontSize: "0.8rem",
-                      cursor: "pointer",
-                      fontFamily: "JetBrains Mono, monospace",
-                    }}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            </div>
+            {renderSizeSelect(size, setSize)}
+            {renderDurationSelect(duration, setDuration)}
 
             {error && (
-              <div
-                style={{
-                  background: "rgba(239,68,68,0.1)",
-                  border: "1px solid rgba(239,68,68,0.2)",
-                  borderRadius: 8,
-                  padding: "10px 12px",
-                  fontSize: "0.8rem",
-                  color: "var(--error)",
-                }}
-              >
+              <div style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: 8, padding: "10px 12px", fontSize: "0.8rem", color: "var(--error)" }}>
                 {error}
               </div>
             )}
@@ -750,78 +418,88 @@ export default function VideoGenerator({ onCreated, generating = false }: VideoG
             <button
               className="btn-primary"
               type="submit"
-              disabled={loading || generating || !prompt.trim() || !canSubmit || !selectedModel}
+              disabled={loading || !prompt.trim() || !canSubmit || !selectedModel}
               style={{ width: "100%" }}
             >
-              {loading ? "提交中..." : generating ? "生成中..." : "生成视频"}
+              {loading ? "提交中..." : "生成视频"}
             </button>
           </form>
         ) : (
+          /* 批量生成 */
           <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-            {renderModelSelect("DEFAULT MODEL")}
+            {renderModelSelect("MODEL")}
 
-            <div style={{ fontSize: "0.78rem", color: "var(--text-muted)", lineHeight: 1.7 }}>
-              批量规则：
-              <br />
-              1. 推荐在 Excel 中填写 <code>imageName</code>，然后在素材库中勾选同名图片。
-              <br />
-              2. 如果没有 <code>imageName</code>，才会使用 <code>imageUrl</code>。
-              <br />
-              3. Excel 里的 <code>model</code> 为空时，使用上面的默认模型。
-            </div>
-
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              <button type="button" className="btn-ghost" onClick={downloadBatchTemplate}>
-                下载模板
-              </button>
-
-              <label
-                className="btn-ghost"
-                style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
-              >
-                上传 Excel
-                <input
-                  type="file"
-                  accept=".xlsx,.xls"
-                  onChange={(event) => void handleBatchFileChange(event.target.files?.[0])}
-                  style={{ display: "none" }}
-                />
+            {/* 统一 Prompt */}
+            <div>
+              <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "JetBrains Mono, monospace", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
+                PROMPT（统一应用于所有素材）
               </label>
+              <textarea
+                className="input-field"
+                value={batchPrompt}
+                onChange={(e) => setBatchPrompt(e.target.value)}
+                placeholder="描述视频动作和镜头效果，将应用于所有选中的素材..."
+                rows={3}
+                style={{ resize: "vertical", minHeight: 88 }}
+              />
+            </div>
 
-              <button type="button" className="btn-ghost" onClick={() => openMaterialLibrary("batch")}>
-                素材库
+            {/* 选择素材 */}
+            <div>
+              <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "JetBrains Mono, monospace", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
+                SELECT MATERIALS（可多选）
+              </label>
+              <button type="button" className="btn-ghost" onClick={() => openLibrary("batch")}>
+                {batchMaterials.length > 0 ? `已选 ${batchMaterials.length} 张，重新选择` : "从素材库选择图片"}
               </button>
             </div>
 
-            {batchFileName && (
-              <div style={{ fontSize: "0.8rem", color: "var(--text-secondary)" }}>
-                已导入 Excel：{batchFileName}，共 {batchRows.length} 条。
+            {/* 已选素材缩略图 */}
+            {batchMaterials.length > 0 && (
+              <div>
+                <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: 8 }}>
+                  已选 {batchMaterials.length} 张素材，将并发生成 {batchMaterials.length} 个视频任务：
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(72px, 1fr))", gap: 8 }}>
+                  {batchMaterials.map((m) => (
+                    <div key={m.id} style={{ position: "relative", borderRadius: 6, overflow: "hidden", border: "1px solid var(--border)", paddingBottom: "100%", background: "var(--bg-raised)" }}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={m.url}
+                        alt={m.name}
+                        loading="lazy"
+                        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setBatchMaterials((prev) => prev.filter((x) => x.id !== m.id))}
+                        style={{
+                          position: "absolute",
+                          top: 2,
+                          right: 2,
+                          width: 16,
+                          height: 16,
+                          borderRadius: "50%",
+                          background: "rgba(0,0,0,0.6)",
+                          color: "#fff",
+                          border: "none",
+                          cursor: "pointer",
+                          fontSize: "0.6rem",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
-            {batchRows.length > 0 && (
-              <div style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>
-                当前已匹配 {batchMatchedCount}/{batchRows.length} 条图片素材。
-              </div>
-            )}
-
-            {batchImageFiles.length > 0 && (
-              <div style={{ fontSize: "0.78rem", color: "var(--text-muted)", lineHeight: 1.7 }}>
-                已选择 {batchImageFiles.length} 张素材：
-                <br />
-                {batchImageFiles
-                  .slice(0, 6)
-                  .map((imageFile) => imageFile.name)
-                  .join("、")}
-                {batchImageFiles.length > 6 ? " ..." : ""}
-              </div>
-            )}
-
-            {batchProgress.total > 0 && (
-              <div style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>
-                进度：{batchProgress.done}/{batchProgress.total}
-              </div>
-            )}
+            {renderSizeSelect(batchSize, setBatchSize)}
+            {renderDurationSelect(batchDuration, setBatchDuration)}
 
             {batchResult && <div style={{ fontSize: "0.8rem", color: "var(--success)" }}>{batchResult}</div>}
             {batchError && <div style={{ fontSize: "0.8rem", color: "var(--error)" }}>{batchError}</div>}
@@ -830,9 +508,9 @@ export default function VideoGenerator({ onCreated, generating = false }: VideoG
               type="button"
               className="btn-primary"
               onClick={() => void handleBatchSubmit()}
-              disabled={batchSubmitting || batchRows.length === 0 || !selectedModel}
+              disabled={batchSubmitting || batchMaterials.length === 0 || !selectedModel || !batchPrompt.trim()}
             >
-              {batchSubmitting ? "批量提交中..." : "批量生成视频"}
+              {batchSubmitting ? "提交中..." : `批量生成视频（${batchMaterials.length} 个任务）`}
             </button>
           </div>
         )}
@@ -841,13 +519,13 @@ export default function VideoGenerator({ onCreated, generating = false }: VideoG
       <MaterialLibraryModal
         open={libraryOpen}
         mode={libraryMode}
-        files={libraryFiles}
-        message={libraryMessage}
-        selectedKeys={librarySelection}
+        selectedIds={
+          libraryMode === "single"
+            ? selectedMaterial ? [selectedMaterial.id] : []
+            : batchMaterials.map((m) => m.id)
+        }
         onClose={() => setLibraryOpen(false)}
-        onApply={applyLibrarySelection}
-        onToggle={toggleLibrarySelection}
-        onUpload={handleLibraryUpload}
+        onApply={handleLibraryApply}
       />
     </>
   );

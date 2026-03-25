@@ -37,6 +37,7 @@ export const textToImageSchema = z.object({
   outputFormat: z.enum(["png", "jpeg", "webp"]).default("png"),
   imageApiType: z.enum(imageApiTypeValues).default("gemini-native"),
   referenceImageUrl: z.string().url().optional(),
+  referenceImageUrls: z.array(z.string().url()).optional(),
 });
 
 export const imageToVideoSchema = z.object({

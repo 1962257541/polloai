@@ -32,6 +32,7 @@ export class GeminiService {
     apiUrl?: string;
     imageApiType?: string;
     referenceImageUrl?: string;
+    referenceImageUrls?: string[];
   }) {
     if (this.env.geminiMock) {
       console.log(`[MOCK] generateImage: prompt="${input.prompt.slice(0, 60)}" size=${input.size}`);
@@ -46,6 +47,14 @@ export class GeminiService {
     const model = input.model;
     if (!model) throw new Error("图片模型未配置，请在账号设置中配置图片模型。");
 
+    // 合并所有参考图 URL（兼容单图旧字段 + 新多图字段）
+    const allReferenceUrls = [
+      ...(input.referenceImageUrls ?? []),
+      ...(input.referenceImageUrl && !input.referenceImageUrls?.includes(input.referenceImageUrl)
+        ? [input.referenceImageUrl]
+        : []),
+    ].filter(Boolean);
+
     if (input.imageApiType === "gemini-native") {
       return this.generateImageNative(
         model,
@@ -54,11 +63,11 @@ export class GeminiService {
         input.outputFormat,
         input.apiKey,
         input.apiUrl,
-        input.referenceImageUrl,
+        allReferenceUrls,
       );
     }
 
-    if (input.referenceImageUrl) {
+    if (allReferenceUrls.length > 0) {
       throw new Error("Reference images are currently only supported in Gemini mode");
     }
 
@@ -101,12 +110,17 @@ export class GeminiService {
     outputFormat: "png" | "jpeg" | "webp",
     apiKey: string,
     apiUrl?: string,
-    referenceImageUrl?: string,
+    referenceImageUrls: string[] = [],
   ) {
     const requestParts: JsonRecord[] = [{ text: prompt }];
 
-    if (referenceImageUrl) {
-      const referenceImage = await this.loadImage(referenceImageUrl);
+    for (const url of referenceImageUrls) {
+      console.log(`[generateImage] Loading reference image: ${url}`);
+      const referenceImage = await this.loadImage(url);
+      if (!referenceImage.mimeType.startsWith("image/")) {
+        throw new Error(`Reference image URL did not return an image (got ${referenceImage.mimeType}): ${url}`);
+      }
+      console.log(`[generateImage] Loaded reference image: ${referenceImage.mimeType} ${referenceImage.buffer.byteLength} bytes`);
       requestParts.push({
         inlineData: {
           mimeType: referenceImage.mimeType,

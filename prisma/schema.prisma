@@ -35,6 +35,11 @@ enum UserRole {
   salesperson
 }
 
+enum MaterialSource {
+  uploaded
+  generated
+}
+
 model User {
   id           String           @id @default(uuid())
   email        String           @unique
@@ -52,6 +57,26 @@ model User {
   updatedAt    DateTime         @updatedAt
   tasks        GenerationTask[]
   auditLogs    ApiAuditLog[]
+  materials    Material[]
+}
+
+model Material {
+  id         String         @id @default(uuid())
+  userId     String
+  name       String
+  url        String
+  storageKey String
+  mimeType   String
+  sizeBytes  Int
+  mediaType  MediaType      @default(image)
+  source     MaterialSource
+  taskId     String?
+  expiresAt  DateTime?
+  createdAt  DateTime       @default(now())
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([userId, expiresAt])
 }
 
 model GenerationTask {
@@ -67,6 +92,8 @@ model GenerationTask {
   providerJobId  String?
   errorCode      String?
   errorMessage   String?
+  sessionId      String?
+  sessionTitle   String?
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
   startedAt      DateTime?
@@ -76,6 +103,7 @@ model GenerationTask {
 
   @@index([userId, createdAt])
   @@index([status, createdAt])
+  @@index([userId, sessionId])
 }
 
 model GenerationAsset {
