@@ -195,11 +195,13 @@ export class GeminiService {
 
     const base = new URL(input.apiUrl ?? this.env.geminiBaseUrl);
     const url = `${base.protocol}//${base.host}/v1/video/create`;
+    const durationSeconds = input.seconds ? this.normalizeVideoDuration(input.seconds) : undefined;
     const reqBody: JsonRecord = {
       model: videoModel,
       prompt: input.prompt,
       aspect_ratio: aspectRatio,
       images: [imageUrl],
+      ...(durationSeconds !== undefined ? { duration_seconds: durationSeconds } : {}),
     };
 
     const response = await fetch(url, {
