@@ -12,15 +12,6 @@ function formatFileSize(bytes: number) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
-function formatExpiry(expiresAt: string | null | undefined) {
-  if (!expiresAt) return null;
-  const diff = new Date(expiresAt).getTime() - Date.now();
-  if (diff <= 0) return "已过期";
-  const hours = Math.floor(diff / 3600000);
-  const minutes = Math.floor((diff % 3600000) / 60000);
-  if (hours > 0) return `${hours}h ${minutes}m 后过期`;
-  return `${minutes}m 后过期`;
-}
 
 export default function MaterialsPage() {
   const [tab, setTab] = useState<TabType>("all");
@@ -127,15 +118,6 @@ export default function MaterialsPage() {
     e.target.value = "";
   };
 
-  const handleArchive = async (id: string) => {
-    try {
-      const updated = await api.archiveMaterial(token, id);
-      setItems((prev) => prev.map((m) => (m.id === id ? updated : m)));
-    } catch (e: any) {
-      setMessage(e.message ?? "归档失败");
-    }
-  };
-
   const handleDelete = async (id: string) => {
     try {
       await api.deleteMaterial(token, id);
@@ -175,7 +157,7 @@ export default function MaterialsPage() {
             素材库
           </h1>
           <p style={{ color: "var(--text-muted)", fontSize: "0.8rem", margin: "4px 0 0" }}>
-            未归档素材 24 小时后自动删除
+            管理上传和 AI 生成的图片与视频
           </p>
         </div>
 
@@ -289,7 +271,6 @@ export default function MaterialsPage() {
             <MaterialCard
               key={material.id}
               material={material}
-              onArchive={handleArchive}
               onDelete={handleDelete}
             />
           ))}
@@ -310,17 +291,12 @@ export default function MaterialsPage() {
 
 function MaterialCard({
   material,
-  onArchive,
   onDelete,
 }: {
   material: Material;
-  onArchive: (id: string) => void;
   onDelete: (id: string) => void;
 }) {
   const [hovered, setHovered] = useState(false);
-  const expiry = formatExpiry(material.expiresAt);
-  const isExpired = expiry === "已过期";
-  const isTemporary = !!material.expiresAt;
 
   return (
     <div
@@ -332,7 +308,6 @@ function MaterialCard({
         background: "var(--bg-raised)",
         border: "1px solid var(--border)",
         position: "relative",
-        opacity: isExpired ? 0.5 : 1,
         transition: "border-color 0.15s",
         borderColor: hovered ? "var(--accent)" : "var(--border)",
       }}
@@ -369,24 +344,6 @@ function MaterialCard({
               gap: 8,
             }}
           >
-            {isTemporary && (
-              <button
-                onClick={() => onArchive(material.id)}
-                title="归档（永久保留）"
-                style={{
-                  background: "var(--accent)",
-                  color: "#000",
-                  border: "none",
-                  borderRadius: 5,
-                  padding: "5px 10px",
-                  cursor: "pointer",
-                  fontSize: "0.75rem",
-                  fontWeight: 600,
-                }}
-              >
-                归档
-              </button>
-            )}
             <button
               onClick={() => onDelete(material.id)}
               title="删除"
@@ -443,20 +400,6 @@ function MaterialCard({
           <span style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>
             {formatFileSize(material.sizeBytes)}
           </span>
-          {expiry && (
-            <span
-              style={{
-                fontSize: "0.65rem",
-                color: isExpired ? "var(--error)" : "var(--text-muted)",
-                flexShrink: 0,
-              }}
-            >
-              {expiry}
-            </span>
-          )}
-          {!material.expiresAt && (
-            <span style={{ fontSize: "0.65rem", color: "var(--success)" }}>已归档</span>
-          )}
         </div>
       </div>
     </div>
