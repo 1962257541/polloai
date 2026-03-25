@@ -1,5 +1,5 @@
 import { imageApiTypeValues } from "@packages/shared";
-import { IsArray, IsIn, IsOptional, IsString, IsUrl, MaxLength, MinLength } from "class-validator";
+import { IsIn, IsOptional, IsString, MaxLength, MinLength } from "class-validator";
 
 export class CreateImageDto {
   @IsString()
@@ -37,9 +37,7 @@ export class CreateImageDto {
   imageApiType?: "openai-images" | "gemini-native";
 
   @IsOptional()
-  @IsArray()
-  @IsUrl({}, { each: true })
-  referenceImageUrls?: string[];
+  referenceImageUrls?: string | string[];
 
   @IsOptional()
   @IsString()

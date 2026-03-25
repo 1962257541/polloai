@@ -48,7 +48,12 @@ export class GenerationsService {
 
     // 合并：文件上传的 URL + DTO 中直接传入的远程 URL（上下文模式）
     const uploadedUrls = referenceImages.map((r) => r.url);
-    const contextUrls = payload.referenceImageUrls ?? [];
+    // FormData multipart 单个值传过来是 string，多个是 string[]，统一规范化
+    const contextUrls = payload.referenceImageUrls
+      ? Array.isArray(payload.referenceImageUrls)
+        ? payload.referenceImageUrls
+        : [payload.referenceImageUrls]
+      : [];
     const allReferenceUrls = [...uploadedUrls, ...contextUrls];
 
     let parsed: ReturnType<typeof textToImageSchema.parse>;
