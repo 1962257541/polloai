@@ -50,6 +50,7 @@ export default function VideoGenerator({ onCreated }: VideoGeneratorProps) {
   const [batchSubmitting, setBatchSubmitting] = useState(false);
   const [batchResult, setBatchResult] = useState("");
   const [batchError, setBatchError] = useState("");
+  const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0 });
 
   // 素材库弹窗
   const [libraryOpen, setLibraryOpen] = useState(false);
@@ -146,32 +147,38 @@ export default function VideoGenerator({ onCreated }: VideoGeneratorProps) {
     setBatchSubmitting(true);
     setBatchError("");
     setBatchResult("");
+    setBatchProgress({ current: 0, total: batchMaterials.length });
+
+    let succeeded = 0;
+    const errors: string[] = [];
 
     try {
-      // 并发提交所有任务，不串行等待
-      const results = await Promise.allSettled(
-        batchMaterials.map((material) =>
-          api.createVideoFromImage(token, {
+      // 串行逐个提交，完成一个再处理下一个
+      for (let i = 0; i < batchMaterials.length; i++) {
+        const material = batchMaterials[i];
+        setBatchProgress({ current: i + 1, total: batchMaterials.length });
+        try {
+          await api.createVideoFromImage(token, {
             prompt: batchPrompt.trim(),
             model: selectedModel,
             imageUrl: material.url,
             aspectRatio: sizeToAspectRatio(batchSize),
             size: batchSize,
             durationSec: batchDuration,
-          }),
-        ),
-      );
-
-      const succeeded = results.filter((r) => r.status === "fulfilled").length;
-      const failed = results
-        .filter((r): r is PromiseRejectedResult => r.status === "rejected")
-        .map((r) => (r.reason as Error).message);
+          });
+          succeeded++;
+          if (succeeded === 1) onCreated(); // 第一个成功后立即刷新列表
+        } catch (err) {
+          errors.push(`第 ${i + 1} 张（${material.name}）：${(err as Error).message}`);
+        }
+      }
 
       setBatchResult(`已提交 ${succeeded}/${batchMaterials.length} 条任务。`);
-      if (failed.length > 0) setBatchError(failed.slice(0, 3).join("；"));
-      if (succeeded > 0) onCreated();
+      if (errors.length > 0) setBatchError(errors.slice(0, 3).join("；"));
+      if (succeeded > 1) onCreated(); // 全部完成后再刷新一次
     } finally {
       setBatchSubmitting(false);
+      setBatchProgress({ current: 0, total: 0 });
     }
   };
 
@@ -458,7 +465,7 @@ export default function VideoGenerator({ onCreated }: VideoGeneratorProps) {
             {batchMaterials.length > 0 && (
               <div>
                 <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: 8 }}>
-                  已选 {batchMaterials.length} 张素材，将并发生成 {batchMaterials.length} 个视频任务：
+                  已选 {batchMaterials.length} 张素材，将依次串行生成 {batchMaterials.length} 个视频任务：
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(72px, 1fr))", gap: 8 }}>
                   {batchMaterials.map((m) => (
@@ -501,6 +508,26 @@ export default function VideoGenerator({ onCreated }: VideoGeneratorProps) {
             {renderSizeSelect(batchSize, setBatchSize)}
             {renderDurationSelect(batchDuration, setBatchDuration)}
 
+            {/* 串行进度条 */}
+            {batchSubmitting && batchProgress.total > 0 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", fontFamily: "JetBrains Mono, monospace" }}>
+                  正在处理第 {batchProgress.current} / {batchProgress.total} 个任务...
+                </div>
+                <div style={{ height: 4, borderRadius: 2, background: "var(--bg-raised)", overflow: "hidden" }}>
+                  <div
+                    style={{
+                      height: "100%",
+                      borderRadius: 2,
+                      background: "var(--accent)",
+                      width: `${(batchProgress.current / batchProgress.total) * 100}%`,
+                      transition: "width 0.3s ease",
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+
             {batchResult && <div style={{ fontSize: "0.8rem", color: "var(--success)" }}>{batchResult}</div>}
             {batchError && <div style={{ fontSize: "0.8rem", color: "var(--error)" }}>{batchError}</div>}
 
@@ -510,7 +537,9 @@ export default function VideoGenerator({ onCreated }: VideoGeneratorProps) {
               onClick={() => void handleBatchSubmit()}
               disabled={batchSubmitting || batchMaterials.length === 0 || !selectedModel || !batchPrompt.trim()}
             >
-              {batchSubmitting ? "提交中..." : `批量生成视频（${batchMaterials.length} 个任务）`}
+              {batchSubmitting
+                ? `提交中（${batchProgress.current}/${batchProgress.total}）...`
+                : `批量生成视频（${batchMaterials.length} 个任务）`}
             </button>
           </div>
         )}
