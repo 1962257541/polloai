@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getToken } from "../../../lib/auth";
 import { api, Material } from "../../../lib/api";
+import UploadProgressBar from "../../../components/UploadProgressBar";
 
 /** 预览弹层 */
 function PreviewModal({ material, onClose }: { material: Material; onClose: () => void }) {
@@ -105,6 +106,12 @@ export default function MaterialsPage() {
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{
+    currentFileIndex: number;
+    totalFiles: number;
+    currentFileName: string;
+    percent: number;
+  } | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -173,24 +180,35 @@ export default function MaterialsPage() {
       );
       if (!item) return;
       const file = item.getAsFile();
-      if (file) void handleUploadFile(file);
+      if (file) void handleUploadFile(file, 0, 1);
     };
     window.addEventListener("paste", handler);
     return () => window.removeEventListener("paste", handler);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
-  const handleUploadFile = async (file: File) => {
+  const handleUploadFile = async (file: File, fileIndex: number, totalFiles: number) => {
     setUploading(true);
     setMessage(null);
+    setUploadProgress({
+      currentFileIndex: fileIndex,
+      totalFiles,
+      currentFileName: file.name,
+      percent: 0,
+    });
     try {
-      const material = await api.uploadMaterial(token, file);
+      const material = await api.uploadMaterial(token, file, (percent) => {
+        setUploadProgress((prev) => (prev ? { ...prev, percent } : prev));
+      });
       setItems((prev) => [material, ...prev]);
       setMessage("上传成功");
     } catch (e: any) {
       setMessage(e.message ?? "上传失败");
     } finally {
-      setUploading(false);
+      if (fileIndex === totalFiles - 1) {
+        setUploading(false);
+        setUploadProgress(null);
+      }
     }
   };
 
@@ -198,9 +216,11 @@ export default function MaterialsPage() {
     const files = Array.from(e.target.files ?? []);
     if (files.length === 0) return;
     (async () => {
-      for (const file of files) {
-        await handleUploadFile(file);
+      for (let i = 0; i < files.length; i++) {
+        await handleUploadFile(files[i], i, files.length);
       }
+      setUploading(false);
+      setUploadProgress(null);
     })();
     e.target.value = "";
   };
@@ -429,6 +449,16 @@ export default function MaterialsPage() {
         >
           {message}
         </div>
+      )}
+
+      {/* 上传进度条 */}
+      {uploading && uploadProgress && (
+        <UploadProgressBar
+          currentFileIndex={uploadProgress.currentFileIndex}
+          totalFiles={uploadProgress.totalFiles}
+          currentFileName={uploadProgress.currentFileName}
+          percent={uploadProgress.percent}
+        />
       )}
 
       {/* 工具栏：全选 + 提示 */}

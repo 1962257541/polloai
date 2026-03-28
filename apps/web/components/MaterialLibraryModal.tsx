@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, Material } from "../lib/api";
 import { getToken } from "../lib/auth";
+import UploadProgressBar from "./UploadProgressBar";
 
 export type MaterialLibraryMode = "single" | "batch";
 
@@ -30,6 +31,12 @@ export default function MaterialLibraryModal({
   const [items, setItems] = useState<Material[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{
+    currentFileIndex: number;
+    totalFiles: number;
+    currentFileName: string;
+    percent: number;
+  } | null>(null);
   const [message, setMessage] = useState("");
   const [selection, setSelection] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -65,20 +72,27 @@ export default function MaterialLibraryModal({
       );
       if (!item) return;
       const file = item.getAsFile();
-      if (file) void handleUpload(file);
+      if (file) void handleUpload(file, 0, 1);
     };
     window.addEventListener("paste", handler);
     return () => window.removeEventListener("paste", handler);
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleUpload = async (file: File) => {
+  const handleUpload = async (file: File, fileIndex: number, totalFiles: number) => {
     if (!token) return;
     setUploading(true);
     setMessage("");
+    setUploadProgress({
+      currentFileIndex: fileIndex,
+      totalFiles,
+      currentFileName: file.name,
+      percent: 0,
+    });
     try {
-      const material = await api.uploadMaterial(token, file);
+      const material = await api.uploadMaterial(token, file, (percent) => {
+        setUploadProgress((prev) => (prev ? { ...prev, percent } : prev));
+      });
       setItems((prev) => [material, ...prev]);
-      // 上传后自动选中
       setSelection((prev) => {
         if (mode === "single") return [material.id];
         return [...prev, material.id];
@@ -87,7 +101,10 @@ export default function MaterialLibraryModal({
     } catch (e: any) {
       setMessage(e.message ?? "上传失败");
     } finally {
-      setUploading(false);
+      if (fileIndex === totalFiles - 1) {
+        setUploading(false);
+        setUploadProgress(null);
+      }
     }
   };
 
@@ -180,7 +197,11 @@ export default function MaterialLibraryModal({
                 onChange={(e) => {
                   const files = Array.from(e.target.files ?? []);
                   (async () => {
-                    for (const f of files) await handleUpload(f);
+                    for (let i = 0; i < files.length; i++) {
+                      await handleUpload(files[i], i, files.length);
+                    }
+                    setUploading(false);
+                    setUploadProgress(null);
                   })();
                   e.currentTarget.value = "";
                 }}
@@ -210,6 +231,16 @@ export default function MaterialLibraryModal({
             >
               {message}
             </div>
+          )}
+
+          {/* 上传进度条 */}
+          {uploading && uploadProgress && (
+            <UploadProgressBar
+              currentFileIndex={uploadProgress.currentFileIndex}
+              totalFiles={uploadProgress.totalFiles}
+              currentFileName={uploadProgress.currentFileName}
+              percent={uploadProgress.percent}
+            />
           )}
 
           {/* 素材网格 */}

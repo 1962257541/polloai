@@ -265,21 +265,44 @@ export const api = {
     return request(`/materials${qs ? `?${qs}` : ""}`, {}, token) as Promise<MaterialListResult>;
   },
 
-  uploadMaterial: async (token: string, file: File): Promise<Material> => {
-    const form = new FormData();
-    form.append("file", file);
-    const response = await fetch(`${API_BASE}/materials/upload`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
-      body: form,
+  uploadMaterial: (
+    token: string,
+    file: File,
+    onProgress?: (percent: number) => void,
+  ): Promise<Material> => {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", `${API_BASE}/materials/upload`);
+      xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable && onProgress) {
+          onProgress(Math.round((e.loaded / e.total) * 100));
+        }
+      };
+
+      xhr.onload = () => {
+        try {
+          const data = xhr.responseText ? JSON.parse(xhr.responseText) : null;
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve(data as Material);
+          } else {
+            const msg = Array.isArray(data?.message)
+              ? data.message.join("; ")
+              : data?.message;
+            reject(new Error(msg || `Request failed (${xhr.status})`));
+          }
+        } catch {
+          reject(new Error("Failed to parse response"));
+        }
+      };
+
+      xhr.onerror = () => reject(new Error("Network error"));
+
+      const form = new FormData();
+      form.append("file", file);
+      xhr.send(form);
     });
-    const text = await response.text();
-    const data = text ? JSON.parse(text) : null;
-    if (!response.ok) {
-      const msg = Array.isArray(data?.message) ? data.message.join("; ") : data?.message;
-      throw new Error(msg || `Request failed (${response.status})`);
-    }
-    return data as Material;
   },
 
   archiveMaterial: (token: string, id: string) =>
