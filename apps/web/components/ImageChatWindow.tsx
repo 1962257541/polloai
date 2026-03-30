@@ -26,10 +26,10 @@ interface ImageChatWindowProps {
   onSessionCreated: (id: string) => void;      // 第一次提交后传出 sessionId
 }
 
-function getProgressWidth(status: ChatRound["status"]) {
-  if (status === "succeeded" || status === "failed" || status === "cancelled") return 100;
-  if (status === "queued") return 15;
-  return 60;
+// 进度缓动：target 越近推进越慢，永远不会真正到达 target
+function easeProgress(current: number, target: number, step: number): number {
+  const remaining = target - current;
+  return current + Math.max(remaining * step, 0.1);
 }
 
 export default function ImageChatWindow({
@@ -50,6 +50,8 @@ export default function ImageChatWindow({
   const [historyLoading, setHistoryLoading] = useState(false);
   // 会话级固定参考图：用户在本会话中上传过的参考图 URL，每轮提交都会自动携带
   const [sessionPinnedUrls, setSessionPinnedUrls] = useState<string[]>([]);
+  // 动态进度：roundId → 0~100
+  const [progressMap, setProgressMap] = useState<Record<string, number>>({});
   const bottomRef = useRef<HTMLDivElement>(null);
   const stopStreamRef = useRef<(() => void) | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -141,6 +143,34 @@ export default function ImageChatWindow({
 
     return () => stopStreamRef.current?.();
   }, [token]);
+
+  // 动态进度条驱动：每 800ms tick 一次
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setProgressMap((prev) => {
+        const next = { ...prev };
+        let changed = false;
+        for (const round of rounds) {
+          const id = round.id;
+          const cur = prev[id] ?? 0;
+          if (round.status === "queued") {
+            // queued：缓慢爬向 25%
+            const val = easeProgress(cur, 25, 0.08);
+            if (Math.abs(val - cur) > 0.01) { next[id] = val; changed = true; }
+          } else if (round.status === "running") {
+            // running：从当前值缓慢爬向 88%
+            const val = easeProgress(Math.max(cur, 25), 88, 0.04);
+            if (Math.abs(val - cur) > 0.01) { next[id] = val; changed = true; }
+          } else if (round.status === "succeeded" || round.status === "failed" || round.status === "cancelled") {
+            // 终态：立即跳到 100%
+            if (cur !== 100) { next[id] = 100; changed = true; }
+          }
+        }
+        return changed ? next : prev;
+      });
+    }, 800);
+    return () => clearInterval(timer);
+  }, [rounds]);
 
   // 自动滚动到底部
   useEffect(() => {
@@ -435,29 +465,28 @@ export default function ImageChatWindow({
                       已取消
                     </div>
                   ) : (
-                    <div style={{ padding: "16px 20px", display: "flex", alignItems: "center", gap: 12 }}>
-                      <div style={{ flex: 1 }}>
+                    <div style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 10 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={{ fontSize: "0.75rem", color: "var(--accent)", fontFamily: "JetBrains Mono, monospace" }}>
+                          {round.status === "queued" ? "排队中..." : "生成中..."}
+                        </span>
+                        <span style={{ fontSize: "0.72rem", color: "var(--text-muted)", fontFamily: "JetBrains Mono, monospace" }}>
+                          {Math.round(progressMap[round.id] ?? 0)}%
+                        </span>
+                      </div>
+                      <div style={{ height: 6, background: "var(--bg-raised)", borderRadius: 3, overflow: "hidden" }}>
                         <div
                           style={{
-                            height: 4,
-                            background: "var(--bg-raised)",
-                            borderRadius: 2,
-                            overflow: "hidden",
+                            height: "100%",
+                            width: `${progressMap[round.id] ?? 0}%`,
+                            background: "linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 70%, white))",
+                            borderRadius: 3,
+                            transition: "width 0.7s ease-out",
                           }}
-                        >
-                          <div
-                            style={{
-                              height: "100%",
-                              width: `${getProgressWidth(round.status)}%`,
-                              background: "var(--accent)",
-                              borderRadius: 2,
-                              transition: "width 0.5s ease",
-                            }}
-                          />
-                        </div>
+                        />
                       </div>
-                      <span style={{ fontSize: "0.75rem", color: "var(--accent)", fontFamily: "JetBrains Mono, monospace", whiteSpace: "nowrap" }}>
-                        {round.status === "queued" ? "排队中..." : "生成中..."}
+                      <span style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>
+                        {round.status === "queued" ? "等待处理，请稍候..." : "AI 正在生成图片，通常需要 10~30 秒"}
                       </span>
                     </div>
                   )}
