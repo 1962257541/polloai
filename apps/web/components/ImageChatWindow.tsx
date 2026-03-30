@@ -26,10 +26,11 @@ interface ImageChatWindowProps {
   onSessionCreated: (id: string) => void;      // 第一次提交后传出 sessionId
 }
 
-// 进度缓动：target 越近推进越慢，永远不会真正到达 target
+// 进度缓动：target 越近推进越慢，不会超过 target
 function easeProgress(current: number, target: number, step: number): number {
-  const remaining = target - current;
-  return current + Math.max(remaining * step, 0.1);
+  if (current >= target) return target;
+  const next = current + (target - current) * step;
+  return Math.min(next, target);
 }
 
 export default function ImageChatWindow({
@@ -203,7 +204,9 @@ export default function ImageChatWindow({
             const val = easeProgress(Math.max(cur, 25), 88, 0.04);
             if (Math.abs(val - cur) > 0.01) { next[id] = val; changed = true; }
           } else if (round.status === "succeeded" || round.status === "failed" || round.status === "cancelled") {
-            if (cur !== 100) { next[id] = 100; changed = true; }
+            // 终态：快速缓动到 100%
+            const val = easeProgress(cur, 100, 0.3);
+            if (Math.abs(val - cur) > 0.01) { next[id] = val; changed = true; }
           }
         }
         return changed ? next : prev;
