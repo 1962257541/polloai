@@ -157,7 +157,10 @@ export class GeminiService {
           contents: [{ parts: requestParts }],
           generationConfig: {
             responseModalities: ["TEXT", "IMAGE"],
+            // 标准 Gemini 原生字段
             ...(aspectRatio ? { aspectRatio } : {}),
+            // 中转站（new-api）使用 imageConfig.aspectRatio
+            ...(aspectRatio ? { imageConfig: { aspectRatio } } : {}),
           },
         },
       },
@@ -506,7 +509,9 @@ export class GeminiService {
       const response = await fetch(url, {
         method: input.method,
         headers: {
+          // 同时发送两种鉴权头：原生 Gemini 用 x-goog-api-key，中转站用 Authorization Bearer
           "x-goog-api-key": apiKey,
+          "Authorization": `Bearer ${apiKey}`,
           ...(input.body ? { "Content-Type": "application/json" } : {}),
         },
         body: input.body ? JSON.stringify(input.body) : undefined,
