@@ -48,6 +48,8 @@ export default function ImageChatWindow({
   const [submitting, setSubmitting] = useState(false);
   const [useContext, setUseContext] = useState(true);
   const [historyLoading, setHistoryLoading] = useState(false);
+  // 会话级固定参考图：用户在本会话中上传过的参考图 URL，每轮提交都会自动携带
+  const [sessionPinnedUrls, setSessionPinnedUrls] = useState<string[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
   const stopStreamRef = useRef<(() => void) | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -95,6 +97,7 @@ export default function ImageChatWindow({
     if (sessionId === null) {
       // 新会话：清空
       setRounds([]);
+      setSessionPinnedUrls([]);
       return;
     }
 
@@ -106,6 +109,11 @@ export default function ImageChatWindow({
         const res = await api.listTasks(token, "text_to_image", 100, 0, sessionId);
         const items: Task[] = res.items ?? [];
         setRounds(items.length > 0 ? items.reverse().map(taskToChatRound) : []);
+        // 恢复会话级固定参考图（从历史任务的 input assets 提取）
+        const pinned = items.flatMap((t) =>
+          t.assets.filter((a) => a.role === "input").map((a) => a.url),
+        );
+        setSessionPinnedUrls([...new Set(pinned)]);
       } finally {
         setHistoryLoading(false);
       }
@@ -180,9 +188,13 @@ export default function ImageChatWindow({
         form.append("referenceImages", f);
       }
 
-      // 上下文：追加上轮图片 URL（服务端作为远程参考图）
-      if (useContext && lastSuccessOutputUrl) {
-        form.append("referenceImageUrls", lastSuccessOutputUrl);
+      // 会话固定参考图 + 上下文上轮输出图，合并后追加（去重）
+      const contextUrls = new Set<string>([
+        ...sessionPinnedUrls,
+        ...(useContext && lastSuccessOutputUrl ? [lastSuccessOutputUrl] : []),
+      ]);
+      for (const url of contextUrls) {
+        form.append("referenceImageUrls", url);
       }
 
       const apiBase = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:3001/api/v1";
@@ -206,6 +218,11 @@ export default function ImageChatWindow({
             : r,
         ),
       );
+
+      // 将本轮上传的参考图 URL 追加到会话固定列表
+      if (data.inputImageUrls?.length) {
+        setSessionPinnedUrls((prev) => [...new Set([...prev, ...data.inputImageUrls])]);
+      }
 
       // 新会话第一次提交成功后，通知父组件
       if (isNewSession) {
@@ -457,6 +474,30 @@ export default function ImageChatWindow({
           background: "var(--bg-surface)",
         }}
       >
+        {/* 会话级固定参考图提示 */}
+        {sessionPinnedUrls.length > 0 && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, fontSize: "0.78rem", color: "var(--text-muted)" }}>
+            <span style={{ color: "var(--accent)" }}>📌</span>
+            <span>已固定 {sessionPinnedUrls.length} 张参考图（每轮自动携带）</span>
+            <button
+              type="button"
+              onClick={() => setSessionPinnedUrls([])}
+              style={{
+                marginLeft: 4,
+                padding: "2px 8px",
+                borderRadius: 4,
+                border: "1px solid var(--border)",
+                background: "transparent",
+                color: "var(--text-muted)",
+                fontSize: "0.72rem",
+                cursor: "pointer",
+              }}
+            >
+              清除
+            </button>
+          </div>
+        )}
+
         {/* 上下文开关 */}
         {lastSuccessOutputUrl && (
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, fontSize: "0.78rem", color: "var(--text-muted)" }}>

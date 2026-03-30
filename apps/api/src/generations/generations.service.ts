@@ -135,7 +135,11 @@ export class GenerationsService {
       type: "text_to_image",
     });
 
-    return { taskId: task.id, status: task.status };
+    return {
+      taskId: task.id,
+      status: task.status,
+      inputImageUrls: referenceImages.map((r) => r.url),
+    };
   }
 
   async createVideoFromImageTask(
