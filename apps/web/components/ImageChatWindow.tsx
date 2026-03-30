@@ -430,6 +430,10 @@ export default function ImageChatWindow({
                     <div style={{ padding: "14px 16px", color: "var(--error)", fontSize: "0.82rem" }}>
                       生成失败{round.errorMessage ? `：${round.errorMessage}` : ""}
                     </div>
+                  ) : round.status === "cancelled" ? (
+                    <div style={{ padding: "14px 16px", color: "var(--text-muted)", fontSize: "0.82rem" }}>
+                      已取消
+                    </div>
                   ) : (
                     <div style={{ padding: "16px 20px", display: "flex", alignItems: "center", gap: 12 }}>
                       <div style={{ flex: 1 }}>
