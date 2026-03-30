@@ -12,6 +12,7 @@ type ChatRound = {
   status: "pending" | "queued" | "running" | "succeeded" | "failed" | "cancelled";
   taskId?: string;
   outputUrl?: string;
+  responseText?: string;
   errorMessage?: string;
 };
 
@@ -83,6 +84,7 @@ export default function ImageChatWindow({
     status: task.status,
     taskId: task.id,
     outputUrl: task.assets.find((a) => a.role === "output")?.url,
+    responseText: task.responseText ?? task.parameters?.responseText ?? undefined,
     errorMessage: task.errorMessage ?? undefined,
   }), []);
 
@@ -122,6 +124,7 @@ export default function ImageChatWindow({
           if (r.taskId !== taskId) return r;
           const updated: ChatRound = { ...r, status: event.status };
           if (event.assetUrl) updated.outputUrl = event.assetUrl;
+          if (event.responseText) updated.responseText = event.responseText;
           if (event.errorMessage) updated.errorMessage = event.errorMessage;
           return updated;
         }),
@@ -393,6 +396,19 @@ export default function ImageChatWindow({
                         </button>
                       </div>
                     </>
+                  ) : round.status === "succeeded" && round.responseText ? (
+                    <div
+                      style={{
+                        padding: "16px 18px",
+                        color: "var(--text-primary)",
+                        fontSize: "0.85rem",
+                        lineHeight: 1.8,
+                        whiteSpace: "pre-wrap",
+                        maxWidth: 560,
+                      }}
+                    >
+                      {round.responseText}
+                    </div>
                   ) : round.status === "failed" ? (
                     <div style={{ padding: "14px 16px", color: "var(--error)", fontSize: "0.82rem" }}>
                       生成失败{round.errorMessage ? `：${round.errorMessage}` : ""}

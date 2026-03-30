@@ -9,6 +9,18 @@ type InlineImagePart = {
   data?: string;
 };
 
+type ImageGenerationResult =
+  | {
+      kind: "image";
+      buffer: Buffer;
+      mimeType: "image/png" | "image/jpeg" | "image/webp";
+      revisedPrompt?: string;
+    }
+  | {
+      kind: "text";
+      responseText: string;
+    };
+
 @Injectable()
 export class GeminiService {
   private readonly remoteDispatcher?: Dispatcher;
@@ -33,11 +45,12 @@ export class GeminiService {
     imageApiType?: string;
     referenceImageUrl?: string;
     referenceImageUrls?: string[];
-  }) {
+  }): Promise<ImageGenerationResult> {
     if (this.env.geminiMock) {
       console.log(`[MOCK] generateImage: prompt="${input.prompt.slice(0, 60)}" size=${input.size}`);
       await this.mockDelay(1500);
       return {
+        kind: "image",
         buffer: this.mockImageBuffer(input.prompt, input.size),
         mimeType: "image/png" as const,
         revisedPrompt: `[MOCK] ${input.prompt}`,
@@ -97,6 +110,7 @@ export class GeminiService {
           : "image/png";
 
     return {
+      kind: "image",
       buffer: Buffer.from(b64, "base64"),
       mimeType,
       revisedPrompt: body?.data?.[0]?.revised_prompt as string | undefined,
@@ -111,8 +125,8 @@ export class GeminiService {
     apiKey: string,
     apiUrl?: string,
     referenceImageUrls: string[] = [],
-  ) {
-    const requestParts: JsonRecord[] = [{ text: prompt }];
+  ): Promise<ImageGenerationResult> {
+    const requestParts: JsonRecord[] = [];
 
     for (const url of referenceImageUrls) {
       console.log(`[generateImage] Loading reference image: ${url}`);
@@ -128,6 +142,10 @@ export class GeminiService {
         },
       });
     }
+
+    requestParts.push({
+      text: prompt,
+    });
 
     const aspectRatio = this.imageAspectRatioFromSize(size);
     const path = `/models/${encodeURIComponent(model)}:generateContent`;
@@ -152,6 +170,13 @@ export class GeminiService {
       body?.candidates?.[0]?.content?.parts ?? [];
     const imagePart = responseParts.find((part) => part.inlineData?.mimeType?.startsWith("image/"));
     if (!imagePart) {
+      const responseText = this.collectResponseText(responseParts);
+      if (responseText) {
+        return {
+          kind: "text",
+          responseText,
+        };
+      }
       throw new Error(`Gemini native response missing image part: ${JSON.stringify(body).slice(0, 500)}`);
     }
 
@@ -163,10 +188,19 @@ export class GeminiService {
       outputFormat === "jpeg" ? "image/jpeg" : outputFormat === "webp" ? "image/webp" : "image/png";
 
     return {
+      kind: "image",
       buffer: Buffer.from(b64, "base64"),
       mimeType,
       revisedPrompt: responseParts.find((part) => part.text)?.text,
     };
+  }
+
+  private collectResponseText(parts: Array<{ text?: string }>) {
+    return parts
+      .map((part) => part.text?.replace(/\s+/g, " ").trim())
+      .filter((text): text is string => Boolean(text))
+      .join(" ")
+      .slice(0, 300);
   }
 
   async createVideoFromImage(input: {

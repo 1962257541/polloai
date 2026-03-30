@@ -144,6 +144,26 @@ export class GenerationWorkerService implements OnModuleInit, OnModuleDestroy {
       throw new TaskCancelledError();
     }
 
+    if (image.kind === "text") {
+      await this.prisma.generationTask.update({
+        where: { id: taskId },
+        data: {
+          status: "succeeded",
+          finishedAt: new Date(),
+          parameters: this.withResponseText(params, image.responseText),
+        },
+      });
+
+      await this.publish({
+        taskId,
+        userId: task.userId,
+        status: "succeeded",
+        type: "text_to_image",
+        responseText: image.responseText,
+      });
+      return;
+    }
+
     const extension =
       image.mimeType.includes("jpeg") ? "jpg" : image.mimeType.includes("webp") ? "webp" : "png";
 
@@ -371,6 +391,7 @@ export class GenerationWorkerService implements OnModuleInit, OnModuleDestroy {
     type: GenerationType;
     errorMessage?: string;
     assetUrl?: string;
+    responseText?: string;
   }) {
     await this.publisher.publish(CHANNEL, JSON.stringify(event));
   }
@@ -401,5 +422,17 @@ export class GenerationWorkerService implements OnModuleInit, OnModuleDestroy {
   private extractVideoFailureDetail(status: any) {
     const candidates = [status?.error, status?.message, status?.detail];
     return candidates.find((value) => typeof value === "string" && value.trim()) as string | undefined;
+  }
+
+  private withResponseText(parameters: unknown, responseText: string) {
+    const base =
+      parameters && typeof parameters === "object" && !Array.isArray(parameters)
+        ? (parameters as Record<string, unknown>)
+        : {};
+
+    return {
+      ...base,
+      responseText,
+    };
   }
 }

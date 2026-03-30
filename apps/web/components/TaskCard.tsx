@@ -11,6 +11,10 @@ export type Task = {
   startedAt?: string | null;
   finishedAt?: string | null;
   errorMessage?: string | null;
+  responseText?: string | null;
+  parameters?: {
+    responseText?: string | null;
+  } | null;
   assets: Array<{
     id: string;
     role: "input" | "output";
@@ -84,6 +88,8 @@ export default function TaskCard({
   const output = task.assets.find((asset) => asset.role === "output");
   const isPending = task.status === "queued" || task.status === "running";
   const isInteractive = compact && Boolean(onSelect);
+  const textResponse = task.responseText?.trim() || task.parameters?.responseText?.trim() || "";
+  const hasTextResponse = task.status === "succeeded" && Boolean(textResponse);
 
   const handleSelect = () => {
     onSelect?.(task.id);
@@ -150,7 +156,17 @@ export default function TaskCard({
                   <div className={getProgressClass(task)} style={{ width: `${progress}%` }} />
                 </div>
               ) : (
-                <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>
+                <span
+                  style={{
+                    fontSize: hasTextResponse ? "0.74rem" : "0.72rem",
+                    color: hasTextResponse ? "var(--text-secondary)" : "var(--text-muted)",
+                    overflow: "hidden",
+                    display: "-webkit-box",
+                    WebkitLineClamp: hasTextResponse ? 4 : 2,
+                    WebkitBoxOrient: "vertical",
+                    whiteSpace: "pre-wrap",
+                  }}
+                >
                   {task.status === "failed" ? "生成失败" : "暂无预览"}
                 </span>
               )}
@@ -193,6 +209,23 @@ export default function TaskCard({
         >
           {task.prompt}
         </p>
+
+        {hasTextResponse && (
+          <p
+            style={{
+              margin: "6px 0 0",
+              fontSize: "0.72rem",
+              color: "var(--text-muted)",
+              overflow: "hidden",
+              display: "-webkit-box",
+              WebkitLineClamp: 3,
+              WebkitBoxOrient: "vertical",
+              whiteSpace: "pre-wrap",
+            }}
+          >
+            {textResponse}
+          </p>
+        )}
 
         <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
           {output ? (
@@ -452,6 +485,21 @@ export default function TaskCard({
         >
           {task.prompt}
         </p>
+
+        {hasTextResponse && (
+          <p
+            style={{
+              marginTop: 8,
+              marginBottom: 0,
+              fontSize: "0.78rem",
+              color: "var(--text-secondary)",
+              lineHeight: 1.7,
+              whiteSpace: "pre-wrap",
+            }}
+          >
+            {textResponse}
+          </p>
+        )}
 
         {task.errorMessage && task.status === "failed" && (
           <p style={{ marginTop: 8, marginBottom: 0, fontSize: "0.75rem", color: "var(--error)" }}>

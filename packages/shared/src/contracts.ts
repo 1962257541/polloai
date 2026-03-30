@@ -66,6 +66,7 @@ export interface GenerationEvent {
   type: GenerationType;
   errorMessage?: string;
   assetUrl?: string;
+  responseText?: string;
 }
 
 export type UserRole = "admin" | "salesperson";
