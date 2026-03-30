@@ -144,9 +144,52 @@ export default function ImageChatWindow({
     return () => stopStreamRef.current?.();
   }, [token]);
 
-  // 动态进度条驱动：每 800ms tick 一次
+  // 记录每个 round 进入当前状态的时间戳
+  const statusStartTimeRef = useRef<Record<string, { status: string; ts: number }>>({});
   useEffect(() => {
+    for (const round of rounds) {
+      const prev = statusStartTimeRef.current[round.id];
+      if (!prev || prev.status !== round.status) {
+        statusStartTimeRef.current[round.id] = { status: round.status, ts: Date.now() };
+      }
+    }
+  }, [rounds]);
+
+  // 动态进度条驱动 + 超时检测：每 800ms tick 一次
+  useEffect(() => {
+    const QUEUED_TIMEOUT_MS = 30_000;   // queued 超过 30s 提示超时
+    const RUNNING_TIMEOUT_MS = 120_000; // running 超过 120s 提示超时
+
     const timer = setInterval(() => {
+      const now = Date.now();
+
+      // 超时检测：将超时的 round 标记为 failed
+      setRounds((prev) => {
+        let changed = false;
+        const next = prev.map((r) => {
+          if (r.status !== "queued" && r.status !== "running") return r;
+          const entry = statusStartTimeRef.current[r.id];
+          if (!entry) return r;
+          const elapsed = now - entry.ts;
+          const timeout =
+            r.status === "queued" ? QUEUED_TIMEOUT_MS : RUNNING_TIMEOUT_MS;
+          if (elapsed > timeout) {
+            changed = true;
+            return {
+              ...r,
+              status: "failed" as const,
+              errorMessage:
+                r.status === "queued"
+                  ? "排队超时，上游渠道可能无响应，请稍后重试"
+                  : "生成超时，上游渠道未在规定时间内返回结果，请稍后重试",
+            };
+          }
+          return r;
+        });
+        return changed ? next : prev;
+      });
+
+      // 进度推进
       setProgressMap((prev) => {
         const next = { ...prev };
         let changed = false;
@@ -154,15 +197,12 @@ export default function ImageChatWindow({
           const id = round.id;
           const cur = prev[id] ?? 0;
           if (round.status === "queued") {
-            // queued：缓慢爬向 25%
             const val = easeProgress(cur, 25, 0.08);
             if (Math.abs(val - cur) > 0.01) { next[id] = val; changed = true; }
           } else if (round.status === "running") {
-            // running：从当前值缓慢爬向 88%
             const val = easeProgress(Math.max(cur, 25), 88, 0.04);
             if (Math.abs(val - cur) > 0.01) { next[id] = val; changed = true; }
           } else if (round.status === "succeeded" || round.status === "failed" || round.status === "cancelled") {
-            // 终态：立即跳到 100%
             if (cur !== 100) { next[id] = 100; changed = true; }
           }
         }
