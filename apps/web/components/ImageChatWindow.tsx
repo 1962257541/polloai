@@ -474,27 +474,74 @@ export default function ImageChatWindow({
           background: "var(--bg-surface)",
         }}
       >
-        {/* 会话级固定参考图提示 */}
+        {/* 会话级固定参考图缩略图 */}
         {sessionPinnedUrls.length > 0 && (
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, fontSize: "0.78rem", color: "var(--text-muted)" }}>
-            <span style={{ color: "var(--accent)" }}>📌</span>
-            <span>已固定 {sessionPinnedUrls.length} 张参考图（每轮自动携带）</span>
-            <button
-              type="button"
-              onClick={() => setSessionPinnedUrls([])}
-              style={{
-                marginLeft: 4,
-                padding: "2px 8px",
-                borderRadius: 4,
-                border: "1px solid var(--border)",
-                background: "transparent",
-                color: "var(--text-muted)",
-                fontSize: "0.72rem",
-                cursor: "pointer",
-              }}
-            >
-              清除
-            </button>
+          <div style={{ marginBottom: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6, fontSize: "0.75rem", color: "var(--text-muted)" }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+              </svg>
+              <span>固定参考图（每轮自动携带）</span>
+              <button
+                type="button"
+                onClick={() => setSessionPinnedUrls([])}
+                style={{
+                  marginLeft: 2,
+                  padding: "1px 6px",
+                  borderRadius: 4,
+                  border: "1px solid var(--border)",
+                  background: "transparent",
+                  color: "var(--text-muted)",
+                  fontSize: "0.7rem",
+                  cursor: "pointer",
+                }}
+              >
+                全部清除
+              </button>
+            </div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {sessionPinnedUrls.map((url, i) => (
+                <div key={url} style={{ position: "relative" }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={url}
+                    alt={`固定参考图 ${i + 1}`}
+                    style={{
+                      width: 48,
+                      height: 48,
+                      objectFit: "cover",
+                      borderRadius: 6,
+                      border: "1.5px solid var(--accent)",
+                      display: "block",
+                    }}
+                  />
+                  <button
+                    type="button"
+                    title="移除此参考图"
+                    onClick={() => setSessionPinnedUrls((prev) => prev.filter((_, idx) => idx !== i))}
+                    style={{
+                      position: "absolute",
+                      top: -4,
+                      right: -4,
+                      width: 16,
+                      height: 16,
+                      borderRadius: "50%",
+                      background: "rgba(0,0,0,0.7)",
+                      color: "#fff",
+                      border: "none",
+                      cursor: "pointer",
+                      fontSize: "0.6rem",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      lineHeight: 1,
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
