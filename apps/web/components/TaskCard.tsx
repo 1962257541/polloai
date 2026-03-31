@@ -62,6 +62,8 @@ interface TaskCardProps {
   selected?: boolean;
   onSelect?: (taskId: string) => void;
   onDelete?: (taskId: string) => void;
+  onCancel?: (taskId: string) => void;
+  onRetry?: (task: Task) => void;
 }
 
 export default function TaskCard({
@@ -70,6 +72,8 @@ export default function TaskCard({
   selected = false,
   onSelect,
   onDelete,
+  onCancel,
+  onRetry,
 }: TaskCardProps) {
   const [clock, setClock] = useState(Date.now);
   const [mediaError, setMediaError] = useState(false);
@@ -278,7 +282,59 @@ export default function TaskCard({
             </span>
           )}
 
-          {onDelete && (
+          {task.status === "failed" && onRetry && (
+            <button
+              type="button"
+              title="重试"
+              onClick={(event) => {
+                event.stopPropagation();
+                onRetry(task);
+              }}
+              style={{
+                flex: 1,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "5px 8px",
+                borderRadius: 4,
+                border: "1px solid var(--accent)",
+                background: "rgba(0, 247, 198, 0.08)",
+                color: "var(--accent)",
+                cursor: "pointer",
+                fontSize: "0.72rem",
+              }}
+            >
+              重试
+            </button>
+          )}
+
+          {isPending && onCancel && (
+            <button
+              type="button"
+              title="取消"
+              onClick={(event) => {
+                event.stopPropagation();
+                onCancel(task.id);
+              }}
+              style={{
+                flex: output ? "0 0 auto" : 1,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "5px 8px",
+                borderRadius: 4,
+                border: "1px solid rgba(251,146,60,0.4)",
+                background: "transparent",
+                color: "#fb923c",
+                cursor: "pointer",
+                fontSize: "0.72rem",
+              }}
+            >
+              取消
+            </button>
+          )}
+
+          {onDelete && !isPending && (
             <button
               type="button"
               title="删除"
@@ -448,28 +504,73 @@ export default function TaskCard({
             {new Date(task.createdAt).toLocaleString("zh-CN")}
           </span>
 
-          {onDelete && (
-            <button
-              type="button"
-              title="删除"
-              onClick={() => onDelete(task.id)}
-              style={{
-                marginLeft: "auto",
-                display: "flex",
-                alignItems: "center",
-                gap: 4,
-                padding: "3px 8px",
-                borderRadius: 4,
-                border: "1px solid rgba(239,68,68,0.3)",
-                background: "transparent",
-                color: "#ef4444",
-                cursor: "pointer",
-                fontSize: "0.75rem",
-              }}
-            >
-              删除
-            </button>
-          )}
+          <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
+            {task.status === "failed" && onRetry && (
+              <button
+                type="button"
+                title="重试"
+                onClick={() => onRetry(task)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                  padding: "3px 10px",
+                  borderRadius: 4,
+                  border: "1px solid var(--accent)",
+                  background: "rgba(0, 247, 198, 0.08)",
+                  color: "var(--accent)",
+                  cursor: "pointer",
+                  fontSize: "0.75rem",
+                }}
+              >
+                重试
+              </button>
+            )}
+
+            {isPending && onCancel && (
+              <button
+                type="button"
+                title="取消"
+                onClick={() => onCancel(task.id)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                  padding: "3px 10px",
+                  borderRadius: 4,
+                  border: "1px solid rgba(251,146,60,0.4)",
+                  background: "transparent",
+                  color: "#fb923c",
+                  cursor: "pointer",
+                  fontSize: "0.75rem",
+                }}
+              >
+                取消
+              </button>
+            )}
+
+            {onDelete && !isPending && (
+              <button
+                type="button"
+                title="删除"
+                onClick={() => onDelete(task.id)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                  padding: "3px 8px",
+                  borderRadius: 4,
+                  border: "1px solid rgba(239,68,68,0.3)",
+                  background: "transparent",
+                  color: "#ef4444",
+                  cursor: "pointer",
+                  fontSize: "0.75rem",
+                }}
+              >
+                删除
+              </button>
+            )}
+          </div>
         </div>
 
         <p

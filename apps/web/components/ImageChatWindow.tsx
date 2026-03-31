@@ -528,9 +528,41 @@ export default function ImageChatWindow({
                           }}
                         />
                       </div>
-                      <span style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>
-                        {round.status === "queued" ? "等待处理，请稍候..." : "AI 正在生成图片，通常需要 10~30 秒"}
-                      </span>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>
+                          {round.status === "queued" ? "等待处理，请稍候..." : "AI 正在生成图片，通常需要 10~30 秒"}
+                        </span>
+                        {round.taskId && (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              const token = getToken();
+                              if (!token || !round.taskId) return;
+                              try {
+                                await api.cancelTask(token, round.taskId);
+                                setRounds((prev) =>
+                                  prev.map((r) =>
+                                    r.id === round.id ? { ...r, status: "cancelled" } : r
+                                  )
+                                );
+                              } catch (error) {
+                                console.error("Failed to cancel task:", error);
+                              }
+                            }}
+                            style={{
+                              padding: "3px 8px",
+                              borderRadius: 4,
+                              border: "1px solid rgba(251,146,60,0.4)",
+                              background: "transparent",
+                              color: "#fb923c",
+                              cursor: "pointer",
+                              fontSize: "0.7rem",
+                            }}
+                          >
+                            取消生成
+                          </button>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>

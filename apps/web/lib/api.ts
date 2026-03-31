@@ -310,4 +310,73 @@ export const api = {
 
   deleteMaterial: (token: string, id: string) =>
     request(`/materials/${id}`, { method: "DELETE" }, token),
+
+  retryImageTask: async (token: string, originalTask: any) => {
+    const params = originalTask.parameters || {};
+    const payload = {
+      prompt: originalTask.prompt,
+      model: params.model,
+      size: params.size,
+      quality: params.quality,
+      outputFormat: params.outputFormat,
+      imageApiType: params.imageApiType,
+      sessionId: originalTask.sessionId,
+    };
+
+    const inputAssets = originalTask.assets?.filter(
+      (a: any) => a.role === "input" && a.mediaType === "image"
+    ) || [];
+
+    if (inputAssets.length > 0 && params.referenceImageUrls) {
+      const form = new FormData();
+      form.append("prompt", payload.prompt);
+      if (payload.model) form.append("model", payload.model);
+      if (payload.size) form.append("size", payload.size);
+      if (payload.quality) form.append("quality", payload.quality);
+      if (payload.outputFormat) form.append("outputFormat", payload.outputFormat);
+      if (payload.imageApiType) form.append("imageApiType", payload.imageApiType);
+      if (payload.sessionId) form.append("sessionId", payload.sessionId);
+
+      for (const url of params.referenceImageUrls) {
+        form.append("referenceImageUrls", url);
+      }
+
+      const response = await fetch(`${API_BASE}/generations/image`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: form,
+      });
+
+      const text = await response.text();
+      const data = text ? JSON.parse(text) : null;
+      if (!response.ok) {
+        const msg = Array.isArray(data?.message) ? data.message.join("; ") : data?.message;
+        throw new Error(msg || `Request failed (${response.status})`);
+      }
+      return data;
+    }
+
+    return api.createImage(token, payload);
+  },
+
+  retryVideoTask: async (token: string, originalTask: any) => {
+    const params = originalTask.parameters || {};
+    const payload = {
+      prompt: originalTask.prompt,
+      model: params.model,
+      aspectRatio: params.aspectRatio,
+      size: params.size,
+      durationSec: params.durationSec,
+    };
+
+    const inputAsset = originalTask.assets?.find(
+      (a: any) => a.role === "input" && a.mediaType === "image"
+    );
+
+    if (inputAsset) {
+      payload.imageUrl = inputAsset.url;
+    }
+
+    return api.createVideoFromImage(token, payload);
+  },
 };

@@ -96,6 +96,28 @@ export default function VideoPage() {
     };
   }, [loadTasks]);
 
+  const handleCancel = async (taskId: string) => {
+    const token = getToken();
+    if (!token) return;
+    try {
+      await api.cancelTask(token, taskId);
+      await loadTasks();
+    } catch (error) {
+      console.error("Failed to cancel task:", error);
+    }
+  };
+
+  const handleRetry = async (task: Task) => {
+    const token = getToken();
+    if (!token) return;
+    try {
+      await api.retryVideoTask(token, task);
+      await loadTasks(true);
+    } catch (error) {
+      console.error("Failed to retry task:", error);
+    }
+  };
+
   const handleDelete = async (taskId: string) => {
     const token = getToken();
     if (!token) return;
@@ -173,7 +195,7 @@ export default function VideoPage() {
             <span style={{ color: "var(--text-muted)", fontSize: "0.8rem" }}>加载中...</span>
           ) : selectedTask ? (
             <div style={{ width: "100%", height: "100%", overflowY: "auto" }}>
-              <TaskCard task={selectedTask} onDelete={handleDelete} />
+              <TaskCard task={selectedTask} onDelete={handleDelete} onCancel={handleCancel} onRetry={handleRetry} />
             </div>
           ) : (
             <div
