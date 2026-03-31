@@ -361,17 +361,24 @@ export const api = {
 
   retryVideoTask: async (token: string, originalTask: any) => {
     const params = originalTask.parameters || {};
-    const payload = {
+    const inputAsset = originalTask.assets?.find(
+      (a: any) => a.role === "input" && a.mediaType === "image"
+    );
+
+    const payload: {
+      prompt: string;
+      model?: string;
+      imageUrl?: string;
+      aspectRatio?: string;
+      size?: string;
+      durationSec?: number;
+    } = {
       prompt: originalTask.prompt,
       model: params.model,
       aspectRatio: params.aspectRatio,
       size: params.size,
       durationSec: params.durationSec,
     };
-
-    const inputAsset = originalTask.assets?.find(
-      (a: any) => a.role === "input" && a.mediaType === "image"
-    );
 
     if (inputAsset) {
       payload.imageUrl = inputAsset.url;
