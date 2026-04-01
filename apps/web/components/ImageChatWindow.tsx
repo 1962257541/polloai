@@ -53,6 +53,11 @@ export default function ImageChatWindow({
   const [sessionPinnedUrls, setSessionPinnedUrls] = useState<string[]>([]);
   // 动态进度：roundId → 0~100
   const [progressMap, setProgressMap] = useState<Record<string, number>>({});
+  // 生成视频弹窗
+  const [videoModalOpen, setVideoModalOpen] = useState(false);
+  const [videoModalImageUrl, setVideoModalImageUrl] = useState("");
+  const [videoPrompt, setVideoPrompt] = useState("");
+  const [videoSubmitting, setVideoSubmitting] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const stopStreamRef = useRef<(() => void) | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -324,6 +329,35 @@ export default function ImageChatWindow({
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
+  // 打开生成视频弹窗
+  const openVideoModal = (imageUrl: string) => {
+    setVideoModalImageUrl(imageUrl);
+    setVideoPrompt("");
+    setVideoModalOpen(true);
+  };
+
+  // 提交生成视频
+  const handleVideoSubmit = async () => {
+    if (!videoPrompt.trim() || videoSubmitting) return;
+
+    setVideoSubmitting(true);
+    try {
+      await api.createVideoFromImage(
+        token,
+        {
+          prompt: videoPrompt.trim(),
+          imageUrl: videoModalImageUrl,
+        },
+      );
+      setVideoModalOpen(false);
+      setVideoPrompt("");
+    } catch (err) {
+      alert((err as Error).message);
+    } finally {
+      setVideoSubmitting(false);
+    }
+  };
+
   return (
     <div
       style={{
@@ -447,6 +481,7 @@ export default function ImageChatWindow({
                         style={{
                           padding: "10px 14px",
                           display: "flex",
+                          flexDirection: "row",
                           gap: 8,
                           borderTop: "1px solid var(--border)",
                         }}
@@ -483,6 +518,21 @@ export default function ImageChatWindow({
                           }}
                         >
                           基于此图继续
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openVideoModal(round.outputUrl!)}
+                          style={{
+                            padding: "5px 12px",
+                            borderRadius: 6,
+                            border: "1px solid var(--accent)",
+                            background: "transparent",
+                            color: "var(--accent)",
+                            fontSize: "0.75rem",
+                            cursor: "pointer",
+                          }}
+                        >
+                          生成视频
                         </button>
                       </div>
                     </>
@@ -782,6 +832,131 @@ export default function ImageChatWindow({
           </p>
         )}
       </div>
+
+      {/* 生成视频弹窗 */}
+      {videoModalOpen && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0,0,0,0.7)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+          }}
+          onClick={() => setVideoModalOpen(false)}
+        >
+          <div
+            style={{
+              background: "var(--bg-surface)",
+              border: "1px solid var(--border)",
+              borderRadius: 12,
+              padding: "24px",
+              width: "90%",
+              maxWidth: 500,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3
+              style={{
+                margin: "0 0 16px",
+                fontFamily: "Syne, sans-serif",
+                fontSize: "1.1rem",
+                color: "var(--text-primary)",
+              }}
+            >
+              生成视频
+            </h3>
+
+            <div style={{ marginBottom: 16 }}>
+              <img
+                src={videoModalImageUrl}
+                alt="source"
+                style={{
+                  width: "100%",
+                  maxHeight: 200,
+                  objectFit: "contain",
+                  borderRadius: 8,
+                  background: "var(--bg-raised)",
+                }}
+              />
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: "0.75rem",
+                  color: "var(--text-muted)",
+                  marginBottom: 8,
+                  fontFamily: "JetBrains Mono, monospace",
+                  letterSpacing: "0.05em",
+                }}
+              >
+                视频提示词
+              </label>
+              <textarea
+                value={videoPrompt}
+                onChange={(e) => setVideoPrompt(e.target.value)}
+                placeholder="描述视频中的动作和场景..."
+                rows={4}
+                style={{
+                  width: "100%",
+                  padding: "10px 12px",
+                  borderRadius: 8,
+                  border: "1px solid var(--border)",
+                  background: "var(--bg-raised)",
+                  color: "var(--text-primary)",
+                  fontSize: "0.85rem",
+                  fontFamily: "inherit",
+                  resize: "vertical",
+                }}
+              />
+            </div>
+
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              <button
+                type="button"
+                onClick={() => setVideoModalOpen(false)}
+                disabled={videoSubmitting}
+                style={{
+                  padding: "8px 16px",
+                  borderRadius: 6,
+                  border: "1px solid var(--border)",
+                  background: "transparent",
+                  color: "var(--text-secondary)",
+                  fontSize: "0.85rem",
+                  cursor: videoSubmitting ? "not-allowed" : "pointer",
+                  opacity: videoSubmitting ? 0.5 : 1,
+                }}
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                onClick={handleVideoSubmit}
+                disabled={!videoPrompt.trim() || videoSubmitting}
+                style={{
+                  padding: "8px 16px",
+                  borderRadius: 6,
+                  border: "1px solid var(--accent)",
+                  background: "var(--accent)",
+                  color: "var(--bg-base)",
+                  fontSize: "0.85rem",
+                  cursor: !videoPrompt.trim() || videoSubmitting ? "not-allowed" : "pointer",
+                  opacity: !videoPrompt.trim() || videoSubmitting ? 0.5 : 1,
+                }}
+              >
+                {videoSubmitting ? "提交中..." : "生成视频"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

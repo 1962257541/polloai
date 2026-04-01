@@ -54,6 +54,11 @@ export const imageToVideoSchema = z.object({
 export type TextToImageInput = z.infer<typeof textToImageSchema>;
 export type ImageToVideoInput = z.infer<typeof imageToVideoSchema>;
 
+export interface TextToImageParameters extends TextToImageInput {
+  enhancedPrompt?: string;  // 增强后的 prompt
+  responseText?: string;     // 模型返回的文本响应
+}
+
 export interface GenerationCreatedResponse {
   taskId: string;
   status: TaskStatus;

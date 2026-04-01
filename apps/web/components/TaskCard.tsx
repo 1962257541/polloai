@@ -392,27 +392,34 @@ export default function TaskCard({
             <video controls src={output.url} style={{ width: "100%", maxHeight: 400, display: "block" }} />
           )}
 
-          <a
-            href={output.url}
-            download
-            target="_blank"
-            rel="noreferrer"
+          <div
             style={{
               position: "absolute",
               bottom: 12,
               right: 12,
-              background: "rgba(0,0,0,0.7)",
-              border: "1px solid var(--border)",
-              borderRadius: 6,
-              padding: "6px 12px",
-              color: "var(--text-primary)",
-              fontSize: "0.8rem",
-              textDecoration: "none",
-              backdropFilter: "blur(8px)",
+              display: "flex",
+              gap: 8,
             }}
           >
-            下载
-          </a>
+            <a
+              href={output.url}
+              download
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                background: "rgba(0,0,0,0.7)",
+                border: "1px solid var(--border)",
+                borderRadius: 6,
+                padding: "6px 12px",
+                color: "var(--text-primary)",
+                fontSize: "0.8rem",
+                textDecoration: "none",
+                backdropFilter: "blur(8px)",
+              }}
+            >
+              下载
+            </a>
+          </div>
         </div>
       ) : (
         <div

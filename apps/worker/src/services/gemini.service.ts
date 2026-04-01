@@ -206,6 +206,109 @@ export class GeminiService {
       .slice(0, 300);
   }
 
+  async enhancePrompt(input: {
+    originalPrompt: string;
+    referenceImageUrls: string[];
+    apiKey: string;
+    apiUrl?: string;
+  }): Promise<string> {
+    const { originalPrompt, referenceImageUrls, apiKey, apiUrl } = input;
+
+    // 限制最多5张参考图
+    const urls = referenceImageUrls.slice(0, 5);
+    if (urls.length === 0) {
+      return originalPrompt;
+    }
+
+    console.log(`[enhancePrompt] Enhancing prompt with ${urls.length} reference images`);
+
+    try {
+      const requestParts: JsonRecord[] = [];
+
+      // 加载所有参考图（复用现有 loadImage 方法）
+      for (const url of urls) {
+        const image = await this.loadImage(url);
+        requestParts.push({
+          inlineData: {
+            mimeType: image.mimeType,
+            data: image.buffer.toString("base64"),
+          },
+        });
+      }
+
+      // 构建增强请求
+      const systemInstruction = this.buildEnhancementSystemPrompt();
+      requestParts.push({
+        text: originalPrompt || "请根据参考图生成详细的图像描述",
+      });
+
+      // 调用 Gemini 文本生成 API（复用现有 requestJson 方法）
+      const path = `/models/gemini-2.0-flash-exp:generateContent`;
+      const body = await this.requestJson(
+        path,
+        {
+          method: "POST",
+          body: {
+            systemInstruction: {
+              parts: [{ text: systemInstruction }],
+            },
+            contents: [{ parts: requestParts }],
+            generationConfig: {
+              temperature: 0.3,
+              maxOutputTokens: 1000,
+            },
+          },
+        },
+        apiKey,
+        apiUrl,
+      );
+
+      // 提取增强后的 prompt（复用现有 collectResponseText 方法）
+      const responseParts: Array<{ text?: string }> = body?.candidates?.[0]?.content?.parts ?? [];
+      const enhancedPrompt = this.collectResponseText(responseParts);
+
+      // 验证结果有效性
+      if (!enhancedPrompt || enhancedPrompt.length < 10) {
+        console.warn(`[enhancePrompt] Enhancement returned empty/short result, using original`);
+        return originalPrompt;
+      }
+
+      console.log(`[enhancePrompt] Original: "${originalPrompt.slice(0, 60)}..."`);
+      console.log(`[enhancePrompt] Enhanced: "${enhancedPrompt.slice(0, 60)}..."`);
+      return enhancedPrompt;
+
+    } catch (error) {
+      console.error(`[enhancePrompt] Failed to enhance prompt:`, error);
+      return originalPrompt; // 降级：返回原始 prompt
+    }
+  }
+
+  private buildEnhancementSystemPrompt(): string {
+    return `你是一个专业的视觉提示词增强专家。你的任务是分析参考图片，提取其"视觉DNA"（风格、配色、光影、构图、质感、氛围），并将其融入用户的原始描述中，生成一个增强后的图像生成提示词。
+
+**核心原则：**
+1. 不要描述参考图的具体内容（如"一张动画片截图"），而是提取其风格特征（如"水彩质感、柔和光影、自然色调"）
+2. 保留用户原始描述的核心意图和主体内容
+3. 将提取的视觉特征自然地融入描述中
+4. 输出纯文本提示词，不包含任何解释、标题或元信息
+
+**提取维度：**
+- 艺术风格：写实/插画/3D渲染/水彩/油画/赛博朋克等
+- 色彩方案：主色调、饱和度、对比度、色温
+- 光影效果：自然光/戏剧性光影/柔和漫射/强烈对比
+- 构图特点：对称/黄金分割/留白/景深
+- 质感细节：细腻/粗糙/光滑/颗粒感
+- 情绪氛围：温暖/冷峻/梦幻/紧张
+
+**输出格式：**
+直接输出增强后的提示词，不要包含"增强后的提示词："等前缀。
+
+**示例：**
+用户输入："一只猫坐在窗边"
+参考图：吉卜力风格的场景
+输出："一只猫坐在窗边，水彩画风格，柔和的自然光透过窗户洒落，温暖的色调，细腻的笔触，宁静祥和的氛围，景深效果突出主体"`;
+  }
+
   async createVideoFromImage(input: {
     model: string;
     prompt: string;

@@ -122,9 +122,38 @@ export class GenerationWorkerService implements OnModuleInit, OnModuleDestroy {
 
     const params = task.parameters as any;
     const inputAsset = task.assets.find((asset) => asset.role === "input" && asset.mediaType === "image");
+
+    // 合并所有参考图 URL
+    const referenceImageUrls = params.referenceImageUrls ?? [];
+
+    // 多模态提示词增强
+    let finalPrompt = task.prompt;
+    let enhancedPrompt: string | undefined;
+
+    if (referenceImageUrls.length > 0) {
+      console.log(`[handleTextToImage] Attempting prompt enhancement with ${referenceImageUrls.length} reference images`);
+      try {
+        enhancedPrompt = await this.gemini.enhancePrompt({
+          originalPrompt: task.prompt,
+          referenceImageUrls,
+          apiKey,
+          apiUrl,
+        });
+
+        // 只有当增强结果与原始不同时才使用
+        if (enhancedPrompt !== task.prompt) {
+          finalPrompt = enhancedPrompt;
+          console.log(`[handleTextToImage] Using enhanced prompt for task ${taskId}`);
+        }
+      } catch (error) {
+        console.warn(`[handleTextToImage] Prompt enhancement failed, using original prompt:`, error);
+        // 降级：继续使用原始 prompt
+      }
+    }
+
     const image = await this.gemini.generateImage({
       model: task.model,
-      prompt: task.prompt,
+      prompt: finalPrompt,
       size: params.size,
       quality: params.quality,
       background: params.background,
@@ -150,7 +179,7 @@ export class GenerationWorkerService implements OnModuleInit, OnModuleDestroy {
         data: {
           status: "succeeded",
           finishedAt: new Date(),
-          parameters: this.withResponseText(params, image.responseText),
+          parameters: this.withEnhancedPrompt(params, enhancedPrompt, image.responseText),
         },
       });
 
@@ -188,7 +217,11 @@ export class GenerationWorkerService implements OnModuleInit, OnModuleDestroy {
 
       await tx.generationTask.update({
         where: { id: taskId },
-        data: { status: "succeeded", finishedAt: new Date() },
+        data: {
+          status: "succeeded",
+          finishedAt: new Date(),
+          parameters: this.withEnhancedPrompt(params, enhancedPrompt),
+        },
       });
     });
 
@@ -433,6 +466,19 @@ export class GenerationWorkerService implements OnModuleInit, OnModuleDestroy {
     return {
       ...base,
       responseText,
+    };
+  }
+
+  private withEnhancedPrompt(parameters: unknown, enhancedPrompt?: string, responseText?: string) {
+    const base =
+      parameters && typeof parameters === "object" && !Array.isArray(parameters)
+        ? (parameters as Record<string, unknown>)
+        : {};
+
+    return {
+      ...base,
+      ...(enhancedPrompt ? { enhancedPrompt } : {}),
+      ...(responseText ? { responseText } : {}),
     };
   }
 }
