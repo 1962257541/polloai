@@ -37,6 +37,9 @@ export class GenerationWorkerService implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleInit() {
+    // 启动时将上次遗留的 queued/running 任务标记为 failed（服务重启导致的僵尸任务）
+    await this.markStalledTasksFailed();
+
     this.worker = new Worker(
       QUEUE_NAME,
       async (job) => {
@@ -55,6 +58,25 @@ export class GenerationWorkerService implements OnModuleInit, OnModuleDestroy {
     this.worker.on("completed", (job) => {
       console.log("Job completed", job.id);
     });
+  }
+
+  /** 将因服务重启而卡在 queued/running 状态的任务批量标记为 failed */
+  private async markStalledTasksFailed() {
+    try {
+      const result = await this.prisma.generationTask.updateMany({
+        where: { status: { in: ["queued", "running"] } },
+        data: {
+          status: "failed",
+          errorMessage: "服务重启，任务中断。请使用重试功能重新生成。",
+          finishedAt: new Date(),
+        },
+      });
+      if (result.count > 0) {
+        console.log(`[Worker startup] Marked ${result.count} stalled task(s) as failed.`);
+      }
+    } catch (err) {
+      console.error("[Worker startup] Failed to mark stalled tasks:", err);
+    }
   }
 
   async onModuleDestroy() {

@@ -225,16 +225,30 @@ export default function ImageSessionList({
                         src={session.outputUrl}
                         alt=""
                         style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                        onError={(e) => {
+                          // 图片加载失败时隐藏 img，显示占位符
+                          (e.currentTarget as HTMLImageElement).style.display = "none";
+                          const placeholder = (e.currentTarget as HTMLImageElement).nextElementSibling as HTMLElement;
+                          if (placeholder) placeholder.style.display = "flex";
+                        }}
                       />
-                    ) : (
-                      <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-                          <rect x="3" y="3" width="18" height="18" rx="2" />
-                          <circle cx="8.5" cy="8.5" r="1.5" />
-                          <path d="m21 15-5-5L5 21" />
-                        </svg>
-                      </div>
-                    )}
+                    ) : null}
+                    {/* 无 outputUrl 或图片加载失败时的占位符 */}
+                    <div
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        display: session.outputUrl ? "none" : "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="3" width="18" height="18" rx="2" />
+                        <circle cx="8.5" cy="8.5" r="1.5" />
+                        <path d="m21 15-5-5L5 21" />
+                      </svg>
+                    </div>
                   </div>
 
                   {/* 内容 */}
