@@ -104,6 +104,7 @@ export default function MaterialsPage() {
   const [cursorStack, setCursorStack] = useState<(string | undefined)[]>([undefined]);
   const [currentPage, setCurrentPage] = useState(0); // 0-indexed
   const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{
@@ -134,6 +135,7 @@ export default function MaterialsPage() {
         const result = await api.listMaterials(token, { mediaType, cursor, limit: PAGE_SIZE });
         setItems(result.items);
         setNextCursor(result.nextCursor);
+        setTotal(result.total ?? 0);
       } catch (e: any) {
         setMessage(e.message ?? "加载失败");
       } finally {
@@ -567,8 +569,10 @@ export default function MaterialsPage() {
             ← 上一页
           </button>
 
-          <span style={{ fontSize: "0.8rem", color: "var(--text-muted)", minWidth: 60, textAlign: "center" }}>
-            第 {currentPage + 1} 页
+          <span style={{ fontSize: "0.8rem", color: "var(--text-muted)", textAlign: "center", whiteSpace: "nowrap" }}>
+            第 {currentPage + 1} / {Math.ceil(total / PAGE_SIZE) || 1} 页
+            <span style={{ color: "var(--border)", margin: "0 6px" }}>·</span>
+            共 {total} 个
           </span>
 
           <button

@@ -58,6 +58,7 @@ export type Material = {
 export type MaterialListResult = {
   items: Material[];
   nextCursor: string | null;
+  total: number;
 };
 
 export type SessionSummary = {

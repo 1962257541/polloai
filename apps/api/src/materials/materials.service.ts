@@ -88,17 +88,29 @@ export class MaterialsService {
       where.createdAt = { lt: new Date(opts.cursor) };
     }
 
-    const items = await this.prisma.material.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      take: limit + 1,
-    });
+    // 用不带 cursor 的 where 统计总数（total 不受分页影响）
+    const whereForCount: any = { userId };
+    if (opts.mediaType === "image" || opts.mediaType === "video") {
+      whereForCount.mediaType = opts.mediaType;
+    }
+    if (opts.source === "uploaded" || opts.source === "generated") {
+      whereForCount.source = opts.source;
+    }
+
+    const [items, total] = await Promise.all([
+      this.prisma.material.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        take: limit + 1,
+      }),
+      this.prisma.material.count({ where: whereForCount }),
+    ]);
 
     const hasMore = items.length > limit;
     const result = hasMore ? items.slice(0, limit) : items;
     const nextCursor = hasMore ? result[result.length - 1].createdAt.toISOString() : null;
 
-    return { items: result, nextCursor };
+    return { items: result, nextCursor, total };
   }
 
   async archive(userId: string, materialId: string) {
