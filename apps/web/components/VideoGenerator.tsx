@@ -153,7 +153,6 @@ export default function VideoGenerator({ onCreated }: VideoGeneratorProps) {
     const errors: string[] = [];
 
     try {
-      // 串行逐个提交，完成一个再处理下一个
       for (let i = 0; i < batchMaterials.length; i++) {
         const material = batchMaterials[i];
         setBatchProgress({ current: i + 1, total: batchMaterials.length });
@@ -167,7 +166,7 @@ export default function VideoGenerator({ onCreated }: VideoGeneratorProps) {
             durationSec: batchDuration,
           });
           succeeded++;
-          if (succeeded === 1) onCreated(); // 第一个成功后立即刷新列表
+          if (succeeded === 1) onCreated();
         } catch (err) {
           errors.push(`第 ${i + 1} 张（${material.name}）：${(err as Error).message}`);
         }
@@ -175,7 +174,7 @@ export default function VideoGenerator({ onCreated }: VideoGeneratorProps) {
 
       setBatchResult(`已提交 ${succeeded}/${batchMaterials.length} 条任务。`);
       if (errors.length > 0) setBatchError(errors.slice(0, 3).join("；"));
-      if (succeeded > 1) onCreated(); // 全部完成后再刷新一次
+      if (succeeded > 1) onCreated();
     } finally {
       setBatchSubmitting(false);
       setBatchProgress({ current: 0, total: 0 });
@@ -273,275 +272,274 @@ export default function VideoGenerator({ onCreated }: VideoGeneratorProps) {
 
   return (
     <>
+      {/* 整个生成器卡片：flex 列，撑满父容器高度 */}
       <div
         style={{
           background: "var(--bg-surface)",
           border: "1px solid var(--border)",
           borderRadius: 12,
           boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
-          padding: "24px",
           display: "flex",
           flexDirection: "column",
-          gap: 20,
+          height: "100%",
+          overflow: "hidden",
         }}
       >
-        <div>
-          <h2
+        {/* Tab 切换 — 固定顶部 */}
+        <div style={{ padding: "14px 16px 12px", flexShrink: 0, borderBottom: "1px solid var(--border)" }}>
+          <div
             style={{
-              fontFamily: "inherit",
-              fontWeight: 700,
-              fontSize: "1rem",
-              color: "var(--text-primary)",
-              margin: 0,
+              display: "grid",
+              gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+              gap: 6,
+              padding: 4,
+              borderRadius: 999,
+              background: "var(--bg-raised)",
+              border: "1px solid var(--border)",
             }}
           >
-            图生视频
-          </h2>
-        </div>
-
-        {/* Tab 切换 */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-            gap: 8,
-            padding: 4,
-            borderRadius: 999,
-            background: "var(--bg-raised)",
-            border: "1px solid var(--border)",
-          }}
-        >
-          {[
-            { key: "single" as const, label: "单个生成" },
-            { key: "batch" as const, label: "批量生成" },
-          ].map((tab) => {
-            const active = activeTab === tab.key;
-            return (
-              <button
-                key={tab.key}
-                type="button"
-                onClick={() => setActiveTab(tab.key)}
-                style={{
-                  border: "none",
-                  borderRadius: 999,
-                  padding: "10px 14px",
-                  background: active ? "var(--accent)" : "transparent",
-                  color: active ? "#FFFFFF" : "var(--text-secondary)",
-                  fontSize: "0.82rem",
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
-              >
-                {tab.label}
-              </button>
-            );
-          })}
+            {[
+              { key: "single" as const, label: "单个生成" },
+              { key: "batch" as const, label: "批量生成" },
+            ].map((tab) => {
+              const active = activeTab === tab.key;
+              return (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => setActiveTab(tab.key)}
+                  style={{
+                    border: "none",
+                    borderRadius: 999,
+                    padding: "8px 14px",
+                    background: active ? "var(--accent)" : "transparent",
+                    color: active ? "#FFFFFF" : "var(--text-secondary)",
+                    fontSize: "0.82rem",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* 单个生成 */}
         {activeTab === "single" ? (
-          <form onSubmit={handleSingleSubmit} style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-            <div>
-              <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "inherit", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
-                PROMPT
-              </label>
-              <textarea
-                className="input-field"
-                value={prompt}
-                onChange={(event) => setPrompt(event.target.value)}
-                placeholder="描述视频动作和镜头效果..."
-                rows={3}
-                style={{ resize: "vertical", minHeight: 88 }}
-              />
-            </div>
+          <form
+            onSubmit={handleSingleSubmit}
+            style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0, overflow: "hidden" }}
+          >
+            {/* 可滚动的表单内容区 */}
+            <div style={{ flex: 1, overflowY: "auto", padding: "16px 16px 8px", display: "flex", flexDirection: "column", gap: 16 }}>
+              <div>
+                <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "inherit", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
+                  PROMPT
+                </label>
+                <textarea
+                  className="input-field"
+                  value={prompt}
+                  onChange={(event) => setPrompt(event.target.value)}
+                  placeholder="描述视频动作和镜头效果..."
+                  rows={3}
+                  style={{ resize: "none", minHeight: 80 }}
+                />
+              </div>
 
-            {renderModelSelect("MODEL")}
+              {renderModelSelect("MODEL")}
 
-            {/* 图片来源 */}
-            <div>
-              <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "inherit", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
-                INPUT IMAGE
-              </label>
+              {/* 图片来源 */}
+              <div>
+                <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "inherit", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
+                  INPUT IMAGE
+                </label>
 
-              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                <button type="button" className="btn-ghost" onClick={() => openLibrary("single")}>
-                  {selectedMaterial ? "重新选择" : "从素材库选择"}
-                </button>
-                {selectedMaterial && (
-                  <button
-                    type="button"
-                    className="btn-ghost"
-                    onClick={() => { setSelectedMaterial(null); setError(""); }}
-                  >
-                    清除
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                  <button type="button" className="btn-ghost" onClick={() => openLibrary("single")}>
+                    {selectedMaterial ? "重新选择" : "从素材库选择"}
                   </button>
+                  {selectedMaterial && (
+                    <button
+                      type="button"
+                      className="btn-ghost"
+                      onClick={() => { setSelectedMaterial(null); setError(""); }}
+                    >
+                      清除
+                    </button>
+                  )}
+                </div>
+
+                {selectedMaterial && (
+                  <div
+                    style={{
+                      marginTop: 10,
+                      border: "1px solid var(--border)",
+                      borderRadius: 10,
+                      overflow: "hidden",
+                      background: "var(--bg-raised)",
+                    }}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={selectedMaterial.url}
+                      alt={selectedMaterial.name}
+                      style={{ width: "100%", display: "block", maxHeight: 180, objectFit: "cover" }}
+                    />
+                    <div style={{ padding: "8px 12px", fontSize: "0.75rem", color: "var(--text-muted)" }}>
+                      {selectedMaterial.name}
+                    </div>
+                  </div>
+                )}
+
+                {!selectedMaterial && (
+                  <input
+                    className="input-field"
+                    type="url"
+                    value={imageUrl}
+                    onChange={(event) => setImageUrl(event.target.value)}
+                    placeholder="或直接输入图片 URL"
+                    style={{ marginTop: 10 }}
+                  />
                 )}
               </div>
 
-              {/* 已选素材预览 */}
-              {selectedMaterial && (
-                <div
-                  style={{
-                    marginTop: 10,
-                    border: "1px solid var(--border)",
-                    borderRadius: 12,
-                    overflow: "hidden",
-                    background: "var(--bg-raised)",
-                  }}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={selectedMaterial.url}
-                    alt={selectedMaterial.name}
-                    style={{ width: "100%", display: "block", maxHeight: 220, objectFit: "cover" }}
-                  />
-                  <div style={{ padding: "10px 14px", fontSize: "0.78rem", color: "var(--text-muted)" }}>
-                    {selectedMaterial.name}
+              {renderSizeSelect(size, setSize)}
+              {renderDurationSelect(duration, setDuration)}
+
+              {error && (
+                <div style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.18)", borderRadius: 8, padding: "10px 12px", fontSize: "0.8rem", color: "var(--error)" }}>
+                  {error}
+                </div>
+              )}
+            </div>
+
+            {/* 生成按钮 — 固定底部，始终可见 */}
+            <div style={{ padding: "12px 16px", borderTop: "1px solid var(--border)", flexShrink: 0, background: "var(--bg-surface)" }}>
+              <button
+                className="btn-primary"
+                type="submit"
+                disabled={loading || !prompt.trim() || !canSubmit || !selectedModel}
+                style={{ width: "100%" }}
+              >
+                {loading ? "提交中..." : "生成视频"}
+              </button>
+            </div>
+          </form>
+        ) : (
+          /* 批量生成 */
+          <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0, overflow: "hidden" }}>
+            {/* 可滚动的表单内容区 */}
+            <div style={{ flex: 1, overflowY: "auto", padding: "16px 16px 8px", display: "flex", flexDirection: "column", gap: 16 }}>
+              {renderModelSelect("MODEL")}
+
+              <div>
+                <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "inherit", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
+                  PROMPT（统一应用于所有素材）
+                </label>
+                <textarea
+                  className="input-field"
+                  value={batchPrompt}
+                  onChange={(e) => setBatchPrompt(e.target.value)}
+                  placeholder="描述视频动作和镜头效果，将应用于所有选中的素材..."
+                  rows={3}
+                  style={{ resize: "none", minHeight: 80 }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "inherit", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
+                  SELECT MATERIALS（可多选）
+                </label>
+                <button type="button" className="btn-ghost" onClick={() => openLibrary("batch")}>
+                  {batchMaterials.length > 0 ? `已选 ${batchMaterials.length} 张，重新选择` : "从素材库选择图片"}
+                </button>
+              </div>
+
+              {batchMaterials.length > 0 && (
+                <div>
+                  <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: 8 }}>
+                    已选 {batchMaterials.length} 张，将串行生成 {batchMaterials.length} 个任务：
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(64px, 1fr))", gap: 6 }}>
+                    {batchMaterials.map((m) => (
+                      <div key={m.id} style={{ position: "relative", borderRadius: 6, overflow: "hidden", border: "1px solid var(--border)", paddingBottom: "100%", background: "var(--bg-raised)" }}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={m.url}
+                          alt={m.name}
+                          loading="lazy"
+                          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setBatchMaterials((prev) => prev.filter((x) => x.id !== m.id))}
+                          style={{
+                            position: "absolute",
+                            top: 2,
+                            right: 2,
+                            width: 16,
+                            height: 16,
+                            borderRadius: "50%",
+                            background: "rgba(0,0,0,0.6)",
+                            color: "#fff",
+                            border: "none",
+                            cursor: "pointer",
+                            fontSize: "0.6rem",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}
 
-              {/* 或输入 URL */}
-              {!selectedMaterial && (
-                <input
-                  className="input-field"
-                  type="url"
-                  value={imageUrl}
-                  onChange={(event) => setImageUrl(event.target.value)}
-                  placeholder="或直接输入图片 URL"
-                  style={{ marginTop: 10 }}
-                />
+              {renderSizeSelect(batchSize, setBatchSize)}
+              {renderDurationSelect(batchDuration, setBatchDuration)}
+
+              {batchSubmitting && batchProgress.total > 0 && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", fontFamily: "inherit" }}>
+                    正在处理第 {batchProgress.current} / {batchProgress.total} 个任务...
+                  </div>
+                  <div style={{ height: 4, borderRadius: 2, background: "var(--bg-raised)", overflow: "hidden" }}>
+                    <div
+                      style={{
+                        height: "100%",
+                        borderRadius: 2,
+                        background: "var(--accent)",
+                        width: `${(batchProgress.current / batchProgress.total) * 100}%`,
+                        transition: "width 0.3s ease",
+                      }}
+                    />
+                  </div>
+                </div>
               )}
+
+              {batchResult && <div style={{ fontSize: "0.8rem", color: "var(--success)" }}>{batchResult}</div>}
+              {batchError && <div style={{ fontSize: "0.8rem", color: "var(--error)" }}>{batchError}</div>}
             </div>
 
-            {renderSizeSelect(size, setSize)}
-            {renderDurationSelect(duration, setDuration)}
-
-            {error && (
-              <div style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: 8, padding: "10px 12px", fontSize: "0.8rem", color: "var(--error)" }}>
-                {error}
-              </div>
-            )}
-
-            <button
-              className="btn-primary"
-              type="submit"
-              disabled={loading || !prompt.trim() || !canSubmit || !selectedModel}
-              style={{ width: "100%" }}
-            >
-              {loading ? "提交中..." : "生成视频"}
-            </button>
-          </form>
-        ) : (
-          /* 批量生成 */
-          <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-            {renderModelSelect("MODEL")}
-
-            {/* 统一 Prompt */}
-            <div>
-              <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "inherit", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
-                PROMPT（统一应用于所有素材）
-              </label>
-              <textarea
-                className="input-field"
-                value={batchPrompt}
-                onChange={(e) => setBatchPrompt(e.target.value)}
-                placeholder="描述视频动作和镜头效果，将应用于所有选中的素材..."
-                rows={3}
-                style={{ resize: "vertical", minHeight: 88 }}
-              />
-            </div>
-
-            {/* 选择素材 */}
-            <div>
-              <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "inherit", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
-                SELECT MATERIALS（可多选）
-              </label>
-              <button type="button" className="btn-ghost" onClick={() => openLibrary("batch")}>
-                {batchMaterials.length > 0 ? `已选 ${batchMaterials.length} 张，重新选择` : "从素材库选择图片"}
+            {/* 批量生成按钮 — 固定底部 */}
+            <div style={{ padding: "12px 16px", borderTop: "1px solid var(--border)", flexShrink: 0, background: "var(--bg-surface)" }}>
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => void handleBatchSubmit()}
+                disabled={batchSubmitting || batchMaterials.length === 0 || !selectedModel || !batchPrompt.trim()}
+                style={{ width: "100%" }}
+              >
+                {batchSubmitting
+                  ? `提交中（${batchProgress.current}/${batchProgress.total}）...`
+                  : `批量生成视频（${batchMaterials.length} 个任务）`}
               </button>
             </div>
-
-            {/* 已选素材缩略图 */}
-            {batchMaterials.length > 0 && (
-              <div>
-                <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: 8 }}>
-                  已选 {batchMaterials.length} 张素材，将依次串行生成 {batchMaterials.length} 个视频任务：
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(72px, 1fr))", gap: 8 }}>
-                  {batchMaterials.map((m) => (
-                    <div key={m.id} style={{ position: "relative", borderRadius: 6, overflow: "hidden", border: "1px solid var(--border)", paddingBottom: "100%", background: "var(--bg-raised)" }}>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={m.url}
-                        alt={m.name}
-                        loading="lazy"
-                        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setBatchMaterials((prev) => prev.filter((x) => x.id !== m.id))}
-                        style={{
-                          position: "absolute",
-                          top: 2,
-                          right: 2,
-                          width: 16,
-                          height: 16,
-                          borderRadius: "50%",
-                          background: "rgba(0,0,0,0.6)",
-                          color: "#fff",
-                          border: "none",
-                          cursor: "pointer",
-                          fontSize: "0.6rem",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {renderSizeSelect(batchSize, setBatchSize)}
-            {renderDurationSelect(batchDuration, setBatchDuration)}
-
-            {/* 串行进度条 */}
-            {batchSubmitting && batchProgress.total > 0 && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", fontFamily: "inherit" }}>
-                  正在处理第 {batchProgress.current} / {batchProgress.total} 个任务...
-                </div>
-                <div style={{ height: 4, borderRadius: 2, background: "var(--bg-raised)", overflow: "hidden" }}>
-                  <div
-                    style={{
-                      height: "100%",
-                      borderRadius: 2,
-                      background: "var(--accent)",
-                      width: `${(batchProgress.current / batchProgress.total) * 100}%`,
-                      transition: "width 0.3s ease",
-                    }}
-                  />
-                </div>
-              </div>
-            )}
-
-            {batchResult && <div style={{ fontSize: "0.8rem", color: "var(--success)" }}>{batchResult}</div>}
-            {batchError && <div style={{ fontSize: "0.8rem", color: "var(--error)" }}>{batchError}</div>}
-
-            <button
-              type="button"
-              className="btn-primary"
-              onClick={() => void handleBatchSubmit()}
-              disabled={batchSubmitting || batchMaterials.length === 0 || !selectedModel || !batchPrompt.trim()}
-            >
-              {batchSubmitting
-                ? `提交中（${batchProgress.current}/${batchProgress.total}）...`
-                : `批量生成视频（${batchMaterials.length} 个任务）`}
-            </button>
           </div>
         )}
       </div>

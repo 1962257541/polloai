@@ -137,45 +137,20 @@ export default function VideoPage() {
   return (
     <div
       className="page-enter"
-      style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 56px)", minHeight: 0 }}
+      style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}
     >
-      {/* 页头 */}
-      <div style={{ marginBottom: 20, flexShrink: 0 }}>
-        <h1
-          style={{
-            fontFamily: "inherit",
-            fontWeight: 700,
-            fontSize: "1.4rem",
-            color: "var(--text-primary)",
-            margin: 0,
-          }}
-        >
-          图生视频
-        </h1>
-        <p
-          style={{
-            color: "var(--text-muted)",
-            fontSize: "0.8rem",
-            fontFamily: "inherit",
-            marginTop: 4,
-          }}
-        >
-          IMAGE TO VIDEO / VEO
-        </p>
-      </div>
-
-      {/* 主体：左生成器 | 中预览 | 右历史列表 */}
+      {/* 主体：左生成器 | 中预览 | 右历史列表 — 撑满剩余高度 */}
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "380px 1fr 280px",
+          gridTemplateColumns: "360px 1fr 280px",
           gap: 16,
           flex: 1,
           minHeight: 0,
         }}
       >
-        {/* 左：生成器 */}
-        <div style={{ overflowY: "auto" }}>
+        {/* 左：生成器 — 不自身滚动，内部组件控制滚动 */}
+        <div style={{ display: "flex", flexDirection: "column", minHeight: 0 }}>
           <VideoGenerator onCreated={handleCreated} />
         </div>
 

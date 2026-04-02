@@ -60,34 +60,9 @@ export default function ImagePage() {
   return (
     <div
       className="page-enter"
-      style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 56px)", minHeight: 0 }}
+      style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}
     >
-      {/* 页头 */}
-      <div style={{ marginBottom: 20, flexShrink: 0 }}>
-        <h1
-          style={{
-            fontFamily: "inherit",
-            fontWeight: 700,
-            fontSize: "1.4rem",
-            color: "var(--text-primary)",
-            margin: 0,
-          }}
-        >
-          文字生图
-        </h1>
-        <p
-          style={{
-            color: "var(--text-muted)",
-            fontSize: "0.8rem",
-            fontFamily: "inherit",
-            marginTop: 4,
-          }}
-        >
-          TEXT TO IMAGE / GEMINI
-        </p>
-      </div>
-
-      {/* 主体：左配置 | 中对话 | 右历史会话 */}
+      {/* 主体：左配置 | 中对话 | 右历史会话 — 撑满剩余高度 */}
       <div
         style={{
           display: "grid",
