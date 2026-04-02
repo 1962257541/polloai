@@ -41,7 +41,7 @@ export default function SearchableMultiSelect({
           style={{
             display: "block",
             fontSize: "0.7rem",
-            fontFamily: "JetBrains Mono, monospace",
+            fontFamily: "inherit",
             color: "var(--text-muted)",
             letterSpacing: "0.05em",
           }}

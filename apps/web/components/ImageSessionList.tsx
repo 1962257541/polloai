@@ -99,7 +99,8 @@ export default function ImageSessionList({
         height: "100%",
         background: "var(--bg-surface)",
         border: "1px solid var(--border)",
-        borderRadius: 10,
+        borderRadius: 12,
+        boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
         overflow: "hidden",
       }}
     >
@@ -115,7 +116,7 @@ export default function ImageSessionList({
           <span
             style={{
               fontSize: "0.7rem",
-              fontFamily: "JetBrains Mono, monospace",
+              fontFamily: "inherit",
               color: "var(--text-muted)",
               letterSpacing: "0.08em",
             }}
@@ -280,7 +281,7 @@ export default function ImageSessionList({
                         {timeAgo(session.latestCreatedAt)}
                       </span>
                       {session.taskCount > 1 && (
-                        <span style={{ fontSize: "0.68rem", color: "var(--text-muted)", fontFamily: "JetBrains Mono, monospace" }}>
+                        <span style={{ fontSize: "0.68rem", color: "var(--text-muted)", fontFamily: "inherit" }}>
                           · {session.taskCount} 张
                         </span>
                       )}

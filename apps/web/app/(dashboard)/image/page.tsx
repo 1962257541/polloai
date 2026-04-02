@@ -60,13 +60,13 @@ export default function ImagePage() {
   return (
     <div
       className="page-enter"
-      style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 64px)", minHeight: 0 }}
+      style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 56px)", minHeight: 0 }}
     >
       {/* 页头 */}
       <div style={{ marginBottom: 20, flexShrink: 0 }}>
         <h1
           style={{
-            fontFamily: "Syne, sans-serif",
+            fontFamily: "inherit",
             fontWeight: 700,
             fontSize: "1.4rem",
             color: "var(--text-primary)",
@@ -79,7 +79,7 @@ export default function ImagePage() {
           style={{
             color: "var(--text-muted)",
             fontSize: "0.8rem",
-            fontFamily: "JetBrains Mono, monospace",
+            fontFamily: "inherit",
             marginTop: 4,
           }}
         >
@@ -102,7 +102,8 @@ export default function ImagePage() {
           style={{
             background: "var(--bg-surface)",
             border: "1px solid var(--border)",
-            borderRadius: 10,
+            borderRadius: 12,
+            boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
             padding: 20,
             display: "flex",
             flexDirection: "column",
@@ -112,8 +113,7 @@ export default function ImagePage() {
         >
           <h2
             style={{
-              fontFamily: "Syne, sans-serif",
-              fontWeight: 700,
+              fontWeight: 600,
               fontSize: "0.9rem",
               color: "var(--text-primary)",
               margin: 0,
@@ -124,7 +124,7 @@ export default function ImagePage() {
 
           {/* Model */}
           <div>
-            <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "JetBrains Mono, monospace", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
+            <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "inherit", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
               MODEL
             </label>
             <select
@@ -145,7 +145,7 @@ export default function ImagePage() {
 
           {/* Image API Type */}
           <div>
-            <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "JetBrains Mono, monospace", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
+            <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "inherit", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
               IMAGE API TYPE
             </label>
             <select
@@ -163,7 +163,7 @@ export default function ImagePage() {
 
           {/* Size */}
           <div>
-            <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "JetBrains Mono, monospace", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
+            <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "inherit", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
               SIZE
             </label>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -180,7 +180,7 @@ export default function ImagePage() {
                     color: size === opt.value ? "var(--accent)" : "var(--text-secondary)",
                     fontSize: "0.78rem",
                     cursor: "pointer",
-                    fontFamily: "JetBrains Mono, monospace",
+                    fontFamily: "inherit",
                     transition: "all 0.15s",
                   }}
                 >
@@ -192,7 +192,7 @@ export default function ImagePage() {
 
           {/* Format */}
           <div>
-            <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "JetBrains Mono, monospace", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
+            <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "inherit", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
               FORMAT
             </label>
             <div style={{ display: "flex", gap: 6 }}>
@@ -209,7 +209,7 @@ export default function ImagePage() {
                     color: format === opt.value ? "var(--accent)" : "var(--text-secondary)",
                     fontSize: "0.78rem",
                     cursor: "pointer",
-                    fontFamily: "JetBrains Mono, monospace",
+                    fontFamily: "inherit",
                     transition: "all 0.15s",
                   }}
                 >

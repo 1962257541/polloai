@@ -113,7 +113,7 @@ export default function SalespersonManage() {
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-        <h3 style={{ fontFamily: "Syne, sans-serif", fontWeight: 700, fontSize: "0.95rem", color: "var(--text-primary)", margin: 0 }}>
+        <h3 style={{ fontFamily: "inherit", fontWeight: 700, fontSize: "0.95rem", color: "var(--text-primary)", margin: 0 }}>
           账号管理
         </h3>
         <button className="btn-ghost" onClick={() => setModal({ type: "create" })} style={{ fontSize: "0.8rem" }}>
@@ -135,7 +135,7 @@ export default function SalespersonManage() {
             padding: "10px 16px",
             borderBottom: "1px solid var(--border)",
             fontSize: "0.65rem",
-            fontFamily: "JetBrains Mono, monospace",
+            fontFamily: "inherit",
             color: "var(--text-muted)",
             letterSpacing: "0.1em",
           }}
@@ -168,7 +168,7 @@ export default function SalespersonManage() {
                 alignItems: "center",
               }}
             >
-              <span style={{ color: "var(--text-primary)", fontFamily: "JetBrains Mono, monospace", fontSize: "0.75rem" }}>
+              <span style={{ color: "var(--text-primary)", fontFamily: "inherit", fontSize: "0.75rem" }}>
                 {user.email}
               </span>
               <span style={{ color: "var(--text-secondary)" }}>{user.name || "-"}</span>
@@ -249,26 +249,26 @@ export default function SalespersonManage() {
               {modal.type === "create" && (
                 <>
                   <div style={{ borderBottom: "2px solid var(--accent)", paddingBottom: 12, marginBottom: 20 }}>
-                    <h3 style={{ fontFamily: "Syne, sans-serif", fontWeight: 700, color: "var(--accent)", margin: 0, fontSize: "1rem" }}>
+                    <h3 style={{ fontFamily: "inherit", fontWeight: 700, color: "var(--accent)", margin: 0, fontSize: "1rem" }}>
                       创建业务员账号
                     </h3>
                   </div>
 
                   <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                     <div>
-                      <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "JetBrains Mono, monospace", color: "var(--text-muted)", marginBottom: 6, letterSpacing: "0.05em" }}>
+                      <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "inherit", color: "var(--text-muted)", marginBottom: 6, letterSpacing: "0.05em" }}>
                         EMAIL *
                       </label>
                       <input className="input-field" type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="user@example.com" />
                     </div>
                     <div>
-                      <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "JetBrains Mono, monospace", color: "var(--text-muted)", marginBottom: 6, letterSpacing: "0.05em" }}>
+                      <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "inherit", color: "var(--text-muted)", marginBottom: 6, letterSpacing: "0.05em" }}>
                         NAME
                       </label>
                       <input className="input-field" type="text" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="显示名称（可选）" />
                     </div>
                     <div>
-                      <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "JetBrains Mono, monospace", color: "var(--text-muted)", marginBottom: 6, letterSpacing: "0.05em" }}>
+                      <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "inherit", color: "var(--text-muted)", marginBottom: 6, letterSpacing: "0.05em" }}>
                         PASSWORD *
                       </label>
                       <input className="input-field" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="至少 8 位" />
@@ -289,7 +289,7 @@ export default function SalespersonManage() {
               {modal.type === "apikey" && (
                 <>
                   <div style={{ borderBottom: "2px solid var(--accent)", paddingBottom: 12, marginBottom: 20 }}>
-                    <h3 style={{ fontFamily: "Syne, sans-serif", fontWeight: 700, color: "var(--accent)", margin: 0, fontSize: "1rem" }}>
+                    <h3 style={{ fontFamily: "inherit", fontWeight: 700, color: "var(--accent)", margin: 0, fontSize: "1rem" }}>
                       配置 API 中转站
                     </h3>
                     <p style={{ color: "var(--text-muted)", fontSize: "0.8rem", marginTop: 4, marginBottom: 0 }}>
@@ -299,7 +299,7 @@ export default function SalespersonManage() {
 
                   <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                     <div>
-                      <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "JetBrains Mono, monospace", color: "var(--text-muted)", marginBottom: 6, letterSpacing: "0.05em" }}>
+                      <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "inherit", color: "var(--text-muted)", marginBottom: 6, letterSpacing: "0.05em" }}>
                         API KEY *
                       </label>
                       <input
@@ -311,7 +311,7 @@ export default function SalespersonManage() {
                       />
                     </div>
                     <div>
-                      <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "JetBrains Mono, monospace", color: "var(--text-muted)", marginBottom: 6, letterSpacing: "0.05em" }}>
+                      <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "inherit", color: "var(--text-muted)", marginBottom: 6, letterSpacing: "0.05em" }}>
                         BASE URL *
                       </label>
                       <input
@@ -342,7 +342,7 @@ export default function SalespersonManage() {
 
               {modal.type === "delete" && (
                 <>
-                  <h3 style={{ fontFamily: "Syne, sans-serif", fontWeight: 700, color: "var(--error)", marginBottom: 12, fontSize: "1rem" }}>
+                  <h3 style={{ fontFamily: "inherit", fontWeight: 700, color: "var(--error)", marginBottom: 12, fontSize: "1rem" }}>
                     确认删除
                   </h3>
                   <p style={{ color: "var(--text-secondary)", fontSize: "0.875rem", marginBottom: 20 }}>

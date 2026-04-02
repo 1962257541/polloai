@@ -309,7 +309,7 @@ export default function MaterialsPage() {
         <div>
           <h1
             style={{
-              fontFamily: "Syne, sans-serif",
+              fontFamily: "inherit",
               fontWeight: 700,
               fontSize: "1.5rem",
               color: "var(--text-primary)",

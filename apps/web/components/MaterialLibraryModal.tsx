@@ -164,7 +164,7 @@ export default function MaterialLibraryModal({
             <h3
               style={{
                 margin: 0,
-                fontFamily: "Syne, sans-serif",
+                fontFamily: "inherit",
                 fontWeight: 700,
                 fontSize: "1rem",
                 color: "var(--text-primary)",

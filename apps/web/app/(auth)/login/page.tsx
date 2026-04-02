@@ -36,33 +36,30 @@ export default function LoginPage() {
 
   return (
     <div
-      className="min-h-screen grid-bg flex items-center justify-center p-4"
-      style={{ background: "var(--bg-base)" }}
+      className="min-h-screen flex items-center justify-center p-4"
+      style={{ background: "#F8FAFC" }}
     >
-      {/* 背景射线装饰 */}
-      <div
-        className="pointer-events-none fixed inset-0 overflow-hidden"
-        aria-hidden
-      >
+      {/* 背景装饰 */}
+      <div className="pointer-events-none fixed inset-0 overflow-hidden" aria-hidden>
         <div
           style={{
             position: "absolute",
-            bottom: "-20%",
-            right: "-10%",
-            width: "600px",
-            height: "600px",
-            background: "radial-gradient(circle, rgba(245,158,11,0.06) 0%, transparent 70%)",
+            bottom: "-10%",
+            right: "-5%",
+            width: "500px",
+            height: "500px",
+            background: "radial-gradient(circle, rgba(37,99,235,0.05) 0%, transparent 70%)",
             borderRadius: "50%",
           }}
         />
         <div
           style={{
             position: "absolute",
-            top: "10%",
+            top: "5%",
             left: "-5%",
             width: "400px",
             height: "400px",
-            background: "radial-gradient(circle, rgba(245,158,11,0.03) 0%, transparent 70%)",
+            background: "radial-gradient(circle, rgba(37,99,235,0.03) 0%, transparent 70%)",
             borderRadius: "50%",
           }}
         />
@@ -71,57 +68,74 @@ export default function LoginPage() {
       <div className="w-full max-w-sm animate-fade-up">
         {/* Logo */}
         <div className="mb-8 text-center">
-          <div className="mb-2 flex items-center justify-center gap-2">
-            <span
+          <div className="mb-3 flex items-center justify-center gap-3">
+            <div
               style={{
-                display: "inline-block",
-                width: 32,
-                height: 32,
-                borderRadius: 8,
-                background: "var(--accent)",
-                clipPath: "polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%)",
+                width: 36,
+                height: 36,
+                borderRadius: 12,
+                background: "linear-gradient(135deg, #2563EB, #1D4ED8)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                boxShadow: "0 4px 12px rgba(37,99,235,0.3)",
               }}
-            />
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+              </svg>
+            </div>
             <h1
-              className="text-2xl tracking-wide"
-              style={{ fontFamily: "Syne, sans-serif", fontWeight: 800, color: "var(--accent)" }}
+              style={{
+                fontSize: "1.5rem",
+                fontWeight: 700,
+                color: "#0F172A",
+                letterSpacing: "-0.01em",
+                margin: 0,
+              }}
             >
               POLLO AI
             </h1>
           </div>
-          <p style={{ color: "var(--text-muted)", fontSize: "0.8rem", fontFamily: "JetBrains Mono, monospace" }}>
-            INTERNAL TOOL
+          <p style={{ color: "#94A3B8", fontSize: "0.8rem", margin: 0 }}>
+            AI 创作平台
           </p>
         </div>
 
         {/* 登录卡片 */}
         <div
           style={{
-            background: "var(--bg-surface)",
-            border: "1px solid var(--border)",
-            borderRadius: 12,
+            background: "#FFFFFF",
+            border: "1px solid #E2E8F0",
+            borderRadius: 16,
             padding: "32px",
-            backdropFilter: "blur(20px)",
+            boxShadow: "0 4px 24px rgba(0,0,0,0.06)",
           }}
         >
           <h2
             style={{
-              fontFamily: "Syne, sans-serif",
-              fontWeight: 700,
+              fontWeight: 600,
               fontSize: "1.1rem",
-              color: "var(--text-primary)",
+              color: "#0F172A",
               marginBottom: 24,
+              marginTop: 0,
             }}
           >
-            登录
+            欢迎回来
           </h2>
 
           <form onSubmit={handleLogin} className="space-y-5">
             <div>
               <label
-                style={{ display: "block", fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: 6, fontFamily: "JetBrains Mono, monospace", letterSpacing: "0.05em" }}
+                style={{
+                  display: "block",
+                  fontSize: "0.8rem",
+                  fontWeight: 500,
+                  color: "#475569",
+                  marginBottom: 6,
+                }}
               >
-                EMAIL
+                邮箱
               </label>
               <input
                 className="input-underline"
@@ -136,9 +150,15 @@ export default function LoginPage() {
 
             <div>
               <label
-                style={{ display: "block", fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: 6, fontFamily: "JetBrains Mono, monospace", letterSpacing: "0.05em" }}
+                style={{
+                  display: "block",
+                  fontSize: "0.8rem",
+                  fontWeight: 500,
+                  color: "#475569",
+                  marginBottom: 6,
+                }}
               >
-                PASSWORD
+                密码
               </label>
               <input
                 className="input-underline"
@@ -154,10 +174,10 @@ export default function LoginPage() {
             {error && (
               <div
                 style={{
-                  background: "rgba(239,68,68,0.1)",
+                  background: "rgba(239,68,68,0.06)",
                   border: "1px solid rgba(239,68,68,0.2)",
-                  borderRadius: 6,
-                  padding: "10px 12px",
+                  borderRadius: 8,
+                  padding: "10px 14px",
                   fontSize: "0.8rem",
                   color: "#ef4444",
                 }}
@@ -182,11 +202,10 @@ export default function LoginPage() {
             textAlign: "center",
             marginTop: 20,
             fontSize: "0.75rem",
-            color: "var(--text-muted)",
-            fontFamily: "JetBrains Mono, monospace",
+            color: "#94A3B8",
           }}
         >
-          内部工具 · 请联系管理员获取账号
+          请联系管理员获取账号
         </p>
       </div>
     </div>

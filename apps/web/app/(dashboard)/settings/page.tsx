@@ -19,10 +19,10 @@ export default function SettingsPage() {
   return (
     <div className="page-enter">
       <div style={{ marginBottom: 32 }}>
-        <h1 style={{ fontFamily: "Syne, sans-serif", fontWeight: 700, fontSize: "1.4rem", color: "var(--text-primary)", margin: 0 }}>
+        <h1 style={{ fontFamily: "inherit", fontWeight: 700, fontSize: "1.4rem", color: "var(--text-primary)", margin: 0 }}>
           系统设置
         </h1>
-        <p style={{ color: "var(--text-muted)", fontSize: "0.8rem", fontFamily: "JetBrains Mono, monospace", marginTop: 4 }}>
+        <p style={{ color: "var(--text-muted)", fontSize: "0.8rem", fontFamily: "inherit", marginTop: 4 }}>
           SYSTEM SETTINGS / ADMIN ONLY
         </p>
       </div>

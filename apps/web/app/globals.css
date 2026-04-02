@@ -1,25 +1,25 @@
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&family=Inter:wght@300;400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --bg-base:    #0a0a0b;
-  --bg-surface: #111113;
-  --bg-raised:  #18181c;
-  --bg-overlay: #1f1f25;
+  --bg-base:    #F8FAFC;
+  --bg-surface: #FFFFFF;
+  --bg-raised:  #F1F5F9;
+  --bg-overlay: #E2E8F0;
 
-  --accent:       #f59e0b;
-  --accent-dim:   #d97706;
-  --accent-glow:  rgba(245,158,11,0.15);
+  --accent:       #2563EB;
+  --accent-dim:   #1D4ED8;
+  --accent-glow:  rgba(37,99,235,0.08);
 
-  --text-primary:   #f0f0f2;
-  --text-secondary: #a0a0b0;
-  --text-muted:     #6b6b80;
+  --text-primary:   #0F172A;
+  --text-secondary: #475569;
+  --text-muted:     #94A3B8;
 
-  --border:       rgba(255,255,255,0.12);
-  --border-focus: rgba(245,158,11,0.4);
+  --border:       #E2E8F0;
+  --border-focus: rgba(37,99,235,0.4);
 
   --success: #10b981;
   --error:   #ef4444;
@@ -37,8 +37,8 @@ html, body {
 body {
   background-color: var(--bg-base);
   color: var(--text-primary);
-  font-family: 'Inter', sans-serif;
-  font-weight: 300;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  font-weight: 400;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -47,7 +47,7 @@ body {
   height: 3px;
   overflow: hidden;
   border-radius: 9999px;
-  background: rgba(255,255,255,0.08);
+  background: rgba(0,0,0,0.08);
 }
 
 .progress-bar {
@@ -58,7 +58,6 @@ body {
 }
 
 .progress-bar-running {
-  animation: progressGlow 2s ease-in-out infinite;
   background: linear-gradient(90deg, var(--accent-dim), var(--accent), var(--accent-dim));
   background-size: 200% 100%;
   animation: shimmer 1.4s linear infinite, progressGlow 2s ease-in-out infinite;
@@ -69,7 +68,7 @@ body {
 }
 
 .progress-bar-cancelled {
-  background: rgba(255,255,255,0.15);
+  background: rgba(0,0,0,0.12);
 }
 
 /* 输入框底部线条样式 */
@@ -80,8 +79,8 @@ body {
   border-radius: 0;
   padding: 8px 0;
   color: var(--text-primary);
-  font-family: 'Inter', sans-serif;
-  font-weight: 300;
+  font-family: inherit;
+  font-weight: 400;
   font-size: 0.875rem;
   width: 100%;
   outline: none;
@@ -94,22 +93,22 @@ body {
 
 .input-underline:focus {
   border-bottom-color: var(--accent);
-  box-shadow: 0 1px 0 0 rgba(245,158,11,0.3);
+  box-shadow: 0 1px 0 0 rgba(37,99,235,0.3);
 }
 
 /* 标准输入框 */
 .input-field {
   background: var(--bg-raised);
   border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 10px 12px;
+  border-radius: 8px;
+  padding: 9px 12px;
   color: var(--text-primary);
-  font-family: 'Inter', sans-serif;
-  font-weight: 300;
+  font-family: inherit;
+  font-weight: 400;
   font-size: 0.875rem;
   width: 100%;
   outline: none;
-  transition: border-color 0.2s;
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
 }
 
 .input-field::placeholder {
@@ -117,56 +116,66 @@ body {
 }
 
 .input-field:focus {
-  border-color: var(--border-focus);
-  box-shadow: 0 0 0 3px var(--accent-glow);
+  border-color: var(--accent);
+  background: var(--bg-surface);
+  box-shadow: 0 0 0 3px rgba(37,99,235,0.12);
+}
+
+.input-field:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* 按钮 */
 .btn-primary {
   background: var(--accent);
-  color: #000;
+  color: #FFFFFF;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   padding: 10px 20px;
-  font-family: 'Syne', sans-serif;
+  font-family: inherit;
   font-weight: 600;
   font-size: 0.875rem;
   cursor: pointer;
-  transition: transform 0.15s, box-shadow 0.15s;
-  position: relative;
-  overflow: hidden;
+  transition: background 0.15s, transform 0.15s, box-shadow 0.15s;
 }
 
 .btn-primary:hover:not(:disabled) {
+  background: var(--accent-dim);
   transform: translateY(-1px);
-  box-shadow: 0 4px 20px rgba(245,158,11,0.4);
+  box-shadow: 0 4px 16px rgba(37,99,235,0.3);
+}
+
+.btn-primary:active:not(:disabled) {
+  transform: translateY(0);
 }
 
 .btn-primary:disabled {
-  opacity: 0.4;
+  opacity: 0.45;
   cursor: not-allowed;
 }
 
 .btn-ghost {
   background: transparent;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 8px;
   padding: 8px 16px;
   color: var(--text-secondary);
   font-size: 0.875rem;
   cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
 
 .btn-ghost:hover:not(:disabled) {
   color: var(--accent);
-  border-color: var(--border-focus);
+  border-color: var(--accent);
+  background: var(--accent-glow);
 }
 
 .btn-danger {
   background: transparent;
-  border: 1px solid rgba(239,68,68,0.3);
-  border-radius: 6px;
+  border: 1px solid rgba(239,68,68,0.25);
+  border-radius: 8px;
   padding: 6px 12px;
   color: #ef4444;
   font-size: 0.8rem;
@@ -175,20 +184,24 @@ body {
 }
 
 .btn-danger:hover {
-  background: rgba(239,68,68,0.1);
+  background: rgba(239,68,68,0.06);
+}
+
+/* 卡片基础样式 */
+.card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
 }
 
 /* 页面进入动画 */
 .page-enter {
-  animation: fadeUp 0.4s ease both;
+  animation: fadeUp 0.35s ease both;
 }
 
-.page-enter:nth-child(2) { animation-delay: 0.05s; }
-.page-enter:nth-child(3) { animation-delay: 0.1s; }
-.page-enter:nth-child(4) { animation-delay: 0.15s; }
-
 @keyframes fadeUp {
-  from { opacity: 0; transform: translateY(12px); }
+  from { opacity: 0; transform: translateY(10px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 
@@ -198,8 +211,8 @@ body {
 }
 
 @keyframes progressGlow {
-  0%,100% { box-shadow: 0 0 8px var(--accent); }
-  50%      { box-shadow: 0 0 20px var(--accent), 0 0 40px var(--accent-glow); }
+  0%,100% { box-shadow: 0 0 6px rgba(37,99,235,0.5); }
+  50%      { box-shadow: 0 0 16px rgba(37,99,235,0.8), 0 0 32px rgba(37,99,235,0.2); }
 }
 
 /* Badge */
@@ -209,8 +222,8 @@ body {
   padding: 2px 8px;
   border-radius: 9999px;
   font-size: 0.7rem;
-  font-family: 'JetBrains Mono', monospace;
-  background: rgba(16,185,129,0.15);
+  font-weight: 500;
+  background: rgba(16,185,129,0.1);
   color: #10b981;
   border: 1px solid rgba(16,185,129,0.2);
 }
@@ -221,31 +234,35 @@ body {
   padding: 2px 8px;
   border-radius: 9999px;
   font-size: 0.7rem;
-  font-family: 'JetBrains Mono', monospace;
-  background: rgba(255,255,255,0.05);
+  font-weight: 500;
+  background: var(--bg-raised);
   color: var(--text-muted);
   border: 1px solid var(--border);
 }
 
-/* 网格背景纹理 */
+/* 网格背景纹理（极淡，用于登录页） */
 .grid-bg {
   background-image:
-    linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+    linear-gradient(rgba(0,0,0,0.015) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,0,0,0.015) 1px, transparent 1px);
   background-size: 40px 40px;
 }
 
 /* 滚动条 */
 ::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--bg-surface);
+  background: var(--bg-overlay);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--text-muted);
-  border-radius: 2px;
+  background: #CBD5E1;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
 }

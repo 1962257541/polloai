@@ -118,7 +118,7 @@ export default function TaskCard({
         style={{
           background: selected ? "var(--bg-raised)" : "var(--bg-surface)",
           border: selected ? "1px solid var(--accent)" : "1px solid var(--border)",
-          boxShadow: selected ? "0 0 0 1px rgba(0, 247, 198, 0.18)" : "none",
+          boxShadow: selected ? "0 0 0 2px rgba(37,99,235,0.25)" : "none",
           borderRadius: 8,
           padding: "10px",
           width: 176,
@@ -185,7 +185,7 @@ export default function TaskCard({
             alignItems: "center",
             gap: 6,
             fontSize: "0.65rem",
-            fontFamily: "JetBrains Mono, monospace",
+            fontFamily: "inherit",
             color: STATUS_COLORS[task.status],
           }}
         >
@@ -298,7 +298,7 @@ export default function TaskCard({
                 padding: "5px 8px",
                 borderRadius: 4,
                 border: "1px solid var(--accent)",
-                background: "rgba(0, 247, 198, 0.08)",
+                background: "rgba(37,99,235,0.06)",
                 color: "var(--accent)",
                 cursor: "pointer",
                 fontSize: "0.72rem",
@@ -369,7 +369,7 @@ export default function TaskCard({
       style={{
         background: "var(--bg-surface)",
         border: "1px solid var(--border)",
-        borderRadius: 10,
+        borderRadius: 12,
         overflow: "hidden",
       }}
     >
@@ -464,7 +464,7 @@ export default function TaskCard({
               </div>
               <div
                 style={{
-                  fontFamily: "JetBrains Mono, monospace",
+                  fontFamily: "inherit",
                   fontSize: "0.75rem",
                   color: "var(--accent)",
                 }}
@@ -492,7 +492,7 @@ export default function TaskCard({
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
           <span
             style={{
-              fontFamily: "JetBrains Mono, monospace",
+              fontFamily: "inherit",
               fontSize: "0.7rem",
               color: STATUS_COLORS[task.status],
               letterSpacing: "0.05em",
@@ -503,7 +503,7 @@ export default function TaskCard({
           <span style={{ color: "var(--border)", fontSize: "0.7rem" }}>/</span>
           <span
             style={{
-              fontFamily: "JetBrains Mono, monospace",
+              fontFamily: "inherit",
               fontSize: "0.7rem",
               color: "var(--text-muted)",
             }}
@@ -524,7 +524,7 @@ export default function TaskCard({
                   padding: "3px 10px",
                   borderRadius: 4,
                   border: "1px solid var(--accent)",
-                  background: "rgba(0, 247, 198, 0.08)",
+                  background: "rgba(37,99,235,0.06)",
                   color: "var(--accent)",
                   cursor: "pointer",
                   fontSize: "0.75rem",

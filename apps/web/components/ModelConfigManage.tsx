@@ -91,7 +91,7 @@ export default function ModelConfigManage() {
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-        <h3 style={{ fontFamily: "Syne, sans-serif", fontWeight: 700, fontSize: "0.95rem", color: "var(--text-primary)", margin: 0 }}>
+        <h3 style={{ fontFamily: "inherit", fontWeight: 700, fontSize: "0.95rem", color: "var(--text-primary)", margin: 0 }}>
           模型配置
         </h3>
         <button className="btn-ghost" onClick={() => void load()} style={{ fontSize: "0.8rem" }}>
@@ -113,7 +113,7 @@ export default function ModelConfigManage() {
             padding: "10px 16px",
             borderBottom: "1px solid var(--border)",
             fontSize: "0.65rem",
-            fontFamily: "JetBrains Mono, monospace",
+            fontFamily: "inherit",
             color: "var(--text-muted)",
             letterSpacing: "0.1em",
           }}
@@ -146,7 +146,7 @@ export default function ModelConfigManage() {
                 alignItems: "center",
               }}
             >
-              <span style={{ color: "var(--text-primary)", fontFamily: "JetBrains Mono, monospace", fontSize: "0.75rem" }}>
+              <span style={{ color: "var(--text-primary)", fontFamily: "inherit", fontSize: "0.75rem" }}>
                 {user.email}
               </span>
               <span style={{ color: "var(--text-secondary)" }}>{user.name || "-"}</span>
@@ -198,7 +198,7 @@ export default function ModelConfigManage() {
               }}
             >
               <div style={{ borderBottom: "2px solid var(--accent)", paddingBottom: 12, marginBottom: 20 }}>
-                <h3 style={{ fontFamily: "Syne, sans-serif", fontWeight: 700, color: "var(--accent)", margin: 0, fontSize: "1rem" }}>
+                <h3 style={{ fontFamily: "inherit", fontWeight: 700, color: "var(--accent)", margin: 0, fontSize: "1rem" }}>
                   配置可用模型
                 </h3>
                 <p style={{ color: "var(--text-muted)", fontSize: "0.8rem", marginTop: 4, marginBottom: 0 }}>

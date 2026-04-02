@@ -161,7 +161,8 @@ export default function ImageGenerator({
       style={{
         background: "var(--bg-surface)",
         border: "1px solid var(--border)",
-        borderRadius: 10,
+        borderRadius: 12,
+        boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
         padding: "24px",
         display: "flex",
         flexDirection: "column",
@@ -170,7 +171,7 @@ export default function ImageGenerator({
     >
       <h2
         style={{
-          fontFamily: "Syne, sans-serif",
+          fontFamily: "inherit",
           fontWeight: 700,
           fontSize: "1rem",
           color: "var(--text-primary)",
@@ -182,7 +183,7 @@ export default function ImageGenerator({
 
       {/* Prompt */}
       <div>
-        <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "JetBrains Mono, monospace", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
+        <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "inherit", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
           PROMPT
         </label>
         <textarea
@@ -197,7 +198,7 @@ export default function ImageGenerator({
 
       {/* Model */}
       <div>
-        <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "JetBrains Mono, monospace", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
+        <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "inherit", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
           MODEL
         </label>
         <select
@@ -218,7 +219,7 @@ export default function ImageGenerator({
 
       {/* Image API Type */}
       <div>
-        <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "JetBrains Mono, monospace", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
+        <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "inherit", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
           IMAGE API TYPE
         </label>
         <select className="input-field" value={imageApiType} onChange={(e) => setImageApiType(e.target.value as ImageApiType)}>
@@ -233,7 +234,7 @@ export default function ImageGenerator({
       {/* Reference Images */}
       <div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-          <label style={{ fontSize: "0.7rem", fontFamily: "JetBrains Mono, monospace", color: "var(--text-muted)", letterSpacing: "0.08em" }}>
+          <label style={{ fontSize: "0.7rem", fontFamily: "inherit", color: "var(--text-muted)", letterSpacing: "0.08em" }}>
             REFERENCE IMAGES {files.length > 0 ? `(${files.length}/9)` : ""}
           </label>
           {files.length > 0 && (
@@ -353,7 +354,7 @@ export default function ImageGenerator({
 
       {/* Size */}
       <div>
-        <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "JetBrains Mono, monospace", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
+        <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "inherit", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
           SIZE
         </label>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -370,7 +371,7 @@ export default function ImageGenerator({
                 color: size === opt.value ? "var(--accent)" : "var(--text-secondary)",
                 fontSize: "0.8rem",
                 cursor: "pointer",
-                fontFamily: "JetBrains Mono, monospace",
+                fontFamily: "inherit",
                 transition: "all 0.15s",
               }}
             >
@@ -382,7 +383,7 @@ export default function ImageGenerator({
 
       {/* Format */}
       <div>
-        <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "JetBrains Mono, monospace", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
+        <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "inherit", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
           FORMAT
         </label>
         <div style={{ display: "flex", gap: 8 }}>
@@ -399,7 +400,7 @@ export default function ImageGenerator({
                 color: format === opt.value ? "var(--accent)" : "var(--text-secondary)",
                 fontSize: "0.8rem",
                 cursor: "pointer",
-                fontFamily: "JetBrains Mono, monospace",
+                fontFamily: "inherit",
                 transition: "all 0.15s",
               }}
             >

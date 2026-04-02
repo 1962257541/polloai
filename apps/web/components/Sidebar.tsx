@@ -78,33 +78,39 @@ export default function Sidebar() {
       style={{
         width: 220,
         minHeight: "100vh",
-        background: "var(--bg-surface)",
-        borderRight: "1px solid var(--border)",
+        background: "#FFFFFF",
+        borderRight: "1px solid #E2E8F0",
         display: "flex",
         flexDirection: "column",
         flexShrink: 0,
       }}
     >
-      <div style={{ padding: "20px 20px 16px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span
+      {/* Logo 区域 */}
+      <div style={{ padding: "18px 20px 16px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div
             style={{
-              display: "inline-block",
-              width: 24,
-              height: 24,
-              borderRadius: 6,
-              background: "var(--accent)",
-              clipPath: "polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%)",
+              width: 32,
+              height: 32,
+              borderRadius: 8,
+              background: "linear-gradient(135deg, #2563EB, #1D4ED8)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
               flexShrink: 0,
+              boxShadow: "0 2px 8px rgba(37,99,235,0.25)",
             }}
-          />
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+            </svg>
+          </div>
           <span
             style={{
-              fontFamily: "Syne, sans-serif",
-              fontWeight: 800,
+              fontWeight: 700,
               fontSize: "1rem",
-              color: "var(--accent)",
-              letterSpacing: "0.05em",
+              color: "#0F172A",
+              letterSpacing: "-0.01em",
             }}
           >
             POLLO AI
@@ -112,9 +118,11 @@ export default function Sidebar() {
         </div>
       </div>
 
-      <div style={{ height: "1px", background: "var(--border)", margin: "0 20px" }} />
+      {/* 分隔线 */}
+      <div style={{ height: "1px", background: "#E2E8F0", margin: "0 16px" }} />
 
-      <nav style={{ flex: 1, padding: "12px 10px" }}>
+      {/* 导航菜单 */}
+      <nav style={{ flex: 1, padding: "10px 10px" }}>
         {visibleItems.map((item) => {
           const active = pathname === item.href || pathname.startsWith(item.href + "/");
           return (
@@ -125,16 +133,27 @@ export default function Sidebar() {
                 display: "flex",
                 alignItems: "center",
                 gap: 10,
-                padding: "10px 10px",
-                borderRadius: 6,
+                padding: "9px 12px",
+                borderRadius: 8,
                 marginBottom: 2,
-                color: active ? "var(--accent)" : "var(--text-secondary)",
-                background: active ? "var(--accent-glow)" : "transparent",
-                borderLeft: active ? "3px solid var(--accent)" : "3px solid transparent",
+                color: active ? "#2563EB" : "#475569",
+                background: active ? "rgba(37,99,235,0.08)" : "transparent",
                 textDecoration: "none",
                 fontSize: "0.875rem",
-                fontWeight: active ? 500 : 400,
-                transition: "all 0.15s",
+                fontWeight: active ? 600 : 400,
+                transition: "background 0.15s, color 0.15s",
+              }}
+              onMouseEnter={(e) => {
+                if (!active) {
+                  (e.currentTarget as HTMLAnchorElement).style.background = "#F1F5F9";
+                  (e.currentTarget as HTMLAnchorElement).style.color = "#0F172A";
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!active) {
+                  (e.currentTarget as HTMLAnchorElement).style.background = "transparent";
+                  (e.currentTarget as HTMLAnchorElement).style.color = "#475569";
+                }
               }}
             >
               {item.icon(active)}
@@ -144,14 +163,34 @@ export default function Sidebar() {
         })}
       </nav>
 
-      <div style={{ padding: "12px 20px", borderTop: "1px solid var(--border)" }}>
+      {/* 分隔线 */}
+      <div style={{ height: "1px", background: "#E2E8F0", margin: "0 16px" }} />
+
+      {/* 底部用户信息 */}
+      <div style={{ padding: "12px 16px" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-          <div style={{ minWidth: 0 }}>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div style={{ marginBottom: 3 }}>
+              <span
+                style={{
+                  display: "inline-block",
+                  fontSize: "0.65rem",
+                  fontWeight: 600,
+                  padding: "2px 7px",
+                  borderRadius: 12,
+                  background: role === "admin" ? "rgba(37,99,235,0.08)" : "#F1F5F9",
+                  color: role === "admin" ? "#2563EB" : "#94A3B8",
+                  letterSpacing: "0.02em",
+                  textTransform: "uppercase",
+                }}
+              >
+                {role === "admin" ? "管理员" : "销售"}
+              </span>
+            </div>
             <div
               style={{
-                fontSize: "0.7rem",
-                fontFamily: "JetBrains Mono, monospace",
-                color: "var(--text-muted)",
+                fontSize: "0.72rem",
+                color: "#94A3B8",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",
@@ -159,19 +198,9 @@ export default function Sidebar() {
             >
               {email}
             </div>
-            <div
-              style={{
-                fontSize: "0.65rem",
-                fontFamily: "JetBrains Mono, monospace",
-                color: role === "admin" ? "var(--accent)" : "var(--text-muted)",
-                marginTop: 2,
-                textTransform: "uppercase",
-                letterSpacing: "0.05em",
-              }}
-            >
-              {role}
-            </div>
           </div>
+
+          {/* 退出按钮 */}
           <button
             onClick={handleLogout}
             title="退出登录"
@@ -179,16 +208,25 @@ export default function Sidebar() {
               background: "transparent",
               border: "none",
               cursor: "pointer",
-              color: "var(--text-muted)",
-              padding: 4,
+              color: "#CBD5E1",
+              padding: 6,
               flexShrink: 0,
-              borderRadius: 4,
-              transition: "color 0.15s",
+              borderRadius: 6,
+              transition: "color 0.15s, background 0.15s",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
             }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = "var(--error)")}
-            onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-muted)")}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.color = "#ef4444";
+              (e.currentTarget as HTMLButtonElement).style.background = "rgba(239,68,68,0.06)";
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.color = "#CBD5E1";
+              (e.currentTarget as HTMLButtonElement).style.background = "transparent";
+            }}
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
               <polyline points="16 17 21 12 16 7" />
               <line x1="21" y1="12" x2="9" y2="12" />

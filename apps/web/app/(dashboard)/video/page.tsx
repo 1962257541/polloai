@@ -137,13 +137,13 @@ export default function VideoPage() {
   return (
     <div
       className="page-enter"
-      style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 64px)", minHeight: 0 }}
+      style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 56px)", minHeight: 0 }}
     >
       {/* 页头 */}
       <div style={{ marginBottom: 20, flexShrink: 0 }}>
         <h1
           style={{
-            fontFamily: "Syne, sans-serif",
+            fontFamily: "inherit",
             fontWeight: 700,
             fontSize: "1.4rem",
             color: "var(--text-primary)",
@@ -156,7 +156,7 @@ export default function VideoPage() {
           style={{
             color: "var(--text-muted)",
             fontSize: "0.8rem",
-            fontFamily: "JetBrains Mono, monospace",
+            fontFamily: "inherit",
             marginTop: 4,
           }}
         >
@@ -184,7 +184,8 @@ export default function VideoPage() {
           style={{
             background: "var(--bg-surface)",
             border: "1px solid var(--border)",
-            borderRadius: 10,
+            borderRadius: 12,
+            boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
             overflow: "hidden",
             display: "flex",
             alignItems: "center",
@@ -233,7 +234,8 @@ export default function VideoPage() {
             flexDirection: "column",
             background: "var(--bg-surface)",
             border: "1px solid var(--border)",
-            borderRadius: 10,
+            borderRadius: 12,
+            boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
             overflow: "hidden",
           }}
         >
@@ -248,7 +250,7 @@ export default function VideoPage() {
             <span
               style={{
                 fontSize: "0.7rem",
-                fontFamily: "JetBrains Mono, monospace",
+                fontFamily: "inherit",
                 color: "var(--text-muted)",
                 letterSpacing: "0.08em",
               }}
@@ -388,7 +390,7 @@ export default function VideoPage() {
                           <span
                             style={{
                               fontSize: "0.68rem",
-                              fontFamily: "JetBrains Mono, monospace",
+                              fontFamily: "inherit",
                               color:
                                 task.status === "succeeded"
                                   ? "var(--success)"

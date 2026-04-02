@@ -188,7 +188,7 @@ export default function VideoGenerator({ onCreated }: VideoGeneratorProps) {
         style={{
           display: "block",
           fontSize: "0.7rem",
-          fontFamily: "JetBrains Mono, monospace",
+          fontFamily: "inherit",
           color: "var(--text-muted)",
           letterSpacing: "0.08em",
           marginBottom: 8,
@@ -215,7 +215,7 @@ export default function VideoGenerator({ onCreated }: VideoGeneratorProps) {
 
   const renderSizeSelect = (value: string, onChange: (v: string) => void) => (
     <div>
-      <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "JetBrains Mono, monospace", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
+      <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "inherit", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
         ASPECT RATIO
       </label>
       <div style={{ display: "flex", gap: 8 }}>
@@ -232,7 +232,7 @@ export default function VideoGenerator({ onCreated }: VideoGeneratorProps) {
               color: value === option.value ? "var(--accent)" : "var(--text-secondary)",
               fontSize: "0.8rem",
               cursor: "pointer",
-              fontFamily: "JetBrains Mono, monospace",
+              fontFamily: "inherit",
             }}
           >
             {option.label}
@@ -244,7 +244,7 @@ export default function VideoGenerator({ onCreated }: VideoGeneratorProps) {
 
   const renderDurationSelect = (value: number, onChange: (v: number) => void) => (
     <div>
-      <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "JetBrains Mono, monospace", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
+      <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "inherit", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
         DURATION
       </label>
       <div style={{ display: "flex", gap: 8 }}>
@@ -261,7 +261,7 @@ export default function VideoGenerator({ onCreated }: VideoGeneratorProps) {
               color: value === option.value ? "var(--accent)" : "var(--text-secondary)",
               fontSize: "0.8rem",
               cursor: "pointer",
-              fontFamily: "JetBrains Mono, monospace",
+              fontFamily: "inherit",
             }}
           >
             {option.label}
@@ -277,7 +277,8 @@ export default function VideoGenerator({ onCreated }: VideoGeneratorProps) {
         style={{
           background: "var(--bg-surface)",
           border: "1px solid var(--border)",
-          borderRadius: 10,
+          borderRadius: 12,
+          boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
           padding: "24px",
           display: "flex",
           flexDirection: "column",
@@ -287,7 +288,7 @@ export default function VideoGenerator({ onCreated }: VideoGeneratorProps) {
         <div>
           <h2
             style={{
-              fontFamily: "Syne, sans-serif",
+              fontFamily: "inherit",
               fontWeight: 700,
               fontSize: "1rem",
               color: "var(--text-primary)",
@@ -325,7 +326,7 @@ export default function VideoGenerator({ onCreated }: VideoGeneratorProps) {
                   borderRadius: 999,
                   padding: "10px 14px",
                   background: active ? "var(--accent)" : "transparent",
-                  color: active ? "#03130f" : "var(--text-secondary)",
+                  color: active ? "#FFFFFF" : "var(--text-secondary)",
                   fontSize: "0.82rem",
                   fontWeight: 600,
                   cursor: "pointer",
@@ -341,7 +342,7 @@ export default function VideoGenerator({ onCreated }: VideoGeneratorProps) {
         {activeTab === "single" ? (
           <form onSubmit={handleSingleSubmit} style={{ display: "flex", flexDirection: "column", gap: 18 }}>
             <div>
-              <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "JetBrains Mono, monospace", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
+              <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "inherit", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
                 PROMPT
               </label>
               <textarea
@@ -358,7 +359,7 @@ export default function VideoGenerator({ onCreated }: VideoGeneratorProps) {
 
             {/* 图片来源 */}
             <div>
-              <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "JetBrains Mono, monospace", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
+              <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "inherit", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
                 INPUT IMAGE
               </label>
 
@@ -383,7 +384,7 @@ export default function VideoGenerator({ onCreated }: VideoGeneratorProps) {
                   style={{
                     marginTop: 10,
                     border: "1px solid var(--border)",
-                    borderRadius: 10,
+                    borderRadius: 12,
                     overflow: "hidden",
                     background: "var(--bg-raised)",
                   }}
@@ -438,7 +439,7 @@ export default function VideoGenerator({ onCreated }: VideoGeneratorProps) {
 
             {/* 统一 Prompt */}
             <div>
-              <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "JetBrains Mono, monospace", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
+              <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "inherit", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
                 PROMPT（统一应用于所有素材）
               </label>
               <textarea
@@ -453,7 +454,7 @@ export default function VideoGenerator({ onCreated }: VideoGeneratorProps) {
 
             {/* 选择素材 */}
             <div>
-              <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "JetBrains Mono, monospace", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
+              <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "inherit", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
                 SELECT MATERIALS（可多选）
               </label>
               <button type="button" className="btn-ghost" onClick={() => openLibrary("batch")}>
@@ -511,7 +512,7 @@ export default function VideoGenerator({ onCreated }: VideoGeneratorProps) {
             {/* 串行进度条 */}
             {batchSubmitting && batchProgress.total > 0 && (
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", fontFamily: "JetBrains Mono, monospace" }}>
+                <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", fontFamily: "inherit" }}>
                   正在处理第 {batchProgress.current} / {batchProgress.total} 个任务...
                 </div>
                 <div style={{ height: 4, borderRadius: 2, background: "var(--bg-raised)", overflow: "hidden" }}>

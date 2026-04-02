@@ -367,7 +367,8 @@ export default function ImageChatWindow({
         minHeight: 0,
         background: "var(--bg-surface)",
         border: "1px solid var(--border)",
-        borderRadius: 10,
+        borderRadius: 12,
+        boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
         overflow: "hidden",
       }}
     >
@@ -560,10 +561,10 @@ export default function ImageChatWindow({
                   ) : (
                     <div style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 10 }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <span style={{ fontSize: "0.75rem", color: "var(--accent)", fontFamily: "JetBrains Mono, monospace" }}>
+                        <span style={{ fontSize: "0.75rem", color: "var(--accent)", fontFamily: "inherit" }}>
                           {round.status === "queued" ? "排队中..." : "生成中..."}
                         </span>
-                        <span style={{ fontSize: "0.72rem", color: "var(--text-muted)", fontFamily: "JetBrains Mono, monospace" }}>
+                        <span style={{ fontSize: "0.72rem", color: "var(--text-muted)", fontFamily: "inherit" }}>
                           {Math.round(progressMap[round.id] ?? 0)}%
                         </span>
                       </div>
@@ -864,7 +865,7 @@ export default function ImageChatWindow({
             <h3
               style={{
                 margin: "0 0 16px",
-                fontFamily: "Syne, sans-serif",
+                fontFamily: "inherit",
                 fontSize: "1.1rem",
                 color: "var(--text-primary)",
               }}
@@ -893,7 +894,7 @@ export default function ImageChatWindow({
                   fontSize: "0.75rem",
                   color: "var(--text-muted)",
                   marginBottom: 8,
-                  fontFamily: "JetBrains Mono, monospace",
+                  fontFamily: "inherit",
                   letterSpacing: "0.05em",
                 }}
               >
