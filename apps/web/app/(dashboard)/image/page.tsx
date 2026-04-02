@@ -60,7 +60,7 @@ export default function ImagePage() {
   return (
     <div
       className="page-enter"
-      style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}
+      style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 48px)", minHeight: 0 }}
     >
       {/* 主体：左配置 | 中对话 | 右历史会话 — 撑满剩余高度 */}
       <div

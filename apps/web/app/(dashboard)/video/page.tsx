@@ -137,7 +137,7 @@ export default function VideoPage() {
   return (
     <div
       className="page-enter"
-      style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}
+      style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 48px)", minHeight: 0 }}
     >
       {/* 主体：左生成器 | 中预览 | 右历史列表 — 撑满剩余高度 */}
       <div

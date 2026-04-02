@@ -17,14 +17,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: "#F8FAFC" }}>
       <Sidebar />
-      {/* 主内容区 — 不自身滚动，让子页面控制内部滚动 */}
+      {/* 主内容区 — 允许纵向滚动，固定高度的子页面（image/video）自身设 height:100% 撑满 */}
       <main
         style={{
           flex: 1,
           display: "flex",
           flexDirection: "column",
           minWidth: 0,
-          overflow: "hidden",
+          height: "100vh",
+          overflowY: "auto",
           padding: "24px 28px",
           background: "#F8FAFC",
         }}
