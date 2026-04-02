@@ -294,7 +294,7 @@ export default function MaterialsPage() {
   const partialSelected = selected.size > 0 && selected.size < items.length;
 
   return (
-    <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+    <div style={{ width: "100%" }}>
       {/* 预览弹层 */}
       {preview && <PreviewModal material={preview} onClose={() => setPreview(null)} />}
       {/* 页头 */}
@@ -516,7 +516,7 @@ export default function MaterialsPage() {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
+            gridTemplateColumns: "repeat(5, 1fr)",
             gap: 12,
           }}
         >
