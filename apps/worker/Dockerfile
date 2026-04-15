@@ -12,6 +12,9 @@ COPY prisma ./prisma
 
 RUN pnpm install --frozen-lockfile
 
+# Generate Prisma client before tsc compilation
+RUN pnpm exec prisma generate
+
 COPY packages/shared ./packages/shared
 COPY apps/worker ./apps/worker
 
