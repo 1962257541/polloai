@@ -4,13 +4,14 @@
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
-import { Injectable, OnModuleInit } from "@nestjs/common";
+import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { EnvService } from "../config/env.service";
 import { randomUUID } from "crypto";
 
 @Injectable()
 export class StorageService implements OnModuleInit {
   private readonly client: S3Client;
+  private readonly logger = new Logger(StorageService.name);
 
   constructor(private readonly env: EnvService) {
     this.client = new S3Client({
@@ -27,8 +28,15 @@ export class StorageService implements OnModuleInit {
   async onModuleInit() {
     try {
       await this.client.send(new HeadBucketCommand({ Bucket: this.env.s3Bucket }));
-    } catch {
+      return;
+    } catch (error) {
+      this.logger.warn(`Failed to access storage bucket on startup: ${(error as Error).message}`);
+    }
+
+    try {
       await this.client.send(new CreateBucketCommand({ Bucket: this.env.s3Bucket }));
+    } catch (error) {
+      this.logger.warn(`Failed to create storage bucket on startup: ${(error as Error).message}`);
     }
   }
 
