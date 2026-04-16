@@ -42,4 +42,4 @@ RUN pnpm exec prisma generate
 
 EXPOSE 3001
 
-CMD ["sh", "-c", "pnpm exec prisma migrate deploy && node apps/api/dist/main.js"]
+CMD ["node", "apps/api/dist/main.js"]

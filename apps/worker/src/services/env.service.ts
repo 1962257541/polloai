@@ -23,38 +23,27 @@ function loadEnvFiles() {
 
 loadEnvFiles();
 
-const envSchema = z
-  .object({
-    REDIS_URL: z.string().min(1),
-    DATABASE_URL: z.string().url(),
-    HTTPS_PROXY: z.string().optional(),
-    HTTP_PROXY: z.string().optional(),
-    S3_ENDPOINT: z.string().url(),
-    S3_REGION: z.string().default("us-east-1"),
-    S3_ACCESS_KEY: z.string().min(1),
-    S3_SECRET_KEY: z.string().min(1),
-    S3_BUCKET: z.string().min(1),
-    S3_FORCE_PATH_STYLE: z.string().default("true"),
-    S3_PUBLIC_BASE_URL: z.string().url(),
-    GEMINI_API_KEY: z.string().min(10).optional(),
-    GOOGLE_API_KEY: z.string().min(10).optional(),
-    GEMINI_MOCK: z.string().optional(),
-    GEMINI_BASE_URL: z.string().url().default("https://generativelanguage.googleapis.com/v1beta"),
-    GEMINI_IMAGE_MODEL: z.string().default("gemini-2.5-flash-image"),
-    GEMINI_VIDEO_MODEL: z.string().default("veo-3.1-generate-preview"),
-    GEMINI_VIDEO_SECONDS: z.coerce.number().int().min(4).max(8).default(4),
-    GEMINI_VIDEO_RESOLUTION: z.string().default("720p"),
-  })
-  .superRefine((value, ctx) => {
-    const isMock = value.GEMINI_MOCK?.toLowerCase() === "true";
-    if (!isMock && !value.GEMINI_API_KEY && !value.GOOGLE_API_KEY) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "GEMINI_API_KEY or GOOGLE_API_KEY is required (or set GEMINI_MOCK=true for local testing)",
-        path: ["GEMINI_API_KEY"],
-      });
-    }
-  });
+const envSchema = z.object({
+  REDIS_URL: z.string().min(1),
+  DATABASE_URL: z.string().url(),
+  HTTPS_PROXY: z.string().optional(),
+  HTTP_PROXY: z.string().optional(),
+  S3_ENDPOINT: z.string().url(),
+  S3_REGION: z.string().default("us-east-1"),
+  S3_ACCESS_KEY: z.string().min(1),
+  S3_SECRET_KEY: z.string().min(1),
+  S3_BUCKET: z.string().min(1),
+  S3_FORCE_PATH_STYLE: z.string().default("true"),
+  S3_PUBLIC_BASE_URL: z.string().url(),
+  GEMINI_API_KEY: z.string().min(10).optional(),
+  GOOGLE_API_KEY: z.string().min(10).optional(),
+  GEMINI_MOCK: z.string().optional(),
+  GEMINI_BASE_URL: z.string().url().default("https://generativelanguage.googleapis.com/v1beta"),
+  GEMINI_IMAGE_MODEL: z.string().default("gemini-2.5-flash-image"),
+  GEMINI_VIDEO_MODEL: z.string().default("veo-3.1-generate-preview"),
+  GEMINI_VIDEO_SECONDS: z.coerce.number().int().min(4).max(8).default(4),
+  GEMINI_VIDEO_RESOLUTION: z.string().default("720p"),
+});
 
 @Injectable()
 export class EnvService {

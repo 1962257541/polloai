@@ -25,6 +25,7 @@ loadEnvFiles();
 
 const envSchema = z.object({
   NODE_ENV: z.string().default("development"),
+  PORT: z.coerce.number().optional(),
   APP_PORT: z.coerce.number().default(3001),
   DATABASE_URL: z.string().url(),
   REDIS_URL: z.string().min(1),
@@ -56,7 +57,7 @@ export class EnvService {
   }
 
   get appPort() {
-    return this.env.APP_PORT;
+    return this.env.PORT ?? this.env.APP_PORT;
   }
 
   get redisUrl() {
