@@ -3,6 +3,7 @@
   HeadBucketCommand,
   PutObjectCommand,
   S3Client,
+  PutBucketPolicyCommand,
 } from "@aws-sdk/client-s3";
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { EnvService } from "./env.service";
@@ -28,16 +29,18 @@ export class StorageService implements OnModuleInit {
   async onModuleInit() {
     try {
       await this.client.send(new HeadBucketCommand({ Bucket: this.env.s3Bucket }));
-      return;
     } catch (error) {
       this.logger.warn(`Failed to access storage bucket on startup: ${(error as Error).message}`);
+
+      try {
+        await this.client.send(new CreateBucketCommand({ Bucket: this.env.s3Bucket }));
+      } catch (createError) {
+        this.logger.warn(`Failed to create storage bucket on startup: ${(createError as Error).message}`);
+        return;
+      }
     }
 
-    try {
-      await this.client.send(new CreateBucketCommand({ Bucket: this.env.s3Bucket }));
-    } catch (error) {
-      this.logger.warn(`Failed to create storage bucket on startup: ${(error as Error).message}`);
-    }
+    await this.ensurePublicReadPolicy();
   }
 
   async uploadBuffer(
@@ -58,5 +61,29 @@ export class StorageService implements OnModuleInit {
       url: `${this.env.s3PublicBaseUrl}/${key}`,
       sizeBytes: buffer.byteLength,
     };
+  }
+
+  private async ensurePublicReadPolicy() {
+    try {
+      await this.client.send(
+        new PutBucketPolicyCommand({
+          Bucket: this.env.s3Bucket,
+          Policy: JSON.stringify({
+            Version: "2012-10-17",
+            Statement: [
+              {
+                Sid: "AllowPublicRead",
+                Effect: "Allow",
+                Principal: "*",
+                Action: ["s3:GetObject"],
+                Resource: [`arn:aws:s3:::${this.env.s3Bucket}/*`],
+              },
+            ],
+          }),
+        }),
+      );
+    } catch (error) {
+      this.logger.warn(`Failed to apply public read policy on startup: ${(error as Error).message}`);
+    }
   }
 }
