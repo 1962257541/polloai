@@ -238,7 +238,7 @@ export class GenerationsService {
       throw new NotFoundException("Task not found");
     }
 
-    return task;
+    return this.serializeTask(task);
   }
 
   async listTasks(
@@ -263,7 +263,7 @@ export class GenerationsService {
       this.prisma.generationTask.count({ where }),
     ]);
 
-    return { items, total };
+    return { items: items.map((item) => this.serializeTask(item)), total };
   }
 
   async listSessions(
@@ -334,7 +334,7 @@ export class GenerationsService {
 
     // 5. 组装有 sessionId 的会话摘要
     const sessionItems = groupedRaw.map((row, i) => {
-      const latest = latestTasksPerSession[i];
+      const latest = latestTasksPerSession[i] ? this.serializeTask(latestTasksPerSession[i]!) : null;
       const first = firstTasksPerSession[i];
       const outputUrl = latest?.assets.find((a) => a.role === "output")?.url;
       return {
@@ -347,14 +347,17 @@ export class GenerationsService {
     });
 
     // 6. 组装无 sessionId 的独立任务摘要
-    const nullItems = nullSessionTasks.map((task) => ({
-      sessionId: task.id, // 用 taskId 作为虚拟 sessionId
-      title: task.sessionTitle || task.prompt.slice(0, 40),
-      taskCount: 1,
-      latestCreatedAt: task.createdAt,
-      outputUrl: task.assets.find((a) => a.role === "output")?.url ?? null,
-      isLegacy: true, // 标记为旧任务
-    }));
+    const nullItems = nullSessionTasks.map((rawTask) => {
+      const task = this.serializeTask(rawTask);
+      return {
+        sessionId: task.id, // 用 taskId 作为虚拟 sessionId
+        title: task.sessionTitle || task.prompt.slice(0, 40),
+        taskCount: 1,
+        latestCreatedAt: task.createdAt,
+        outputUrl: task.assets.find((a) => a.role === "output")?.url ?? null,
+        isLegacy: true, // 标记为旧任务
+      };
+    });
 
     // 合并按时间排序
     const all = [...sessionItems, ...nullItems].sort(
@@ -488,6 +491,16 @@ export class GenerationsService {
       await this.markFailed(taskId, "QUEUE_ENQUEUE_FAILED", String(error));
       throw new InternalServerErrorException("Failed to enqueue generation task");
     }
+  }
+
+  private serializeTask<T extends { assets: Array<{ url: string; storageKey: string | null }> }>(task: T): T {
+    return {
+      ...task,
+      assets: task.assets.map((asset) => ({
+        ...asset,
+        url: this.storageService.resolvePublicUrl(asset.url, asset.storageKey),
+      })),
+    };
   }
 
   private async markFailed(taskId: string, errorCode: string, errorMessage: string) {

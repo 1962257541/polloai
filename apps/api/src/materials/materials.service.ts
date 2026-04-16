@@ -50,7 +50,7 @@ export class MaterialsService {
         ? input.expiresAt
         : new Date(Date.now() + 24 * 60 * 60 * 1000);
 
-    return this.prisma.material.create({
+    const material = await this.prisma.material.create({
       data: {
         userId: input.userId,
         name: input.name,
@@ -64,7 +64,10 @@ export class MaterialsService {
         expiresAt,
       },
     });
+
+    return this.serializeMaterial(material);
   }
+
 
   async list(
     userId: string,
@@ -110,7 +113,7 @@ export class MaterialsService {
     const result = hasMore ? items.slice(0, limit) : items;
     const nextCursor = hasMore ? result[result.length - 1].createdAt.toISOString() : null;
 
-    return { items: result, nextCursor, total };
+    return { items: result.map((item) => this.serializeMaterial(item)), nextCursor, total };
   }
 
   async archive(userId: string, materialId: string) {
@@ -152,7 +155,7 @@ export class MaterialsService {
     taskId: string;
   }) {
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-    return this.prisma.material.create({
+    const material = await this.prisma.material.create({
       data: {
         userId: input.userId,
         name: input.name,
@@ -166,5 +169,14 @@ export class MaterialsService {
         expiresAt,
       },
     });
+
+    return this.serializeMaterial(material);
+  }
+
+  private serializeMaterial<T extends { url: string; storageKey: string | null }>(material: T): T {
+    return {
+      ...material,
+      url: this.storage.resolvePublicUrl(material.url, material.storageKey),
+    };
   }
 }

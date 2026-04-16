@@ -40,6 +40,19 @@ export class StorageService implements OnModuleInit {
     }
   }
 
+  buildPublicUrl(key: string) {
+    const baseUrl = this.env.s3PublicBaseUrl.replace(/\/+$/, "");
+    const normalizedKey = key.replace(/^\/+/, "");
+    return `${baseUrl}/${normalizedKey}`;
+  }
+
+  resolvePublicUrl(url: string, storageKey?: string | null) {
+    if (!storageKey || /^https?:\/\//i.test(storageKey)) {
+      return url;
+    }
+    return this.buildPublicUrl(storageKey);
+  }
+
   async uploadBuffer(
     buffer: Buffer,
     input: {
@@ -61,7 +74,7 @@ export class StorageService implements OnModuleInit {
 
     return {
       key,
-      url: `${this.env.s3PublicBaseUrl}/${key}`,
+      url: this.buildPublicUrl(key),
       sizeBytes: buffer.byteLength,
     };
   }
