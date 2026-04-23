@@ -205,6 +205,13 @@ export const api = {
   deleteTask: (token: string, taskId: string) =>
     request(`/generations/${taskId}`, { method: "DELETE" }, token),
 
+  clearCompletedTasks: (token: string, type?: string) =>
+    request(
+      `/generations?onlyTerminated=true${type ? `&type=${type}` : ""}`,
+      { method: "DELETE" },
+      token,
+    ),
+
   streamTasks: (token: string, onEvent: (data: any) => void): (() => void) => {
     const url = `${API_BASE}/notifications/stream`;
     const es = new EventSource(`${url}?token=${encodeURIComponent(token)}`);

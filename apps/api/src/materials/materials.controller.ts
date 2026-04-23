@@ -54,7 +54,7 @@ export class MaterialsController {
 
     return this.materialsService.upload({
       userId: user.sub,
-      name: file.originalname,
+      name: Buffer.from(file.originalname, "latin1").toString("utf8"),
       buffer: file.buffer,
       mimeType: file.mimetype,
       mediaType: mediaType as any,

@@ -471,6 +471,32 @@ export class GenerationsService {
     return { success: true };
   }
 
+  async deleteAllTasks(
+    userId: string,
+    opts: { type?: string; onlyTerminated?: boolean } = {},
+  ) {
+    const where: any = { userId };
+    if (opts.type) where.type = opts.type;
+    if (opts.onlyTerminated) {
+      where.status = { in: ["succeeded", "failed", "cancelled"] };
+    }
+
+    const tasks = await this.prisma.generationTask.findMany({
+      where,
+      select: { id: true, status: true },
+    });
+
+    for (const task of tasks) {
+      if (task.status === "queued" || task.status === "running") {
+        const job = await this.queue.getJob(task.id);
+        if (job) await job.remove();
+      }
+    }
+
+    const { count } = await this.prisma.generationTask.deleteMany({ where });
+    return { deleted: count };
+  }
+
   private async enqueueTaskOrFail(taskId: string, apiKey: string, apiUrl?: string, imageApiType?: string) {
     try {
       await this.queue.add(

@@ -192,10 +192,12 @@ export default function TaskCard({
           <span>{STATUS_LABELS[task.status]}</span>
           <span style={{ color: "var(--border)" }}>/</span>
           <span style={{ color: "var(--text-muted)" }}>
-            {new Date(task.createdAt).toLocaleTimeString("zh-CN", {
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
+            {(() => {
+              const d = new Date(task.createdAt);
+              const dateStr = d.toLocaleDateString("zh-CN", { month: "2-digit", day: "2-digit" });
+              const timeStr = d.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
+              return `${dateStr} ${timeStr}`;
+            })()}
           </span>
         </div>
 
@@ -395,7 +397,7 @@ export default function TaskCard({
           <div
             style={{
               position: "absolute",
-              bottom: 12,
+              top: 12,
               right: 12,
               display: "flex",
               gap: 8,
@@ -407,16 +409,24 @@ export default function TaskCard({
               target="_blank"
               rel="noreferrer"
               style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
                 background: "rgba(0,0,0,0.7)",
-                border: "1px solid var(--border)",
+                border: "1px solid rgba(255,255,255,0.2)",
                 borderRadius: 6,
                 padding: "6px 12px",
-                color: "var(--text-primary)",
+                color: "#ffffff",
                 fontSize: "0.8rem",
                 textDecoration: "none",
                 backdropFilter: "blur(8px)",
               }}
             >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
               下载
             </a>
           </div>
@@ -443,10 +453,10 @@ export default function TaskCard({
               bottom: 12,
               right: 12,
               background: "rgba(0,0,0,0.4)",
-              border: "1px solid var(--border)",
+              border: "1px solid rgba(255,255,255,0.15)",
               borderRadius: 6,
               padding: "6px 12px",
-              color: "var(--text-muted)",
+              color: "#ffffff",
               fontSize: "0.8rem",
               opacity: 0.4,
               cursor: "not-allowed",

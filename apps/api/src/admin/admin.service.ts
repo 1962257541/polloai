@@ -247,7 +247,19 @@ export class AdminService {
       throw new BadRequestException("Configured API URL is invalid");
     }
 
-    return `${parsed.protocol}//${parsed.host}/v1/models`;
+    // 保留原始 pathname，智能拼接 /models
+    // 支持 https://host/v1、https://host/path/v1、https://host 等格式
+    let pathname = parsed.pathname;
+    if (pathname.endsWith("/")) {
+      pathname = pathname.slice(0, -1);
+    }
+    if (pathname.endsWith("/v1")) {
+      return `${parsed.protocol}//${parsed.host}${pathname}/models`;
+    }
+    if (pathname === "" || pathname === "/") {
+      return `${parsed.protocol}//${parsed.host}/v1/models`;
+    }
+    return `${parsed.protocol}//${parsed.host}${pathname}/v1/models`;
   }
 
   private stringifyErrorPayload(payload: unknown) {

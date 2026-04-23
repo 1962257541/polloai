@@ -39,6 +39,7 @@ export default function MaterialLibraryModal({
   } | null>(null);
   const [message, setMessage] = useState("");
   const [selection, setSelection] = useState<string[]>([]);
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const token = getToken() ?? "";
 
@@ -113,6 +114,20 @@ export default function MaterialLibraryModal({
       if (mode === "single") return prev[0] === id ? [] : [id];
       return prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id];
     });
+  };
+
+  const handleDeleteMaterial = async (e: React.MouseEvent, material: Material) => {
+    e.stopPropagation();
+    if (!token) return;
+    if (!window.confirm(`确定删除「${material.name}」吗？`)) return;
+    try {
+      await api.deleteMaterial(token, material.id);
+      setItems((prev) => prev.filter((m) => m.id !== material.id));
+      setSelection((prev) => prev.filter((id) => id !== material.id));
+      setMessage(`已删除：${material.name}`);
+    } catch (err: any) {
+      setMessage(err.message ?? "删除失败");
+    }
   };
 
   const handleApply = () => {
@@ -273,10 +288,19 @@ export default function MaterialLibraryModal({
               {items.map((material) => {
                 const active = selection.includes(material.id);
                 return (
-                  <button
+                  <div
                     key={material.id}
-                    type="button"
+                    role="button"
+                    tabIndex={0}
                     onClick={() => toggleSelection(material.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        toggleSelection(material.id);
+                      }
+                    }}
+                    onMouseEnter={() => setHoveredId(material.id)}
+                    onMouseLeave={() => setHoveredId(null)}
                     style={{
                       border: active ? "2px solid var(--accent)" : "1px solid var(--border)",
                       background: active ? "var(--accent-glow)" : "var(--bg-base)",
@@ -286,6 +310,7 @@ export default function MaterialLibraryModal({
                       cursor: "pointer",
                       textAlign: "left",
                       position: "relative",
+                      outline: "none",
                     }}
                   >
                     {/* 选中角标 */}
@@ -332,6 +357,40 @@ export default function MaterialLibraryModal({
                       </div>
                     )}
 
+                    {/* 删除按钮 */}
+                    {hoveredId === material.id && (
+                      <button
+                        type="button"
+                        onClick={(e) => void handleDeleteMaterial(e, material)}
+                        title="删除"
+                        style={{
+                          position: "absolute",
+                          bottom: 6,
+                          right: 6,
+                          width: 20,
+                          height: 20,
+                          borderRadius: "50%",
+                          background: "rgba(239,68,68,0.9)",
+                          color: "#fff",
+                          border: "none",
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          zIndex: 3,
+                          fontSize: "0.7rem",
+                          fontWeight: 700,
+                          padding: 0,
+                          lineHeight: 1,
+                        }}
+                      >
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
+                          <line x1="18" y1="6" x2="6" y2="18" />
+                          <line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                      </button>
+                    )}
+
                     <div
                       style={{
                         height: 112,
@@ -375,7 +434,7 @@ export default function MaterialLibraryModal({
                         <span>{active ? "已选中" : mode === "batch" ? "多选" : "选中"}</span>
                       </div>
                     </div>
-                  </button>
+                  </div>
                 );
               })}
             </div>

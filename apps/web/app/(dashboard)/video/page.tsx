@@ -129,6 +129,22 @@ export default function VideoPage() {
     await loadTasks();
   };
 
+  const handleClearAll = async () => {
+    const token = getToken();
+    if (!token) return;
+    const terminated = tasks.filter(
+      (t) => t.status === "succeeded" || t.status === "failed" || t.status === "cancelled",
+    );
+    if (terminated.length === 0) return;
+    if (!window.confirm(`确定清除 ${terminated.length} 条已完成的记录吗？此操作不可撤销`)) return;
+    try {
+      await api.clearCompletedTasks(token, "image_to_video");
+      await loadTasks();
+    } catch (error) {
+      console.error("Failed to clear tasks:", error);
+    }
+  };
+
   const handleCreated = () => void loadTasks(true);
 
   const selectedTask = tasks.find((t) => t.id === selectedTaskId) ?? tasks[0];
@@ -222,16 +238,49 @@ export default function VideoPage() {
               flexShrink: 0,
             }}
           >
-            <span
-              style={{
-                fontSize: "0.7rem",
-                fontFamily: "inherit",
-                color: "var(--text-muted)",
-                letterSpacing: "0.08em",
-              }}
-            >
-              HISTORY
-            </span>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span
+                style={{
+                  fontSize: "0.7rem",
+                  fontFamily: "inherit",
+                  color: "var(--text-muted)",
+                  letterSpacing: "0.08em",
+                }}
+              >
+                HISTORY
+              </span>
+              <button
+                type="button"
+                onClick={() => void handleClearAll()}
+                title="清除已完成"
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                  color: "var(--text-muted)",
+                  padding: 2,
+                  lineHeight: 1,
+                  opacity: 0.5,
+                  transition: "opacity 0.15s, color 0.15s",
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.opacity = "1";
+                  (e.currentTarget as HTMLButtonElement).style.color = "#ef4444";
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.opacity = "0.5";
+                  (e.currentTarget as HTMLButtonElement).style.color = "var(--text-muted)";
+                }}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="3 6 5 6 21 6" />
+                  <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                  <path d="M10 11v6" />
+                  <path d="M14 11v6" />
+                  <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                </svg>
+              </button>
+            </div>
           </div>
 
           {/* 列表 */}
@@ -359,7 +408,7 @@ export default function VideoPage() {
                           {task.prompt || "无描述"}
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2 }}>
-                          <span style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>
+                          <span title={new Date(task.createdAt).toLocaleString("zh-CN")} style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>
                             {timeAgo(task.createdAt)}
                           </span>
                           <span

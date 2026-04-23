@@ -114,4 +114,13 @@ export class GenerationsController {
   async deleteTask(@CurrentUser() user: JwtUser, @Param("taskId") taskId: string) {
     return this.generationsService.deleteTask(user.sub, taskId);
   }
+
+  @Delete()
+  async deleteAllTasks(
+    @CurrentUser() user: JwtUser,
+    @Query("type") type?: string,
+    @Query("onlyTerminated") onlyTerminated?: string,
+  ) {
+    return this.generationsService.deleteAllTasks(user.sub, { type, onlyTerminated: onlyTerminated === "true" });
+  }
 }
