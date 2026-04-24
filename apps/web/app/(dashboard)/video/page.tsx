@@ -407,9 +407,20 @@ export default function VideoPage() {
                         >
                           {task.prompt || "无描述"}
                         </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2, whiteSpace: "nowrap" }}>
                           <span title={new Date(task.createdAt).toLocaleString("zh-CN")} style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>
                             {timeAgo(task.createdAt)}
+                          </span>
+                          <span
+                            title={new Date(task.createdAt).toLocaleString("zh-CN")}
+                            style={{ fontSize: "0.68rem", color: "var(--text-muted)", fontFamily: "inherit" }}
+                          >
+                            {(() => {
+                              const d = new Date(task.createdAt);
+                              const dateStr = d.toLocaleDateString("zh-CN", { month: "2-digit", day: "2-digit" });
+                              const timeStr = d.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
+                              return `· ${dateStr} ${timeStr}`;
+                            })()}
                           </span>
                           <span
                             style={{

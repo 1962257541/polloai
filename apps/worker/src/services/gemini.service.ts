@@ -187,12 +187,26 @@ export class GeminiService {
     if (!b64) {
       throw new Error(`Gemini native response missing image data: ${JSON.stringify(body).slice(0, 500)}`);
     }
+    const buffer = Buffer.from(b64, "base64");
     const mimeType =
       outputFormat === "jpeg" ? "image/jpeg" : outputFormat === "webp" ? "image/webp" : "image/png";
 
+    // 诊断：打印返回的图像信息，用于排查"绿色占位图"等代理返回异常数据的情况
+    console.log(
+      `[generateImageNative] model=${model} b64Len=${b64.length} bufferBytes=${buffer.byteLength} ` +
+        `respMimeType=${imagePart.inlineData?.mimeType} outMimeType=${mimeType} ` +
+        `b64Head=${b64.slice(0, 80)}`,
+    );
+    if (buffer.byteLength < 1024) {
+      console.warn(
+        `[generateImageNative] SUSPICIOUSLY SMALL IMAGE (${buffer.byteLength} bytes). ` +
+          `Full response: ${JSON.stringify(body).slice(0, 1500)}`,
+      );
+    }
+
     return {
       kind: "image",
-      buffer: Buffer.from(b64, "base64"),
+      buffer,
       mimeType,
       revisedPrompt: responseParts.find((part) => part.text)?.text,
     };

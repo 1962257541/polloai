@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm -v)",
+      "Bash(docker --version)",
+      "Bash(cp D:/polloai/.env.example D:/polloai/.env)",
+      "Bash(docker compose *)",
+      "Bash(pnpm install *)",
+      "Bash(pnpm approve-builds *)",
+      "Bash(docker exec *)",
+      "Bash(pnpm db:generate)",
+      "Bash(pnpm db:push)",
+      "Bash(docker volume *)",
+      "Bash(pnpm db:seed)",
+      "Bash(pnpm --filter @packages/shared build)",
+      "Bash(pnpm --filter @apps/api dev)",
+      "Bash(pnpm --filter @apps/worker dev)",
+      "Bash(pnpm --filter @apps/web dev)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3001/health)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000)",
+      "Bash(tasklist)",
+      "PowerShell(Get-CimInstance *)",
+      "PowerShell(Stop-Process *)",
+      "PowerShell(pnpm dev:api *)",
+      "PowerShell(pnpm dev:worker *)",
+      "PowerShell(pnpm dev:web *)"
+    ]
+  }
+}

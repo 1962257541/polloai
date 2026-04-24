@@ -290,9 +290,20 @@ export default function ImageSessionList({
                         {session.title || "未命名对话"}
                       </div>
                     )}
-                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2, whiteSpace: "nowrap" }}>
                       <span style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>
                         {timeAgo(session.latestCreatedAt)}
+                      </span>
+                      <span
+                        title={new Date(session.latestCreatedAt).toLocaleString("zh-CN")}
+                        style={{ fontSize: "0.68rem", color: "var(--text-muted)", fontFamily: "inherit" }}
+                      >
+                        {(() => {
+                          const d = new Date(session.latestCreatedAt);
+                          const dateStr = d.toLocaleDateString("zh-CN", { month: "2-digit", day: "2-digit" });
+                          const timeStr = d.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
+                          return `· ${dateStr} ${timeStr}`;
+                        })()}
                       </span>
                       {session.taskCount > 1 && (
                         <span style={{ fontSize: "0.68rem", color: "var(--text-muted)", fontFamily: "inherit" }}>
