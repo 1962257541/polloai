@@ -21,6 +21,27 @@ function formatFileSize(size: number) {
   return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+/** 紧凑时间格式：24h 内仅显示时分；同年显示 MM-DD HH:mm；跨年显示 YYYY-MM-DD */
+function formatTime(iso: string) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const hm = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const diffMs = now.getTime() - d.getTime();
+  if (diffMs < 24 * 60 * 60 * 1000 && d.getDate() === now.getDate()) return hm;
+  if (d.getFullYear() === now.getFullYear()) return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${hm}`;
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/** 完整时间，用于 hover tooltip */
+function formatFullTime(iso: string) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
 export default function MaterialLibraryModal({
   open,
   mode,
@@ -428,10 +449,14 @@ export default function MaterialLibraryModal({
                           color: "var(--text-muted)",
                           display: "flex",
                           justifyContent: "space-between",
+                          gap: 6,
+                          alignItems: "center",
                         }}
                       >
                         <span>{formatFileSize(material.sizeBytes)}</span>
-                        <span>{active ? "已选中" : mode === "batch" ? "多选" : "选中"}</span>
+                        <span style={{ whiteSpace: "nowrap" }} title={`${material.source === "generated" ? "生成时间" : "上传时间"}：${formatFullTime(material.createdAt)}`}>
+                          {formatTime(material.createdAt)}
+                        </span>
                       </div>
                     </div>
                   </div>

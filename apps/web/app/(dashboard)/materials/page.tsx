@@ -86,6 +86,27 @@ function formatFileSize(bytes: number) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
+/** 紧凑时间格式：24h 内仅显示时分；同年显示 MM-DD HH:mm；跨年显示 YYYY-MM-DD */
+function formatTime(iso: string) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const hm = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const diffMs = now.getTime() - d.getTime();
+  if (diffMs < 24 * 60 * 60 * 1000 && d.getDate() === now.getDate()) return hm;
+  if (d.getFullYear() === now.getFullYear()) return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${hm}`;
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/** 完整时间，用于 hover tooltip */
+function formatFullTime(iso: string) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
 /** 通过 fetch + blob 下载单个文件到本地 */
 async function downloadFile(url: string, filename: string) {
   const res = await fetch(url);
@@ -745,9 +766,15 @@ function MaterialCard({
         >
           {material.name}
         </div>
-        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4, gap: 4 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4, gap: 6 }}>
           <span style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>
             {formatFileSize(material.sizeBytes)}
+          </span>
+          <span
+            style={{ fontSize: "0.7rem", color: "var(--text-muted)", whiteSpace: "nowrap" }}
+            title={`${material.source === "generated" ? "生成时间" : "上传时间"}：${formatFullTime(material.createdAt)}`}
+          >
+            {formatTime(material.createdAt)}
           </span>
         </div>
       </div>
