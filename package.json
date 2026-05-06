@@ -9,6 +9,7 @@
                     "dev":  "pnpm -r --parallel dev",
                     "dev:api":  "pnpm --filter @packages/shared build \u0026\u0026 pnpm --filter @apps/api dev",
                     "dev:worker":  "pnpm --filter @packages/shared build \u0026\u0026 pnpm --filter @apps/worker dev",
+                    "dev:scraper":  "pnpm --filter @packages/shared build && pnpm --filter @apps/scraper dev",
                     "dev:web":  "pnpm --filter @apps/web dev",
                     "test":  "pnpm -r test",
                     "db:generate":  "prisma generate",

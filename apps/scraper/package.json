@@ -1,0 +1,30 @@
+{
+  "name": "@apps/scraper",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "ts-node-dev --respawn --transpile-only src/main.ts",
+    "start": "node dist/main.js",
+    "test": "echo \"No tests yet\""
+  },
+  "dependencies": {
+    "@nestjs/bullmq": "^11.0.3",
+    "@nestjs/common": "^11.0.7",
+    "@nestjs/core": "^11.0.7",
+    "@nestjs/schedule": "^4.1.2",
+    "@prisma/client": "^6.7.0",
+    "bullmq": "^5.46.1",
+    "dotenv": "^16.4.7",
+    "ioredis": "^5.4.2",
+    "playwright": "^1.49.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.11",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.8.3"
+  }
+}

@@ -44,6 +44,12 @@ const envSchema = z.object({
   GEMINI_VIDEO_MODEL: z.string().default("veo-3.1-generate-preview"),
   GEMINI_VIDEO_SECONDS: z.coerce.number().int().min(4).max(8).default(4),
   GEMINI_VIDEO_RESOLUTION: z.string().default("720p"),
+  TIKTOK_BOOT_KEY: z
+    .string()
+    .refine((v) => Buffer.from(v, "base64").length === 32, {
+      message: "TIKTOK_BOOT_KEY 必须是 32 字节 base64",
+    })
+    .optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -136,5 +142,10 @@ export class EnvService {
 
   get geminiVideoResolution() {
     return this.env.GEMINI_VIDEO_RESOLUTION;
+  }
+
+  get tiktokBootKey(): Buffer | null {
+    if (!this.env.TIKTOK_BOOT_KEY) return null;
+    return Buffer.from(this.env.TIKTOK_BOOT_KEY, "base64");
   }
 }

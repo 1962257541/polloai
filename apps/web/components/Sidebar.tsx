@@ -43,6 +43,16 @@ const NAV_ITEMS = [
     roles: ["admin", "salesperson"],
   },
   {
+    label: "TikTok 数据",
+    href: "/tiktok",
+    icon: (active: boolean) => (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2 : 1.5} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5" />
+      </svg>
+    ),
+    roles: ["admin", "salesperson"],
+  },
+  {
     label: "系统设置",
     href: "/settings",
     icon: (active: boolean) => (
