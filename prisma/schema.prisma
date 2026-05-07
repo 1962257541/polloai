@@ -42,8 +42,8 @@ enum MaterialSource {
 
 enum TiktokAccountStatus {
   active
-  cookie_expired
-  captcha_blocked
+  not_found
+  rate_limited
   error
   disabled
 }
@@ -166,25 +166,37 @@ model SystemConfig {
 }
 
 model TiktokAccount {
-  id                   String              @id @default(uuid())
-  ownerId              String
-  handle               String              @unique
-  nickname             String?
-  status               TiktokAccountStatus @default(active)
-  storageStateEnc      Bytes?
-  storageStateIv       Bytes?
-  storageStateTag      Bytes?
-  scrapeIntervalMin    Int                 @default(60)
-  followerCount        Int                 @default(0)
-  videoCount           Int                 @default(0)
-  totalGmvCents        BigInt              @default(0)
-  totalCommissionCents BigInt              @default(0)
-  totalOrders          Int                 @default(0)
-  lastScrapedAt        DateTime?
-  lastErrorAt          DateTime?
-  lastErrorMessage     String?
-  createdAt            DateTime            @default(now())
-  updatedAt            DateTime            @updatedAt
+  id           String              @id @default(uuid())
+  ownerId      String
+
+  // 入口字段（handle 或 uid 至少一个）
+  handle       String?             @unique // @username（去掉 @ 前缀存储或带 @，统一在 service 层处理）
+  uid          String?             @unique // TikTok 数字 userId（19 位）
+  secUid       String?             // 抓取后回填，主键给 API 用
+
+  // 抓取回填基本信息
+  nickname     String?
+  avatarUrl    String?
+  bioSignature String?
+
+  // 手动运营字段
+  salesTag String?
+  category String?
+  region   String?
+  note     String?
+
+  // 公开聚合指标
+  followerCount  Int    @default(0)
+  followingCount Int    @default(0)
+  heartCount     BigInt @default(0)
+  videoCount     Int    @default(0)
+
+  status           TiktokAccountStatus @default(active)
+  lastScrapedAt    DateTime?
+  lastErrorAt      DateTime?
+  lastErrorMessage String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
 
   owner  User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   videos TiktokVideo[]
@@ -199,14 +211,14 @@ model TiktokVideo {
   videoId      String
   title        String?
   coverUrl     String?
+  videoUrl     String?
+  durationMs   Int       @default(0)
   publishedAt  DateTime?
   playCount    BigInt    @default(0)
   likeCount    BigInt    @default(0)
   commentCount BigInt    @default(0)
   shareCount   BigInt    @default(0)
   collectCount BigInt    @default(0)
-  gmvCents     BigInt    @default(0)
-  orderCount   Int       @default(0)
   scrapedAt    DateTime  @default(now())
 
   account TiktokAccount       @relation(fields: [accountId], references: [id], onDelete: Cascade)
@@ -225,8 +237,6 @@ model TiktokVideoMetric {
   commentCount BigInt
   shareCount   BigInt
   collectCount BigInt
-  gmvCents     BigInt
-  orderCount   Int
   capturedAt   DateTime @default(now())
 
   video TiktokVideo @relation(fields: [videoId], references: [id], onDelete: Cascade)

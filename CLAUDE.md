@@ -81,3 +81,17 @@ Env files are loaded from `.env.local` → `.env` → `../../.env.local` → `..
 - `textToImageSchema` / `imageToVideoSchema` — Zod schemas used for validation in both API and worker
 - `GenerationEvent` — shape of Redis pub/sub messages
 - TaskStatus state machine: `queued → running → succeeded | failed | cancelled` (terminal states cannot transition back)
+
+## Agent skills
+
+### Issue tracker
+
+Issues and PRDs for this repo live as GitHub issues. Uses the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Uses the default canonical label vocabulary. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context repo — one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.

@@ -2,38 +2,54 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { createPortal } from "react-dom";
 import { getToken } from "../../../../lib/auth";
-import { tiktokApi, TiktokAccountDetail, TiktokVideo, TiktokVideoMetric } from "../../../../lib/tiktok";
+import {
+  tiktokApi,
+  TiktokAccountDetail,
+  TiktokAccountStatus,
+  TiktokVideo,
+  TiktokRecentStats,
+} from "../../../../lib/tiktok";
 
-const STATUS_LABEL: Record<string, { label: string; bg: string; color: string; border: string }> = {
+const STATUS_LABEL: Record<TiktokAccountStatus, { label: string; bg: string; color: string; border: string }> = {
   active: { label: "正常", bg: "rgba(16,185,129,0.1)", color: "#10b981", border: "rgba(16,185,129,0.2)" },
-  cookie_expired: { label: "Cookie 过期", bg: "rgba(245,158,11,0.1)", color: "#f59e0b", border: "rgba(245,158,11,0.25)" },
-  captcha_blocked: { label: "验证码拦截", bg: "rgba(249,115,22,0.1)", color: "#f97316", border: "rgba(249,115,22,0.25)" },
+  not_found: { label: "未找到", bg: "rgba(245,158,11,0.1)", color: "#f59e0b", border: "rgba(245,158,11,0.25)" },
+  rate_limited: { label: "反爬限流", bg: "rgba(249,115,22,0.1)", color: "#f97316", border: "rgba(249,115,22,0.25)" },
   error: { label: "异常", bg: "rgba(239,68,68,0.1)", color: "#ef4444", border: "rgba(239,68,68,0.2)" },
   disabled: { label: "已停用", bg: "#F1F5F9", color: "#94A3B8", border: "#E2E8F0" },
 };
 
-function formatNumber(n: number | string) {
+function formatNumber(n: number | string): string {
   const v = typeof n === "string" ? Number(n) : n;
+  if (!Number.isFinite(v)) return "0";
   if (v >= 1_000_000) return (v / 1_000_000).toFixed(1) + "M";
   if (v >= 1_000) return (v / 1_000).toFixed(1) + "K";
-  return String(v);
+  return String(Math.round(v));
 }
 
-function formatCents(cents: string) {
-  const v = Number(cents) / 100;
-  return "$" + v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+function formatPublishedAt(iso: string | null): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return d.toLocaleString("zh-CN", { hour12: false });
 }
 
-function timeAgo(iso: string | null) {
+function formatDuration(ms: number): string {
+  if (!ms) return "—";
+  const s = ms / 1000;
+  if (s < 60) return `${s.toFixed(1)}s`;
+  const m = Math.floor(s / 60);
+  const rs = Math.round(s % 60);
+  return `${m}m${rs}s`;
+}
+
+function formatRelativeTime(iso: string | null): string {
   if (!iso) return "从未";
   const diff = Date.now() - new Date(iso).getTime();
   const s = Math.round(diff / 1000);
   if (s < 60) return "刚刚";
-  if (s < 3600) return `${Math.floor(s / 60)} 分钟前`;
-  if (s < 86400) return `${Math.floor(s / 3600)} 小时前`;
-  return `${Math.floor(s / 86400)} 天前`;
+  if (s < 3600) return `${Math.floor(s / 60)}分钟前`;
+  if (s < 86400) return `${Math.floor(s / 3600)}小时前`;
+  return `${Math.floor(s / 86400)}天前`;
 }
 
 export default function TiktokDetailPage() {
@@ -43,29 +59,28 @@ export default function TiktokDetailPage() {
 
   const [account, setAccount] = useState<TiktokAccountDetail | null>(null);
   const [videos, setVideos] = useState<TiktokVideo[]>([]);
-  const [metrics, setMetrics] = useState<TiktokVideoMetric[] | null>(null);
-  const [expandedVideoId, setExpandedVideoId] = useState<string | null>(null);
-  const [sortBy, setSortBy] = useState<"publishedAt" | "playCount" | "gmv" | "orderCount">("publishedAt");
+  const [stats, setStats] = useState<TiktokRecentStats | null>(null);
+  const [sortBy, setSortBy] = useState<"publishedAt" | "playCount">("publishedAt");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [refreshing, setRefreshing] = useState(false);
-  const [modal, setModal] = useState<"upload" | "interval" | "delete" | null>(null);
-  const [newInterval, setNewInterval] = useState(60);
-  const [submitting, setSubmitting] = useState(false);
 
-  const token = typeof window !== "undefined" ? getToken() : null;
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+  const token = mounted ? getToken() : null;
 
   const load = useCallback(async () => {
     if (!token || !accountId) return;
     try {
       setLoading(true);
-      const [acc, vids] = await Promise.all([
+      const [acc, vids, s] = await Promise.all([
         tiktokApi.getAccount(token, accountId),
-        tiktokApi.listVideos(token, accountId, sortBy),
+        tiktokApi.listVideos(token, accountId, { sortBy }),
+        tiktokApi.getRecentStats(token, accountId, 15),
       ]);
       setAccount(acc);
       setVideos(vids);
-      setNewInterval(acc.scrapeIntervalMin);
+      setStats(s);
       setError("");
     } catch (e) {
       setError((e as Error).message);
@@ -77,69 +92,62 @@ export default function TiktokDetailPage() {
   useEffect(() => { void load(); }, [load]);
 
   const handleRefresh = async () => {
-    if (!token) return;
+    if (!token || refreshing) return;
+    const beforeTs = account?.lastScrapedAt ? new Date(account.lastScrapedAt).getTime() : 0;
+    setRefreshing(true);
+    setError("");
     try {
-      setRefreshing(true);
       await tiktokApi.refreshAccount(token, accountId);
-      setError("");
     } catch (e) {
       setError((e as Error).message);
-    } finally {
       setRefreshing(false);
+      return;
     }
+    const start = Date.now();
+    while (Date.now() - start < 120_000) {
+      await new Promise((r) => setTimeout(r, 4000));
+      try {
+        const acc = await tiktokApi.getAccount(token, accountId);
+        const ts = acc.lastScrapedAt ? new Date(acc.lastScrapedAt).getTime() : 0;
+        if (ts > beforeTs) {
+          await load();
+          setRefreshing(false);
+          return;
+        }
+      } catch {
+        // continue
+      }
+    }
+    setError("采集超时（>120s），TikTok 反爬限流中，稍后再试");
+    setRefreshing(false);
   };
 
   const handleDelete = async () => {
     if (!token) return;
+    if (!confirm(`删除 ${account?.handle ?? account?.uid}？`)) return;
     try {
-      setSubmitting(true);
       await tiktokApi.deleteAccount(token, accountId);
       router.push("/tiktok");
     } catch (e) {
       setError((e as Error).message);
-      setSubmitting(false);
     }
   };
 
-  const handleUpdateInterval = async () => {
-    if (!token || !account) return;
-    try {
-      setSubmitting(true);
-      await tiktokApi.updateAccount(token, accountId, { scrapeIntervalMin: newInterval });
-      setModal(null);
-      await load();
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setSubmitting(false);
-    }
-  };
+  if (loading && !account) {
+    return <div style={{ padding: 60, textAlign: "center", color: "#94A3B8" }}>加载中...</div>;
+  }
+  if (!account) {
+    return <div style={{ padding: 60, textAlign: "center", color: "#94A3B8" }}>账号不存在</div>;
+  }
 
-  const toggleExpand = async (videoId: string) => {
-    if (expandedVideoId === videoId) {
-      setExpandedVideoId(null);
-      setMetrics(null);
-      return;
-    }
-    setExpandedVideoId(videoId);
-    if (token) {
-      try {
-        const m = await tiktokApi.listVideoMetrics(token, accountId, videoId, 7);
-        setMetrics(m);
-      } catch {
-        setMetrics([]);
-      }
-    }
-  };
-
-  const st = account ? STATUS_LABEL[account.status] : null;
+  const st = STATUS_LABEL[account.status];
 
   return (
     <div className="page-enter">
-      <div style={{ marginBottom: 24 }}>
+      <div style={{ marginBottom: 20 }}>
         <button
           onClick={() => router.push("/tiktok")}
-          style={{ background: "none", border: "none", cursor: "pointer", color: "#475569", fontSize: "0.875rem", display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}
+          style={{ background: "none", border: "none", cursor: "pointer", color: "#475569", fontSize: "0.875rem", display: "flex", alignItems: "center", gap: 6, marginBottom: 12 }}
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <line x1="19" y1="12" x2="5" y2="12" />
@@ -147,19 +155,39 @@ export default function TiktokDetailPage() {
           </svg>
           返回列表
         </button>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <h1 style={{ fontFamily: "inherit", fontWeight: 700, fontSize: "1.2rem", color: "#0F172A", margin: 0 }}>
-            {account?.handle ?? "..."}
-          </h1>
-          {st && (
-            <span style={{ padding: "2px 8px", borderRadius: 9999, fontSize: "0.7rem", fontWeight: 500, background: st.bg, color: st.color, border: `1px solid ${st.border}` }}>
-              {st.label}
-            </span>
+
+        <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
+          {account.avatarUrl ? (
+            <img src={account.avatarUrl} alt="" style={{ width: 80, height: 80, borderRadius: 16, objectFit: "cover" }} />
+          ) : (
+            <div style={{ width: 80, height: 80, borderRadius: 16, background: "#F1F5F9" }} />
           )}
-        </div>
-        {account?.nickname && <div style={{ fontSize: "0.8rem", color: "#94A3B8", marginTop: 2 }}>{account.nickname}</div>}
-        <div style={{ fontSize: "0.7rem", color: "#94A3B8", marginTop: 4 }}>
-          最近抓取：{timeAgo(account?.lastScrapedAt ?? null)}
+          <div style={{ flex: 1 }}>
+            <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+              <h1 style={{ fontFamily: "inherit", fontWeight: 700, fontSize: "1.3rem", color: "#0F172A", margin: 0 }}>
+                {account.nickname || account.handle || account.uid}
+              </h1>
+              <span style={{ padding: "2px 8px", borderRadius: 9999, fontSize: "0.7rem", fontWeight: 500, background: st.bg, color: st.color, border: `1px solid ${st.border}` }}>{st.label}</span>
+              {account.salesTag && (
+                <span style={{ padding: "2px 8px", borderRadius: 9999, fontSize: "0.7rem", background: "rgba(239,68,68,0.1)", color: "#ef4444" }}>{account.salesTag}</span>
+              )}
+            </div>
+            <div style={{ fontSize: "0.85rem", color: "#475569", marginTop: 4 }}>
+              {account.handle || ""}
+              {account.uid && <span style={{ marginLeft: 8, color: "#94A3B8" }}>UID: {account.uid}</span>}
+            </div>
+            {account.bioSignature && (
+              <div style={{ fontSize: "0.8rem", color: "#64748B", marginTop: 6, whiteSpace: "pre-wrap" }}>{account.bioSignature}</div>
+            )}
+            <div style={{ fontSize: "0.7rem", color: "#94A3B8", marginTop: 6 }}>
+              地区: <strong style={{ color: "#475569" }}>{account.region || "—"}</strong>
+              <span style={{ marginLeft: 16 }}>分类: <strong style={{ color: "#475569" }}>{account.category || "—"}</strong></span>
+              {account.note && <span style={{ marginLeft: 16 }}>备注: <strong style={{ color: "#475569" }}>{account.note}</strong></span>}
+            </div>
+            <div style={{ fontSize: "0.7rem", color: "#94A3B8", marginTop: 4 }}>
+              最近抓取：{formatRelativeTime(account.lastScrapedAt)}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -168,177 +196,112 @@ export default function TiktokDetailPage() {
           {error}
         </div>
       )}
-
-      {account && (
-        <>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 12, marginBottom: 16 }}>
-            {[
-              { label: "粉丝", value: formatNumber(account.followerCount) },
-              { label: "视频", value: formatNumber(account.videoCount) },
-              { label: "累计 GMV", value: formatCents(account.totalGmvCents) },
-              { label: "订单", value: formatNumber(account.totalOrders) },
-              { label: "佣金", value: formatCents(account.totalCommissionCents) },
-            ].map((s, i) => (
-              <div
-                key={s.label}
-                style={{
-                  background: "#FFFFFF",
-                  border: "1px solid #E2E8F0",
-                  borderRadius: 12,
-                  padding: "16px 20px",
-                  borderLeft: i === 0 ? "3px solid #2563EB" : undefined,
-                }}
-              >
-                <div style={{ fontSize: "1.5rem", fontWeight: 700, color: "#0F172A" }}>{s.value}</div>
-                <div style={{ fontSize: "0.65rem", fontWeight: 600, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.08em" }}>{s.label}</div>
-              </div>
-            ))}
-          </div>
-
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button className="btn-ghost" onClick={handleRefresh} disabled={refreshing}>
-                {refreshing ? "⟳ 刷新中..." : "↻ 立即刷新"}
-              </button>
-              <button className="btn-ghost" onClick={() => setModal("upload")}>
-                ⇧ 上传 Cookie
-              </button>
-              <button className="btn-ghost" onClick={() => setModal("interval")}>
-                ⏱ {account.scrapeIntervalMin}min
-              </button>
-            </div>
-            <button className="btn-danger" onClick={() => setModal("delete")}>🗑 删除账号</button>
-          </div>
-        </>
+      {account.status === "rate_limited" && (
+        <div style={{ background: "rgba(249,115,22,0.08)", border: "1px solid rgba(249,115,22,0.2)", borderRadius: 6, padding: "10px 12px", fontSize: "0.8rem", color: "#9a3412", marginBottom: 16 }}>
+          TikTok 反爬限流：{account.lastErrorMessage || "稍等几分钟后重试"}
+        </div>
       )}
 
+      {/* 顶部摘要 */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr) 2fr", gap: 12, marginBottom: 20 }}>
+        {[
+          { label: "粉丝", value: formatNumber(account.followerCount) },
+          { label: "关注", value: formatNumber(account.followingCount) },
+          { label: "总点赞", value: formatNumber(account.heartCount) },
+          { label: "作品总数", value: formatNumber(account.videoCount) },
+        ].map((s) => (
+          <div key={s.label} style={{ background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: 12, padding: "14px 18px" }}>
+            <div style={{ fontSize: "1.3rem", fontWeight: 700, color: "#0F172A" }}>{s.value}</div>
+            <div style={{ fontSize: "0.65rem", fontWeight: 600, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.08em" }}>{s.label}</div>
+          </div>
+        ))}
+        <div style={{ background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: 12, padding: "14px 18px" }}>
+          <div style={{ fontSize: "0.7rem", color: "#94A3B8", marginBottom: 6 }}>过去 15 天数据</div>
+          {stats ? (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 12, fontSize: "0.85rem" }}>
+              <div><div style={{ color: "#94A3B8", fontSize: "0.65rem" }}>视频</div><strong>{stats.videoCount}</strong></div>
+              <div><div style={{ color: "#94A3B8", fontSize: "0.65rem" }}>总播放</div><strong>{formatNumber(stats.totalPlay)}</strong></div>
+              <div><div style={{ color: "#94A3B8", fontSize: "0.65rem" }}>播粉比</div><strong>{stats.playFollowerRatio.toFixed(2)}</strong></div>
+              <div><div style={{ color: "#94A3B8", fontSize: "0.65rem" }}>均播</div><strong>{formatNumber(stats.avgPlay)}</strong></div>
+              <div><div style={{ color: "#94A3B8", fontSize: "0.65rem" }}>日均</div><strong>{stats.postsPerDay.toFixed(2)}</strong></div>
+            </div>
+          ) : <div style={{ color: "#94A3B8" }}>—</div>}
+        </div>
+      </div>
+
+      <div style={{ display: "flex", gap: 8, marginBottom: 20, alignItems: "center" }}>
+        <button className="btn-ghost" onClick={handleRefresh} disabled={refreshing}>
+          {refreshing ? "采集中..." : "↻ 立即刷新"}
+        </button>
+        {refreshing && <span style={{ fontSize: "0.75rem", color: "#94A3B8" }}>30–90 秒，请勿重复点击</span>}
+        <div style={{ flex: 1 }} />
+        <button className="btn-danger" onClick={handleDelete} disabled={refreshing}>🗑 删除</button>
+      </div>
+
+      {/* 视频表 */}
       <div style={{ background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "56px 2fr 100px 90px 80px 70px 70px 80px 32px",
-            padding: "10px 16px",
-            borderBottom: "1px solid #E2E8F0",
-            fontSize: "0.65rem",
-            fontWeight: 600,
-            color: "#94A3B8",
-            letterSpacing: "0.1em",
-            textTransform: "uppercase",
-            background: "#F8FAFC",
-          }}
-        >
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "56px 2fr 110px 80px 80px 80px 80px",
+          padding: "10px 16px",
+          borderBottom: "1px solid #E2E8F0",
+          fontSize: "0.65rem",
+          fontWeight: 600,
+          color: "#94A3B8",
+          letterSpacing: "0.1em",
+          textTransform: "uppercase",
+          background: "#F8FAFC",
+        }}>
           <span>封面</span>
           <span>标题</span>
-          <span>发布时间</span>
+          <span>时长</span>
+          <SortHeader label="发布" active={sortBy === "publishedAt"} onClick={() => setSortBy("publishedAt")} />
           <SortHeader label="播放" active={sortBy === "playCount"} onClick={() => setSortBy("playCount")} />
           <span>点赞</span>
           <span>评论</span>
-          <SortHeader label="GMV" active={sortBy === "gmv"} onClick={() => setSortBy("gmv")} />
-          <SortHeader label="订单" active={sortBy === "orderCount"} onClick={() => setSortBy("orderCount")} />
-          <span />
         </div>
 
-        {loading ? (
-          <div style={{ padding: 40, textAlign: "center", color: "#94A3B8" }}>加载中...</div>
-        ) : videos.length === 0 ? (
-          <div style={{ padding: 40, textAlign: "center", color: "#94A3B8" }}>暂无视频数据</div>
+        {videos.length === 0 ? (
+          <div style={{ padding: 40, textAlign: "center", color: "#94A3B8", fontSize: "0.85rem" }}>
+            {account.videoCount > 0
+              ? `账号有 ${account.videoCount} 个视频，但 TikTok 视频列表 API 暂未返回数据，点击"立即刷新"重试`
+              : "暂无视频"}
+          </div>
         ) : (
           videos.map((v) => (
-            <div key={v.id}>
-              <div
-                onClick={() => toggleExpand(v.id)}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "56px 2fr 100px 90px 80px 70px 70px 80px 32px",
-                  padding: "10px 16px",
-                  borderBottom: "1px solid #E2E8F0",
-                  fontSize: "0.8rem",
-                  alignItems: "center",
-                  cursor: "pointer",
-                  background: expandedVideoId === v.id ? "#F8FAFC" : "transparent",
-                  borderLeft: expandedVideoId === v.id ? "2px solid #2563EB" : "2px solid transparent",
-                }}
-                onMouseEnter={(e) => { if (expandedVideoId !== v.id) e.currentTarget.style.background = "#F8FAFC"; }}
-                onMouseLeave={(e) => { if (expandedVideoId !== v.id) e.currentTarget.style.background = "transparent"; }}
-              >
-                <img src={v.coverUrl || "/placeholder.png"} alt="" style={{ width: 48, height: 48, borderRadius: 6, objectFit: "cover" }} />
-                <span style={{ color: "#0F172A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v.title || "-"}</span>
-                <span style={{ color: "#94A3B8" }}>{v.publishedAt ? timeAgo(v.publishedAt) : "-"}</span>
-                <span style={{ color: "#0F172A", fontWeight: 600 }}>{formatNumber(v.playCount)}</span>
-                <span style={{ color: "#475569" }}>{formatNumber(v.likeCount)}</span>
-                <span style={{ color: "#475569" }}>{formatNumber(v.commentCount)}</span>
-                <span style={{ color: "#0F172A", fontWeight: 600 }}>{formatCents(v.gmvCents)}</span>
-                <span style={{ color: "#475569" }}>{formatNumber(v.orderCount)}</span>
-                <span style={{ color: "#94A3B8" }}>{expandedVideoId === v.id ? "▾" : "▸"}</span>
-              </div>
-
-              {expandedVideoId === v.id && metrics !== null && (
-                <div style={{ background: "#F1F5F9", padding: 24, borderBottom: "1px solid #E2E8F0" }}>
-                  <div style={{ fontSize: "0.8rem", fontWeight: 600, color: "#0F172A", marginBottom: 12 }}>播放量趋势 (近 7 天)</div>
-                  {metrics.length === 0 ? (
-                    <div style={{ color: "#94A3B8", fontSize: "0.8rem" }}>暂无趋势数据</div>
-                  ) : (
-                    <SimpleLineChart data={metrics} />
-                  )}
-                </div>
+            <a
+              key={v.id}
+              href={v.videoUrl || (account.handle ? `https://www.tiktok.com/${account.handle}/video/${v.videoId}` : "#")}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: "grid",
+                gridTemplateColumns: "56px 2fr 110px 80px 80px 80px 80px",
+                padding: "10px 16px",
+                borderBottom: "1px solid #E2E8F0",
+                fontSize: "0.8rem",
+                alignItems: "center",
+                textDecoration: "none",
+                color: "inherit",
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "#F8FAFC"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+            >
+              {v.coverUrl ? (
+                <img src={v.coverUrl} alt="" style={{ width: 48, height: 48, borderRadius: 6, objectFit: "cover" }} />
+              ) : (
+                <div style={{ width: 48, height: 48, borderRadius: 6, background: "#F1F5F9" }} />
               )}
-            </div>
+              <span style={{ color: "#0F172A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v.title || "—"}</span>
+              <span style={{ color: "#475569" }}>{formatDuration(v.durationMs)}</span>
+              <span style={{ color: "#94A3B8" }}>{formatPublishedAt(v.publishedAt)}</span>
+              <span style={{ color: "#0F172A", fontWeight: 600 }}>{formatNumber(v.playCount)}</span>
+              <span style={{ color: "#475569" }}>{formatNumber(v.likeCount)}</span>
+              <span style={{ color: "#475569" }}>{formatNumber(v.commentCount)}</span>
+            </a>
           ))
         )}
       </div>
-
-      {modal && createPortal(
-        <div
-          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}
-          onClick={(e) => { if (e.target === e.currentTarget) setModal(null); }}
-        >
-          {modal === "upload" && (
-            <div style={{ background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: 12, padding: 28, width: "calc(100% - 32px)", maxWidth: 440 }}>
-              <h3 style={{ fontFamily: "inherit", fontWeight: 700, fontSize: "1rem", color: "#0F172A", margin: "0 0 8px" }}>
-                上传 Cookie — {account?.handle}
-              </h3>
-              <p style={{ color: "#475569", fontSize: "0.8rem", marginBottom: 16 }}>选择 Playwright storage_state JSON 文件</p>
-              <UploadCookieForm accountId={accountId} token={token!} onSuccess={() => { setModal(null); setError(""); }} onClose={() => setModal(null)} />
-            </div>
-          )}
-
-          {modal === "interval" && (
-            <div style={{ background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: 12, padding: 28, width: "calc(100% - 32px)", maxWidth: 360 }}>
-              <h3 style={{ fontFamily: "inherit", fontWeight: 700, fontSize: "1rem", color: "#0F172A", margin: "0 0 16px" }}>修改抓取间隔</h3>
-              <div style={{ marginBottom: 20 }}>
-                <label style={{ display: "block", fontSize: "0.7rem", color: "#94A3B8", marginBottom: 6, textTransform: "uppercase", fontWeight: 600 }}>
-                  间隔 (分钟，15–1440)
-                </label>
-                <input className="input-field" type="number" min={15} max={1440} value={newInterval} onChange={(e) => setNewInterval(Number(e.target.value))} style={{ width: "100%" }} />
-              </div>
-              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-                <button className="btn-ghost" onClick={() => setModal(null)}>取消</button>
-                <button className="btn-primary" onClick={handleUpdateInterval} disabled={submitting}>
-                  {submitting ? "保存中..." : "保存"}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {modal === "delete" && (
-            <div style={{ background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: 12, padding: 28, width: "calc(100% - 32px)", maxWidth: 400 }}>
-              <h3 style={{ fontFamily: "inherit", fontWeight: 700, fontSize: "1rem", color: "#ef4444", margin: "0 0 8px" }}>确认删除</h3>
-              <p style={{ color: "#475569", fontSize: "0.875rem", marginBottom: 20 }}>
-                确定要删除账号 <strong style={{ color: "#0F172A" }}>{account?.handle}</strong> 吗？所有历史数据将被永久删除。
-              </p>
-              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-                <button className="btn-ghost" onClick={() => setModal(null)} type="button">取消</button>
-                <button type="button" disabled={submitting} onClick={handleDelete}
-                  style={{ background: "#ef4444", color: "#fff", border: "none", borderRadius: 6, padding: "8px 16px", fontSize: "0.875rem", cursor: "pointer", opacity: submitting ? 0.5 : 1 }}
-                >
-                  {submitting ? "删除中..." : "确认删除"}
-                </button>
-              </div>
-            </div>
-          )}
-        </div>,
-        document.body,
-      )}
     </div>
   );
 }
@@ -352,66 +315,5 @@ function SortHeader({ label, active, onClick }: { label: string; active: boolean
       {label}
       {active && <span>▼</span>}
     </span>
-  );
-}
-
-function SimpleLineChart({ data }: { data: TiktokVideoMetric[] }) {
-  const values = data.map((d) => Number(d.playCount));
-  const max = Math.max(...values, 1);
-  const min = Math.min(...values, 0);
-  const range = max - min || 1;
-  const w = 600;
-  const h = 160;
-  const pad = 20;
-  const pts = data.map((_d, i) => {
-    const x = pad + (i / (data.length - 1 || 1)) * (w - pad * 2);
-    const y = h - pad - ((Number(values[i]) - min) / range) * (h - pad * 2);
-    return `${x},${y}`;
-  }).join(" ");
-
-  return (
-    <svg width="100%" height={h} viewBox={`0 0 ${w} ${h}`} style={{ overflow: "visible" }}>
-      <polyline fill="none" stroke="#2563EB" strokeWidth="2" points={pts} />
-      {data.map((_d, i) => {
-        const x = pad + (i / (data.length - 1 || 1)) * (w - pad * 2);
-        const y = h - pad - ((Number(values[i]) - min) / range) * (h - pad * 2);
-        return <circle key={i} cx={x} cy={y} r="3" fill="#2563EB" />;
-      })}
-    </svg>
-  );
-}
-
-function UploadCookieForm({ accountId, token, onSuccess, onClose }: {
-  accountId: string;
-  token: string;
-  onSuccess: () => void;
-  onClose: () => void;
-}) {
-  const [file, setFile] = useState<File | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [err, setErr] = useState("");
-
-  const handleUpload = async () => {
-    if (!file) return;
-    try {
-      setUploading(true);
-      await tiktokApi.uploadCookie(token, accountId, file);
-      onSuccess();
-    } catch (e) {
-      setErr((e as Error).message);
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  return (
-    <>
-      <input type="file" accept=".json" onChange={(e) => setFile(e.target.files?.[0] ?? null)} style={{ marginBottom: 16, width: "100%" }} />
-      {err && <div style={{ fontSize: "0.8rem", color: "#ef4444", marginBottom: 12 }}>{err}</div>}
-      <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-        <button className="btn-ghost" onClick={onClose}>取消</button>
-        <button className="btn-primary" onClick={handleUpload} disabled={uploading || !file}>{uploading ? "上传中..." : "上传"}</button>
-      </div>
-    </>
   );
 }

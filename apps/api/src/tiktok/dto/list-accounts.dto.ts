@@ -1,7 +1,7 @@
 import { IsIn, IsInt, IsOptional, IsString, Max, Min } from "class-validator";
 import { Type } from "class-transformer";
 
-const STATUS_VALUES = ["active", "cookie_expired", "captcha_blocked", "error", "disabled"] as const;
+const STATUS_VALUES = ["active", "not_found", "rate_limited", "error", "disabled"] as const;
 
 export class ListAccountsQueryDto {
   @IsOptional()
@@ -12,7 +12,7 @@ export class ListAccountsQueryDto {
   @IsString()
   q?: string;
 
-  /** admin 专用：'all' 看全部，'mine' 仅看自己（默认） */
+  /** admin 专用：'all' 看全部（默认），'mine' 仅看自己 */
   @IsOptional()
   @IsIn(["all", "mine"])
   scope?: "all" | "mine";

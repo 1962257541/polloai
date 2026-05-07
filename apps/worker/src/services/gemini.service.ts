@@ -363,15 +363,32 @@ export class GeminiService {
     const base = new URL(input.apiUrl ?? this.env.geminiBaseUrl);
     const url = `${base.protocol}//${base.host}/v1/video/create`;
     const durationSeconds = input.seconds ? this.normalizeVideoDuration(input.seconds) : undefined;
+    // yunwu.ai 中转的 /v1/video/create 接口未公开 duration 字段命名，
+    // 不同上游（Google Veo / 七牛 / 中转自定义）使用 duration_seconds、durationSeconds、
+    // duration、seconds 等多种命名，且类型要求也不同（Google 官方和 yunwu.ai 的 grok 要求 string，
+    // 部分后端可能接受 number）。这里冗余发送多种格式，确保中转和上游能识别其中之一。
+    const durationFields: JsonRecord = durationSeconds !== undefined
+      ? {
+          // string 格式：Google Veo 官方 + yunwu.ai grok 等要求
+          seconds: String(durationSeconds),
+          durationSeconds: String(durationSeconds),
+          // number 格式：备选兼容
+          duration: durationSeconds,
+          duration_seconds: durationSeconds,
+        }
+      : {};
     const reqBody: JsonRecord = {
       model: videoModel,
       prompt: input.prompt,
       aspect_ratio: aspectRatio,
       images: [imageUrl],
-      ...(durationSeconds !== undefined ? { duration_seconds: durationSeconds } : {}),
+      ...durationFields,
     };
 
     // 诊断日志：记录完整请求体
+    console.log(
+      `[createVideoFromImage] requested seconds=${input.seconds}, normalized=${durationSeconds}`,
+    );
     console.log(`[createVideoFromImage] Request body: ${JSON.stringify(reqBody)}`);
 
     const response = await fetch(url, {

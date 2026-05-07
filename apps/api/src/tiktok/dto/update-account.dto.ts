@@ -1,19 +1,28 @@
-import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from "class-validator";
+import { IsIn, IsOptional, IsString, MaxLength } from "class-validator";
 
-const STATUS_VALUES = ["active", "cookie_expired", "captcha_blocked", "error", "disabled"] as const;
+const STATUS_VALUES = ["active", "not_found", "rate_limited", "error", "disabled"] as const;
 type Status = (typeof STATUS_VALUES)[number];
 
 export class UpdateTiktokAccountDto {
   @IsOptional()
   @IsString()
   @MaxLength(64)
-  nickname?: string;
+  salesTag?: string;
 
   @IsOptional()
-  @IsInt()
-  @Min(15)
-  @Max(1440)
-  scrapeIntervalMin?: number;
+  @IsString()
+  @MaxLength(64)
+  category?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  region?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  note?: string;
 
   @IsOptional()
   @IsIn(STATUS_VALUES as readonly string[])

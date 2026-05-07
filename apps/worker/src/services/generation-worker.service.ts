@@ -285,13 +285,18 @@ export class GenerationWorkerService implements OnModuleInit, OnModuleDestroy {
     }
 
     const params = task.parameters as any;
+    // 诊断日志：确认用户选择的秒数已正确传到 worker
+    console.log(
+      `[handleImageToVideo] taskId=${taskId} params.durationSec=${params.durationSec} (${typeof params.durationSec}), env default=${this.env.geminiVideoSeconds}`,
+    );
     const operation = await this.gemini.createVideoFromImage({
       model: task.model,
       prompt: task.prompt,
       imageUrl: inputAsset.url,
       aspectRatio: params.aspectRatio,
       size: params.size,
-      seconds: params.durationSec || this.env.geminiVideoSeconds,
+      // 用 ?? 而非 ||，避免未来 0 等假值边界（当前 schema 范围 4-8 暂不涉及，但更严谨）
+      seconds: params.durationSec ?? this.env.geminiVideoSeconds,
       apiKey,
       apiUrl,
     });

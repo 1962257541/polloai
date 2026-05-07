@@ -1,37 +1,34 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { Browser, chromium } from "playwright";
-
-interface PooledContext {
-  id: number;
-  active: boolean;
-}
+import { EnvService } from "./env.service";
 
 /**
- * Playwright Chromium 浏览器池。
- * M3 阶段：单 Browser + 受控并发 Context。
- * 每个抓取任务独立创建/销毁 Context（因 storageState 每个账号不同）。
+ * Playwright Chromium 池：单 Browser + 受控并发 Context。
+ * 池大小、代理、headless 全部从 EnvService 读取（启动时确定，不再热更新）。
  */
 @Injectable()
 export class BrowserPoolService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(BrowserPoolService.name);
   private browser: Browser | null = null;
-  private semaphore: number;
+  private inFlight = 0;
   private waiting: Array<() => void> = [];
 
-  constructor() {
-    this.semaphore = Number(process.env.TIKTOK_BROWSER_POOL_SIZE) || 4;
-  }
+  constructor(private readonly env: EnvService) {}
 
   async onModuleInit() {
+    const proxy = this.env.scraperProxy ? { server: this.env.scraperProxy } : undefined;
     this.browser = await chromium.launch({
-      headless: process.env.TIKTOK_SCRAPER_HEADLESS !== "false",
+      headless: this.env.scraperHeadless,
+      proxy,
       args: [
         "--disable-blink-features=AutomationControlled",
         "--no-sandbox",
         "--disable-setuid-sandbox",
       ],
     });
-    this.logger.log(`Browser launched (pool=${this.semaphore})`);
+    this.logger.log(
+      `Browser launched (poolSize=${this.poolSize}${proxy ? `, proxy=${proxy.server}` : ""})`,
+    );
   }
 
   async onModuleDestroy() {
@@ -42,22 +39,19 @@ export class BrowserPoolService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  /** 获取一个空闲槽位 */
   async acquire(): Promise<void> {
-    if (this.semaphore > 0) {
-      this.semaphore--;
+    if (this.inFlight < this.poolSize) {
+      this.inFlight++;
       return;
     }
-    return new Promise((resolve) => this.waiting.push(resolve));
+    await new Promise<void>((resolve) => this.waiting.push(resolve));
+    this.inFlight++;
   }
 
   release(): void {
-    if (this.waiting.length > 0) {
-      const next = this.waiting.shift();
-      next?.();
-    } else {
-      this.semaphore++;
-    }
+    this.inFlight = Math.max(0, this.inFlight - 1);
+    const next = this.waiting.shift();
+    if (next) next();
   }
 
   getBrowser(): Browser {
@@ -65,12 +59,11 @@ export class BrowserPoolService implements OnModuleInit, OnModuleDestroy {
     return this.browser;
   }
 
-  get activeSlots(): number {
-    const max = Number(process.env.TIKTOK_BROWSER_POOL_SIZE) || 4;
-    return max - this.semaphore;
+  get activeBrowsers(): number {
+    return this.inFlight;
   }
 
   get poolSize(): number {
-    return Number(process.env.TIKTOK_BROWSER_POOL_SIZE) || 4;
+    return this.env.scraperPoolSize;
   }
 }

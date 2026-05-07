@@ -12,7 +12,6 @@ import { MaterialsModule } from "./materials/materials.module";
 import { APP_INTERCEPTOR } from "@nestjs/core";
 import { AuditInterceptor } from "./audit/audit.interceptor";
 import { AuditModule } from "./audit/audit.module";
-import { SystemConfigModule } from "./system-config/system-config.module";
 import { TiktokModule } from "./tiktok/tiktok.module";
 
 @Module({
@@ -33,7 +32,6 @@ import { TiktokModule } from "./tiktok/tiktok.module";
     GenerationsModule,
     MaterialsModule,
     AuditModule,
-    SystemConfigModule,
     TiktokModule,
   ],
   providers: [

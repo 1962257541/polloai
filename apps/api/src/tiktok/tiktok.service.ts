@@ -8,8 +8,6 @@ import { InjectQueue } from "@nestjs/bullmq";
 import { Queue } from "bullmq";
 import { Prisma, TiktokAccount, TiktokAccountStatus } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
-import { SystemConfigService } from "../system-config/system-config.service";
-import { SystemConfigCryptoService } from "../system-config/crypto.service";
 import { JwtUser } from "../common/current-user.decorator";
 import { CreateTiktokAccountDto } from "./dto/create-account.dto";
 import { UpdateTiktokAccountDto } from "./dto/update-account.dto";
@@ -20,31 +18,46 @@ export const TIKTOK_QUEUE_NAME = "tt-scrape";
 interface AccountSummary {
   id: string;
   ownerId: string;
-  handle: string;
+  handle: string | null;
+  uid: string | null;
+  secUid: string | null;
   nickname: string | null;
+  avatarUrl: string | null;
+  bioSignature: string | null;
+  salesTag: string | null;
+  category: string | null;
+  region: string | null;
+  note: string | null;
   status: TiktokAccountStatus;
-  lastScrapedAt: Date | null;
   followerCount: number;
+  followingCount: number;
+  heartCount: string;
   videoCount: number;
-  totalGmvCents: string;
-  totalCommissionCents: string;
-  totalOrders: number;
+  lastScrapedAt: Date | null;
   lastErrorMessage: string | null;
 }
 
 interface AccountDetail extends AccountSummary {
-  scrapeIntervalMin: number;
-  hasStorageState: boolean;
   createdAt: Date;
   updatedAt: Date;
+}
+
+interface RecentStats {
+  /** 用作过去 N 天聚合 */
+  days: number;
+  videoCount: number;
+  totalPlay: string;
+  avgPlay: number;
+  /** 总播放 / 粉丝（粉丝为 0 时返 0） */
+  playFollowerRatio: number;
+  /** 视频数 / 天数 */
+  postsPerDay: number;
 }
 
 @Injectable()
 export class TiktokService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly systemConfig: SystemConfigService,
-    private readonly crypto: SystemConfigCryptoService,
     @InjectQueue(TIKTOK_QUEUE_NAME) private readonly queue: Queue,
   ) {}
 
@@ -63,14 +76,15 @@ export class TiktokService {
       const text = q.q.trim();
       where.OR = [
         { handle: { contains: text, mode: "insensitive" } },
+        { uid: { contains: text } },
         { nickname: { contains: text, mode: "insensitive" } },
+        { salesTag: { contains: text, mode: "insensitive" } },
       ];
     }
 
-    // 行级权限：salesperson 强制看自己；admin 默认仅自己（mine），可 scope=all 看全部
     if (user.role !== "admin") {
       where.ownerId = user.sub;
-    } else if ((q.scope ?? "mine") === "mine") {
+    } else if ((q.scope ?? "all") === "mine") {
       where.ownerId = user.sub;
     }
 
@@ -100,21 +114,37 @@ export class TiktokService {
   // ============ CRUD ============
 
   async createAccount(user: JwtUser, dto: CreateTiktokAccountDto): Promise<AccountDetail> {
-    const handle = dto.handle.startsWith("@") ? dto.handle : `@${dto.handle}`;
+    if (!dto.handle && !dto.uid) {
+      throw new BadRequestException("handle 或 uid 至少填一个");
+    }
 
-    const exists = await this.prisma.tiktokAccount.findUnique({ where: { handle } });
-    if (exists) {
-      throw new BadRequestException(`账号 ${handle} 已存在`);
+    const handle = dto.handle ? this.normalizeHandle(dto.handle) : null;
+    const uid = dto.uid ?? null;
+
+    if (handle) {
+      const exists = await this.prisma.tiktokAccount.findUnique({ where: { handle } });
+      if (exists) throw new BadRequestException(`账号 ${handle} 已存在`);
+    }
+    if (uid) {
+      const exists = await this.prisma.tiktokAccount.findUnique({ where: { uid } });
+      if (exists) throw new BadRequestException(`UID ${uid} 已存在`);
     }
 
     const created = await this.prisma.tiktokAccount.create({
       data: {
         ownerId: user.sub,
         handle,
-        nickname: dto.nickname ?? null,
-        scrapeIntervalMin: dto.scrapeIntervalMin ?? 60,
+        uid,
+        salesTag: dto.salesTag ?? null,
+        category: dto.category ?? null,
+        region: dto.region ?? null,
+        note: dto.note ?? null,
       },
     });
+
+    // 创建后立即入队抓一次（不阻塞 HTTP 响应）
+    await this.enqueueScrape(created.id, user.sub, true);
+
     return this.toDetail(created);
   }
 
@@ -127,10 +157,10 @@ export class TiktokService {
     const updated = await this.prisma.tiktokAccount.update({
       where: { id },
       data: {
-        ...(dto.nickname !== undefined ? { nickname: dto.nickname } : {}),
-        ...(dto.scrapeIntervalMin !== undefined
-          ? { scrapeIntervalMin: dto.scrapeIntervalMin }
-          : {}),
+        ...(dto.salesTag !== undefined ? { salesTag: dto.salesTag } : {}),
+        ...(dto.category !== undefined ? { category: dto.category } : {}),
+        ...(dto.region !== undefined ? { region: dto.region } : {}),
+        ...(dto.note !== undefined ? { note: dto.note } : {}),
         ...(dto.status !== undefined ? { status: dto.status } : {}),
       },
     });
@@ -142,119 +172,94 @@ export class TiktokService {
     await this.prisma.tiktokAccount.delete({ where: { id } });
   }
 
-  // ============ Cookie 上传 ============
-
-  async uploadCookie(user: JwtUser, id: string, buffer: Buffer): Promise<{ ok: true }> {
-    await this.ensureAccessible(user, id);
-
-    if (!buffer || buffer.length === 0) {
-      throw new BadRequestException("文件为空");
-    }
-
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(buffer.toString("utf8"));
-    } catch {
-      throw new BadRequestException("无法解析 JSON，期望 Playwright storage_state 格式");
-    }
-
-    const cookieKey = await this.systemConfig.getCookieKeyBuffer();
-    if (!cookieKey) {
-      throw new BadRequestException("Cookie 主密钥尚未配置，请联系管理员先生成");
-    }
-
-    const blob = this.crypto.encryptWithKey(cookieKey, parsed);
-    await this.prisma.tiktokAccount.update({
-      where: { id },
-      data: {
-        storageStateEnc: new Uint8Array(blob.enc),
-        storageStateIv: new Uint8Array(blob.iv),
-        storageStateTag: new Uint8Array(blob.tag),
-        status: "active",
-        lastErrorMessage: null,
-        lastErrorAt: null,
-      },
-    });
-
-    return { ok: true };
-  }
-
   // ============ 触发刷新 ============
 
   async refreshAccount(user: JwtUser, id: string): Promise<{ enqueued: true }> {
     await this.ensureAccessible(user, id);
-    await this.queue.add(
-      "scrape",
-      { accountId: id, triggeredBy: user.sub, manual: true },
-      {
-        jobId: `manual:${id}:${Date.now()}`,
-        removeOnComplete: 100,
-        removeOnFail: 100,
-      },
-    );
+    await this.enqueueScrape(id, user.sub, true);
     return { enqueued: true };
   }
 
-  // ============ 视频列表 / 趋势 ============
+  // ============ 视频列表 ============
 
   async listVideos(
     user: JwtUser,
     accountId: string,
-    sortBy?: string,
-  ): Promise<Array<ReturnType<TiktokService["toVideo"]>>> {
+    opts: { sortBy?: string; limit?: number } = {},
+  ) {
     await this.ensureAccessible(user, accountId);
 
     const orderBy: Prisma.TiktokVideoOrderByWithRelationInput =
-      sortBy === "playCount"
+      opts.sortBy === "playCount"
         ? { playCount: "desc" }
-        : sortBy === "gmv"
-          ? { gmvCents: "desc" }
-          : sortBy === "orderCount"
-            ? { orderCount: "desc" }
-            : { publishedAt: "desc" };
+        : { publishedAt: "desc" };
 
     const videos = await this.prisma.tiktokVideo.findMany({
       where: { accountId },
       orderBy,
+      take: opts.limit && opts.limit > 0 ? opts.limit : undefined,
     });
     return videos.map((v) => this.toVideo(v));
   }
 
-  async listVideoMetrics(
-    user: JwtUser,
-    accountId: string,
-    videoId: string,
-    days = 7,
-  ): Promise<Array<{ capturedAt: Date; playCount: string; likeCount: string; gmvCents: string }>> {
-    await this.ensureAccessible(user, accountId);
+  // ============ 过去 N 天聚合 ============
+
+  async getRecentStats(user: JwtUser, accountId: string, days = 15): Promise<RecentStats> {
+    const acc = await this.ensureAccessible(user, accountId);
     const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-    const metrics = await this.prisma.tiktokVideoMetric.findMany({
-      where: {
-        videoId,
-        capturedAt: { gte: since },
-        video: { accountId },
-      },
-      orderBy: { capturedAt: "asc" },
+
+    const videos = await this.prisma.tiktokVideo.findMany({
+      where: { accountId, publishedAt: { gte: since } },
+      select: { playCount: true },
     });
-    return metrics.map((m) => ({
-      capturedAt: m.capturedAt,
-      playCount: m.playCount.toString(),
-      likeCount: m.likeCount.toString(),
-      gmvCents: m.gmvCents.toString(),
-    }));
+
+    const videoCount = videos.length;
+    const totalPlay = videos.reduce((sum, v) => sum + v.playCount, 0n);
+    const avgPlay = videoCount === 0 ? 0 : Number(totalPlay / BigInt(videoCount));
+    const playFollowerRatio =
+      acc.followerCount > 0 ? Number(totalPlay) / acc.followerCount : 0;
+    const postsPerDay = videoCount / days;
+
+    return {
+      days,
+      videoCount,
+      totalPlay: totalPlay.toString(),
+      avgPlay,
+      playFollowerRatio: Number(playFollowerRatio.toFixed(2)),
+      postsPerDay: Number(postsPerDay.toFixed(2)),
+    };
   }
 
   // ============ 内部 ============
 
+  private async enqueueScrape(
+    accountId: string,
+    triggeredBy: string,
+    manual: boolean,
+  ): Promise<void> {
+    await this.queue.add(
+      "scrape",
+      { accountId, triggeredBy, manual },
+      {
+        jobId: `${manual ? "manual" : "auto"}:${accountId}:${Date.now()}`,
+        removeOnComplete: 100,
+        removeOnFail: 100,
+      },
+    );
+  }
+
   private async ensureAccessible(user: JwtUser, id: string): Promise<TiktokAccount> {
     const acc = await this.prisma.tiktokAccount.findUnique({ where: { id } });
-    if (!acc) {
-      throw new NotFoundException("账号不存在");
-    }
+    if (!acc) throw new NotFoundException("账号不存在");
     if (user.role !== "admin" && acc.ownerId !== user.sub) {
       throw new ForbiddenException("无权访问该账号");
     }
     return acc;
+  }
+
+  private normalizeHandle(input: string): string {
+    const trimmed = input.trim();
+    return trimmed.startsWith("@") ? trimmed : `@${trimmed}`;
   }
 
   private toSummary(a: TiktokAccount): AccountSummary {
@@ -262,14 +267,21 @@ export class TiktokService {
       id: a.id,
       ownerId: a.ownerId,
       handle: a.handle,
+      uid: a.uid,
+      secUid: a.secUid,
       nickname: a.nickname,
+      avatarUrl: a.avatarUrl,
+      bioSignature: a.bioSignature,
+      salesTag: a.salesTag,
+      category: a.category,
+      region: a.region,
+      note: a.note,
       status: a.status,
-      lastScrapedAt: a.lastScrapedAt,
       followerCount: a.followerCount,
+      followingCount: a.followingCount,
+      heartCount: a.heartCount.toString(),
       videoCount: a.videoCount,
-      totalGmvCents: a.totalGmvCents.toString(),
-      totalCommissionCents: a.totalCommissionCents.toString(),
-      totalOrders: a.totalOrders,
+      lastScrapedAt: a.lastScrapedAt,
       lastErrorMessage: a.lastErrorMessage,
     };
   }
@@ -277,8 +289,6 @@ export class TiktokService {
   private toDetail(a: TiktokAccount): AccountDetail {
     return {
       ...this.toSummary(a),
-      scrapeIntervalMin: a.scrapeIntervalMin,
-      hasStorageState: a.storageStateEnc != null,
       createdAt: a.createdAt,
       updatedAt: a.updatedAt,
     };
@@ -290,14 +300,14 @@ export class TiktokService {
     videoId: string;
     title: string | null;
     coverUrl: string | null;
+    videoUrl: string | null;
+    durationMs: number;
     publishedAt: Date | null;
     playCount: bigint;
     likeCount: bigint;
     commentCount: bigint;
     shareCount: bigint;
     collectCount: bigint;
-    gmvCents: bigint;
-    orderCount: number;
     scrapedAt: Date;
   }) {
     return {
@@ -305,14 +315,14 @@ export class TiktokService {
       videoId: v.videoId,
       title: v.title,
       coverUrl: v.coverUrl,
+      videoUrl: v.videoUrl,
+      durationMs: v.durationMs,
       publishedAt: v.publishedAt,
       playCount: v.playCount.toString(),
       likeCount: v.likeCount.toString(),
       commentCount: v.commentCount.toString(),
       shareCount: v.shareCount.toString(),
       collectCount: v.collectCount.toString(),
-      gmvCents: v.gmvCents.toString(),
-      orderCount: v.orderCount,
       scrapedAt: v.scrapedAt,
     };
   }

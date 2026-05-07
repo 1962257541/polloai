@@ -7,11 +7,8 @@ import {
   Patch,
   Post,
   Query,
-  UploadedFile,
   UseGuards,
-  UseInterceptors,
 } from "@nestjs/common";
-import { FileInterceptor } from "@nestjs/platform-express";
 import { JwtAuthGuard } from "../common/jwt-auth.guard";
 import { RolesGuard } from "../common/roles.guard";
 import { Roles } from "../common/roles.decorator";
@@ -56,16 +53,6 @@ export class TiktokController {
     return this.service.deleteAccount(user, id);
   }
 
-  @Post("accounts/:id/cookies")
-  @UseInterceptors(FileInterceptor("file"))
-  uploadCookie(
-    @CurrentUser() user: JwtUser,
-    @Param("id") id: string,
-    @UploadedFile() file?: Express.Multer.File,
-  ) {
-    return this.service.uploadCookie(user, id, file?.buffer ?? Buffer.alloc(0));
-  }
-
   @Post("accounts/:id/refresh")
   refreshAccount(@CurrentUser() user: JwtUser, @Param("id") id: string) {
     return this.service.refreshAccount(user, id);
@@ -76,17 +63,20 @@ export class TiktokController {
     @CurrentUser() user: JwtUser,
     @Param("id") id: string,
     @Query("sortBy") sortBy?: string,
+    @Query("limit") limit?: string,
   ) {
-    return this.service.listVideos(user, id, sortBy);
+    return this.service.listVideos(user, id, {
+      sortBy,
+      limit: limit ? Number(limit) : undefined,
+    });
   }
 
-  @Get("accounts/:id/videos/:videoId/metrics")
-  listVideoMetrics(
+  @Get("accounts/:id/stats")
+  getRecentStats(
     @CurrentUser() user: JwtUser,
     @Param("id") id: string,
-    @Param("videoId") videoId: string,
     @Query("days") days?: string,
   ) {
-    return this.service.listVideoMetrics(user, id, videoId, days ? Number(days) : 7);
+    return this.service.getRecentStats(user, id, days ? Number(days) : 15);
   }
 }

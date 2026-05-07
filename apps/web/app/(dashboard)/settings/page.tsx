@@ -5,11 +5,10 @@ import { useRouter } from "next/navigation";
 import { getRole } from "../../../lib/auth";
 import SalespersonManage from "../../../components/SalespersonManage";
 import ModelConfigManage from "../../../components/ModelConfigManage";
-import TiktokConfigManage from "../../../components/TiktokConfigManage";
 
 export default function SettingsPage() {
   const router = useRouter();
-  const [tab, setTab] = useState<"accounts" | "models" | "tiktok">("accounts");
+  const [tab, setTab] = useState<"accounts" | "models">("accounts");
 
   useEffect(() => {
     if (getRole() !== "admin") {
@@ -53,23 +52,10 @@ export default function SettingsPage() {
         >
           模型配置
         </button>
-        <button
-          type="button"
-          className="btn-ghost"
-          onClick={() => setTab("tiktok")}
-          style={{
-            color: tab === "tiktok" ? "var(--accent)" : undefined,
-            borderColor: tab === "tiktok" ? "var(--border-focus)" : undefined,
-            background: tab === "tiktok" ? "var(--accent-glow)" : undefined,
-          }}
-        >
-          TikTok 配置
-        </button>
       </div>
 
       {tab === "accounts" && <SalespersonManage />}
       {tab === "models" && <ModelConfigManage />}
-      {tab === "tiktok" && <TiktokConfigManage />}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import IORedis from "ioredis";
 import { EnvService } from "./env.service";
+import { BrowserPoolService } from "./browser-pool.service";
 
 const HB_KEY = "tt:scraper:hb";
 const HB_TTL_SEC = 30;
@@ -15,10 +16,7 @@ interface HeartbeatPayload {
 
 /**
  * 每 10s 写一次心跳到 Redis（TTL 30s）。
- * API 侧 /admin/tiktok/health 直接 GET 这个 key 显示运行状态。
- *
- * M1 阶段 activeBrowsers/poolSize 暂时返回占位值，
- * M3 接入 BrowserPool 后改为真实数据。
+ * activeBrowsers/poolSize 实时取自 BrowserPool；successRate 由 MonitorWorker 累加。
  */
 @Injectable()
 export class HeartbeatService implements OnModuleInit, OnModuleDestroy {
@@ -26,13 +24,13 @@ export class HeartbeatService implements OnModuleInit, OnModuleDestroy {
   private readonly redis: IORedis;
   private timer?: NodeJS.Timeout;
 
-  // 占位字段：M3 由 BrowserPool 注入真实值
-  activeBrowsers = 0;
-  poolSize = 0;
   totalScrapesLastHour = 0;
   successScrapesLastHour = 0;
 
-  constructor(private readonly env: EnvService) {
+  constructor(
+    private readonly env: EnvService,
+    private readonly browserPool: BrowserPoolService,
+  ) {
     this.redis = new IORedis(env.redisUrl);
   }
 
@@ -55,8 +53,8 @@ export class HeartbeatService implements OnModuleInit, OnModuleDestroy {
         : null;
     const payload: HeartbeatPayload = {
       ts: Date.now(),
-      activeBrowsers: this.activeBrowsers,
-      poolSize: this.poolSize,
+      activeBrowsers: this.browserPool.activeBrowsers,
+      poolSize: this.browserPool.poolSize,
       successRate,
     };
     await this.redis.set(HB_KEY, JSON.stringify(payload), "EX", HB_TTL_SEC);

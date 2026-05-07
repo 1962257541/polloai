@@ -26,12 +26,10 @@ loadEnvFiles();
 const envSchema = z.object({
   REDIS_URL: z.string().min(1),
   DATABASE_URL: z.string().url(),
-  TIKTOK_BOOT_KEY: z
-    .string()
-    .refine((v) => Buffer.from(v, "base64").length === 32, {
-      message: "TIKTOK_BOOT_KEY 必须是 32 字节 base64",
-    })
-    .optional(),
+  TIKTOK_SCRAPER_HEADLESS: z.string().optional(),
+  TIKTOK_SCRAPER_PROXY: z.string().optional(),
+  TIKTOK_SCRAPER_POOL_SIZE: z.coerce.number().int().min(1).max(20).default(5),
+  TIKTOK_SCRAPER_TIMEOUT_MS: z.coerce.number().int().min(20_000).max(300_000).default(90_000),
 });
 
 @Injectable()
@@ -54,8 +52,26 @@ export class EnvService {
     };
   }
 
-  get tiktokBootKey(): Buffer | null {
-    if (!this.env.TIKTOK_BOOT_KEY) return null;
-    return Buffer.from(this.env.TIKTOK_BOOT_KEY, "base64");
+  get scraperHeadless(): boolean {
+    return this.env.TIKTOK_SCRAPER_HEADLESS !== "false";
+  }
+
+  /** 代理优先级：TIKTOK_SCRAPER_PROXY > all_proxy > ALL_PROXY > HTTPS_PROXY */
+  get scraperProxy(): string | undefined {
+    return (
+      this.env.TIKTOK_SCRAPER_PROXY ||
+      process.env.all_proxy ||
+      process.env.ALL_PROXY ||
+      process.env.HTTPS_PROXY ||
+      undefined
+    );
+  }
+
+  get scraperPoolSize(): number {
+    return this.env.TIKTOK_SCRAPER_POOL_SIZE;
+  }
+
+  get scraperTimeoutMs(): number {
+    return this.env.TIKTOK_SCRAPER_TIMEOUT_MS;
   }
 }
