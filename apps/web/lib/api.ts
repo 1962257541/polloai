@@ -319,6 +319,16 @@ export const api = {
   deleteMaterial: (token: string, id: string) =>
     request(`/materials/${id}`, { method: "DELETE" }, token),
 
+  /**
+   * 拼接下载 URL：token 走 query（JwtStrategy 已支持），便于直接给 <a href> 用浏览器原生下载。
+   * 之所以不用 fetch + blob：某些浏览器/扩展会在跨源 fetch 大 binary 响应时拦截 body，
+   * 导致 status=200 但 await blob() 报 Failed to fetch。原生 download 流不受此影响。
+   */
+  buildDownloadUrl: (token: string, id: string, opts: { fakeIphone?: boolean } = {}) => {
+    const fake = opts.fakeIphone === false ? "0" : "1";
+    return `${API_BASE}/materials/${id}/download?fakeIphone=${fake}&token=${encodeURIComponent(token)}`;
+  },
+
   retryImageTask: async (token: string, originalTask: any) => {
     const params = originalTask.parameters || {};
     const payload = {

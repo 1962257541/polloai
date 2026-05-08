@@ -1,9 +1,10 @@
-import { Injectable, NotFoundException, ForbiddenException } from "@nestjs/common";
+import { Injectable, NotFoundException, ForbiddenException, Logger } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { StorageService } from "../storage/storage.service";
 import { DeleteObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { EnvService } from "../config/env.service";
 import { MaterialSource, MediaType } from "@prisma/client";
+import { IphoneMetadataService } from "./iphone-metadata.service";
 
 export interface CreateMaterialInput {
   userId: string;
@@ -19,11 +20,13 @@ export interface CreateMaterialInput {
 @Injectable()
 export class MaterialsService {
   private readonly s3Client: S3Client;
+  private readonly logger = new Logger(MaterialsService.name);
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
     private readonly env: EnvService,
+    private readonly iphoneMetadata: IphoneMetadataService,
   ) {
     this.s3Client = new S3Client({
       region: env.s3Region,
@@ -125,6 +128,48 @@ export class MaterialsService {
       where: { id: materialId },
       data: { expiresAt: null },
     });
+  }
+
+  async findOwned(userId: string, materialId: string) {
+    const material = await this.prisma.material.findUnique({ where: { id: materialId } });
+    if (!material) throw new NotFoundException("Material not found");
+    if (material.userId !== userId) throw new ForbiddenException();
+    return material;
+  }
+
+  resolveDownloadUrl(material: { url: string; storageKey: string | null }) {
+    return this.storage.resolvePublicUrl(material.url, material.storageKey);
+  }
+
+  async getRawBuffer(material: { storageKey: string }) {
+    return this.storage.getObjectBuffer(material.storageKey);
+  }
+
+  /**
+   * 下载视频并注入 iPhone 拍摄元数据，返回处理后的 buffer。
+   * 失败返回 null，让上层降级。
+   */
+  async buildIphoneVideo(
+    userId: string,
+    materialId: string,
+  ): Promise<{ buffer: Buffer; filename: string } | null> {
+    const material = await this.findOwned(userId, materialId);
+    if (material.mediaType !== "video") return null;
+
+    try {
+      const source = await this.storage.getObjectBuffer(material.storageKey);
+      const buffer = await this.iphoneMetadata.transformBuffer(source, {
+        creationDate: material.createdAt,
+      });
+      const baseName = material.name.replace(/\.[^./\\]+$/, "");
+      const filename = `${baseName || "IMG_" + material.id.slice(0, 8)}.mov`;
+      return { buffer, filename };
+    } catch (err) {
+      this.logger.warn(
+        `iPhone metadata injection failed for material ${materialId}: ${(err as Error).message}`,
+      );
+      return null;
+    }
   }
 
   async remove(userId: string, materialId: string) {

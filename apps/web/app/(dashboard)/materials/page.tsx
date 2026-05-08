@@ -107,15 +107,31 @@ function formatFullTime(iso: string) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
-/** 通过 fetch + blob 下载单个文件到本地 */
-async function downloadFile(url: string, filename: string) {
-  const res = await fetch(url);
-  const blob = await res.blob();
+/** 通过原生 a 标签触发浏览器下载（绕开 fetch+blob，让浏览器自己处理大文件传输） */
+function triggerNativeDownload(url: string, filename: string) {
   const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = filename;
+  a.href = url;
+  a.download = filename; // 同源时生效；跨源时浏览器以 server 的 Content-Disposition: attachment 为准
+  document.body.appendChild(a);
   a.click();
-  URL.revokeObjectURL(a.href);
+  document.body.removeChild(a);
+}
+
+/** 下载素材：fakeIphone=true 时视频会被注入 iPhone 元数据并以 .mov 返回；
+ *  fakeIphone=false 始终拿原始字节（视频维持 mp4，图片维持原 mime）。 */
+function downloadMaterialFile(
+  token: string,
+  material: Material,
+  opts: { fakeIphone: boolean },
+): Promise<void> {
+  const isVideo = material.mediaType === "video";
+  const fake = opts.fakeIphone && isVideo;
+  const url = api.buildDownloadUrl(token, material.id, { fakeIphone: fake });
+  const fallback = fake
+    ? `${material.name.replace(/\.[^./\\]+$/, "") || material.id.slice(0, 8)}.mov`
+    : material.name;
+  triggerNativeDownload(url, fallback);
+  return Promise.resolve();
 }
 
 export default function MaterialsPage() {
@@ -286,8 +302,8 @@ export default function MaterialsPage() {
     }
   };
 
-  // 批量下载
-  const handleBatchDownload = async () => {
+  // 批量下载（参数控制是否伪装 iPhone）
+  const runBatchDownload = async (fakeIphone: boolean) => {
     const targets = items.filter((m) => selected.has(m.id));
     if (targets.length === 0) return;
     setDownloading(true);
@@ -295,17 +311,23 @@ export default function MaterialsPage() {
     try {
       // 串行下载，避免同时打开大量弹窗
       for (const m of targets) {
-        await downloadFile(m.url, m.name);
+        await downloadMaterialFile(token, m, { fakeIphone });
         // 短暂间隔，防止浏览器拦截
         await new Promise((r) => setTimeout(r, 300));
       }
-      setMessage(`已下载 ${targets.length} 个文件`);
+      setMessage(
+        fakeIphone
+          ? `已下载 ${targets.length} 个文件（仿 iPhone）`
+          : `已下载 ${targets.length} 个文件`,
+      );
     } catch (e: any) {
       setMessage(e.message ?? "下载失败");
     } finally {
       setDownloading(false);
     }
   };
+  const handleBatchDownload = () => runBatchDownload(false);
+  const handleBatchDownloadFakeIphone = () => runBatchDownload(true);
 
   const TAB_LABELS: { key: TabType; label: string }[] = [
     { key: "all", label: "全部" },
@@ -351,8 +373,34 @@ export default function MaterialsPage() {
           {selected.size > 0 && (
             <>
               <button
+                onClick={handleBatchDownloadFakeIphone}
+                disabled={downloading || deleting}
+                title="视频会被注入 iPhone 元数据并以 .mov 输出（图片仍按原始字节下载）"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "7px 14px",
+                  borderRadius: 6,
+                  border: "1px solid rgba(59,130,246,0.4)",
+                  background: "transparent",
+                  color: "#3b82f6",
+                  fontSize: "0.82rem",
+                  cursor: downloading ? "not-allowed" : "pointer",
+                  opacity: downloading ? 0.6 : 1,
+                }}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="7" y="2" width="10" height="20" rx="2" />
+                  <line x1="11" y1="18" x2="13" y2="18" />
+                </svg>
+                {downloading ? "下载中..." : `仿 iPhone (${selected.size})`}
+              </button>
+
+              <button
                 onClick={handleBatchDownload}
                 disabled={downloading || deleting}
+                title="下载原始文件，不做任何处理"
                 style={{
                   display: "flex",
                   alignItems: "center",

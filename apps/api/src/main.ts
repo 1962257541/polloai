@@ -22,7 +22,7 @@ async function bootstrap() {
     },
     methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "x-request-id"],
-    exposedHeaders: ["x-request-id"],
+    exposedHeaders: ["x-request-id", "Content-Disposition"],
     credentials: false,
     optionsSuccessStatus: 204,
   });

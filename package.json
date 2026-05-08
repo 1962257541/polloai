@@ -25,5 +25,8 @@
                          "bcryptjs":  "^2.4.3",
                          "@prisma/client":  "6.19.2",
                          "prisma":  "6.19.2"
-                     }
+                     },
+    "pnpm":  {
+                 "onlyBuiltDependencies":  ["ffmpeg-static"]
+             }
 }

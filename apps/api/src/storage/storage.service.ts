@@ -1,10 +1,12 @@
 ﻿import {
   CreateBucketCommand,
+  GetObjectCommand,
   HeadBucketCommand,
   PutObjectCommand,
   S3Client,
   PutBucketPolicyCommand,
 } from "@aws-sdk/client-s3";
+import { Readable } from "stream";
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { EnvService } from "../config/env.service";
 import { randomUUID } from "crypto";
@@ -80,6 +82,25 @@ export class StorageService implements OnModuleInit {
       url: this.buildPublicUrl(key),
       sizeBytes: buffer.byteLength,
     };
+  }
+
+  async getObjectBuffer(key: string): Promise<Buffer> {
+    const result = await this.client.send(
+      new GetObjectCommand({
+        Bucket: this.env.s3Bucket,
+        Key: key,
+      }),
+    );
+    const body = result.Body;
+    if (!body) {
+      throw new Error(`S3 object body is empty: ${key}`);
+    }
+    const stream = body as Readable;
+    const chunks: Buffer[] = [];
+    for await (const chunk of stream) {
+      chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : (chunk as Buffer));
+    }
+    return Buffer.concat(chunks);
   }
 
   private async ensurePublicReadPolicy() {

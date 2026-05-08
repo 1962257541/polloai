@@ -55,7 +55,20 @@
       "Bash(cd /d D:\\\\polloai)",
       "Bash(dir /b)",
       "Bash(xargs grep -l \"imageToVideoSchema\")",
-      "Bash(xargs grep -l \"video\\\\|Video\")"
+      "Bash(xargs grep -l \"video\\\\|Video\")",
+      "Bash(pnpm *)",
+      "PowerShell(docker info *)",
+      "PowerShell(docker compose up *)",
+      "PowerShell(Get-NetTCPConnection *)",
+      "PowerShell(pnpm db:generate *)",
+      "PowerShell(pnpm db:migrate *)",
+      "PowerShell(pnpm prisma *)",
+      "PowerShell(pnpm db:seed *)",
+      "Bash(netstat -ano)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3001/api/v1/auth/me)",
+      "PowerShell(pnpm rebuild *)",
+      "PowerShell(Get-Item *)",
+      "Bash(curl -s -i -X OPTIONS \"http://localhost:3001/api/v1/materials/e847f2d9-6621-4012-b3f8-b9527be78658/download?fakeIphone=1\" -H \"Origin: http://localhost:3000\" -H \"Access-Control-Request-Method: GET\" -H \"Access-Control-Request-Headers: authorization\")"
     ]
   }
 }
