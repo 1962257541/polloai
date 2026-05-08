@@ -341,8 +341,8 @@ function AccountCard({
         borderRadius: 14,
         padding: "16px 20px",
         display: "grid",
-        gridTemplateColumns: "auto minmax(260px, 1.1fr) minmax(220px, 1fr) minmax(540px, 1.5fr)",
-        gap: 20,
+        gridTemplateColumns: "auto minmax(200px, 1fr) minmax(180px, 0.8fr) minmax(320px, 1.2fr)",
+        gap: 16,
         alignItems: "stretch",
         cursor: "pointer",
         transition: "all 0.15s",
@@ -455,8 +455,8 @@ function AccountCard({
       </div>
 
       {/* 右：近 6 条 + actions */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 8, minWidth: 0 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, minWidth: 0, overflow: "hidden" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           <span style={{ fontSize: "0.72rem", color: refreshing ? "#2563EB" : "#94A3B8", display: "flex", alignItems: "center", gap: 6, fontWeight: 500 }}>
             {refreshing && <Spinner size={12} />}
             {refreshing
@@ -481,7 +481,7 @@ function AccountCard({
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: 6, overflowX: "auto", position: "relative" }}>
+        <div style={{ display: "flex", gap: 6, overflowX: "auto", position: "relative", maxWidth: "100%" }}>
           {videos.length === 0 ? (
             <div style={{
               flex: 1, padding: 14, textAlign: "center",
