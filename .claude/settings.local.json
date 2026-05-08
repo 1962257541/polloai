@@ -68,7 +68,22 @@
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3001/api/v1/auth/me)",
       "PowerShell(pnpm rebuild *)",
       "PowerShell(Get-Item *)",
-      "Bash(curl -s -i -X OPTIONS \"http://localhost:3001/api/v1/materials/e847f2d9-6621-4012-b3f8-b9527be78658/download?fakeIphone=1\" -H \"Origin: http://localhost:3000\" -H \"Access-Control-Request-Method: GET\" -H \"Access-Control-Request-Headers: authorization\")"
+      "Bash(curl -s -i -X OPTIONS \"http://localhost:3001/api/v1/materials/e847f2d9-6621-4012-b3f8-b9527be78658/download?fakeIphone=1\" -H \"Origin: http://localhost:3000\" -H \"Access-Control-Request-Method: GET\" -H \"Access-Control-Request-Headers: authorization\")",
+      "mcp__playwright__browser_navigate",
+      "mcp__playwright__browser_snapshot",
+      "mcp__playwright__browser_click",
+      "mcp__playwright__browser_wait_for",
+      "mcp__playwright__browser_network_requests",
+      "mcp__playwright__browser_evaluate",
+      "mcp__playwright__browser_type",
+      "mcp__playwright__browser_take_screenshot",
+      "mcp__playwright__browser_press_key",
+      "mcp__plugin_context7_context7__resolve-library-id",
+      "mcp__plugin_context7_context7__get-library-docs"
     ]
-  }
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "playwright"
+  ]
 }
