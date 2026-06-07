@@ -6,9 +6,9 @@ import { api, Material } from "../lib/api";
 import { getToken } from "../lib/auth";
 
 const DURATION_OPTIONS = [
-  { value: 4, label: "4s" },
-  { value: 6, label: "6s" },
-  { value: 8, label: "8s" },
+  { value: 5, label: "5s" },
+  { value: 10, label: "10s" },
+  { value: 15, label: "15s" },
 ];
 
 const SIZE_OPTIONS = [
@@ -16,7 +16,6 @@ const SIZE_OPTIONS = [
   { value: "720x1280", label: "9:16", aspectRatio: "9:16" as const },
 ];
 
-type AspectRatioValue = "16:9" | "9:16";
 type GeneratorTab = "single" | "batch";
 
 interface VideoGeneratorProps {
@@ -30,33 +29,33 @@ function sizeToAspectRatio(size: string) {
 export default function VideoGenerator({ onCreated }: VideoGeneratorProps) {
   const [activeTab, setActiveTab] = useState<GeneratorTab>("single");
 
-  // 单个生成状态
+  // 单个生成状态（支持多张参考图合成 1 个任务）
   const [prompt, setPrompt] = useState("");
   const [imageUrl, setImageUrl] = useState("");
-  const [selectedMaterial, setSelectedMaterial] = useState<Material | null>(null);
+  const [selectedMaterials, setSelectedMaterials] = useState<Material[]>([]);
   const [size, setSize] = useState("1280x720");
-  const [duration, setDuration] = useState(4);
+  const [duration, setDuration] = useState(5);
   const [availableModels, setAvailableModels] = useState<string[]>([]);
   const [selectedModel, setSelectedModel] = useState("");
   const [configLoading, setConfigLoading] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // 批量生成状态
+  // 批量生成状态（每张图 1 个任务）
   const [batchPrompt, setBatchPrompt] = useState("");
   const [batchMaterials, setBatchMaterials] = useState<Material[]>([]);
   const [batchSize, setBatchSize] = useState("1280x720");
-  const [batchDuration, setBatchDuration] = useState(4);
+  const [batchDuration, setBatchDuration] = useState(5);
   const [batchSubmitting, setBatchSubmitting] = useState(false);
   const [batchResult, setBatchResult] = useState("");
   const [batchError, setBatchError] = useState("");
   const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0 });
 
-  // 素材库弹窗
+  // 素材库弹窗（两个 tab 都用多选）
   const [libraryOpen, setLibraryOpen] = useState(false);
-  const [libraryMode, setLibraryMode] = useState<"single" | "batch">("single");
+  const [libraryTarget, setLibraryTarget] = useState<"single" | "batch">("single");
 
-  const canSubmit = Boolean(imageUrl.trim() || selectedMaterial);
+  const canSubmit = Boolean(imageUrl.trim() || selectedMaterials.length > 0);
 
   useEffect(() => {
     const token = getToken();
@@ -85,16 +84,17 @@ export default function VideoGenerator({ onCreated }: VideoGeneratorProps) {
     return () => { active = false; };
   }, []);
 
-  const openLibrary = (mode: "single" | "batch") => {
-    setLibraryMode(mode);
+  const openLibrary = (target: "single" | "batch") => {
+    setLibraryTarget(target);
     setLibraryOpen(true);
   };
 
   const handleLibraryApply = (selected: Material[]) => {
-    if (libraryMode === "single") {
-      setSelectedMaterial(selected[0] ?? null);
-      if (selected[0]) setImageUrl("");
-      setError("");
+    if (libraryTarget === "single") {
+      const capped = selected.slice(0, 9);
+      setSelectedMaterials(capped);
+      if (capped.length > 0) setImageUrl("");
+      setError(selected.length > 9 ? "图生视频最多 9 张参考图，已自动保留前 9 张。" : "");
     } else {
       setBatchMaterials(selected);
       setBatchError("");
@@ -114,20 +114,22 @@ export default function VideoGenerator({ onCreated }: VideoGeneratorProps) {
       return;
     }
 
+    const imageUrls = [
+      ...selectedMaterials.map((m) => m.url),
+      ...(imageUrl.trim() ? [imageUrl.trim()] : []),
+    ];
+
     try {
       setLoading(true);
       setError("");
-      await api.createVideoFromImage(
-        token,
-        {
-          prompt: prompt.trim(),
-          model: selectedModel,
-          imageUrl: selectedMaterial ? selectedMaterial.url : imageUrl || undefined,
-          aspectRatio: sizeToAspectRatio(size),
-          size,
-          durationSec: duration,
-        },
-      );
+      await api.createVideoFromImage(token, {
+        prompt: prompt.trim(),
+        model: selectedModel,
+        imageUrls,
+        aspectRatio: sizeToAspectRatio(size),
+        size,
+        durationSec: duration,
+      });
       onCreated();
     } catch (requestError) {
       setError((requestError as Error).message);
@@ -270,6 +272,44 @@ export default function VideoGenerator({ onCreated }: VideoGeneratorProps) {
     </div>
   );
 
+  const renderThumbGrid = (materials: Material[], onRemove: (id: string) => void) => (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(64px, 1fr))", gap: 6 }}>
+      {materials.map((m) => (
+        <div key={m.id} style={{ position: "relative", borderRadius: 6, overflow: "hidden", border: "1px solid var(--border)", paddingBottom: "100%", background: "var(--bg-raised)" }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={m.url}
+            alt={m.name}
+            loading="lazy"
+            style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+          />
+          <button
+            type="button"
+            onClick={() => onRemove(m.id)}
+            style={{
+              position: "absolute",
+              top: 2,
+              right: 2,
+              width: 16,
+              height: 16,
+              borderRadius: "50%",
+              background: "rgba(0,0,0,0.6)",
+              color: "#fff",
+              border: "none",
+              cursor: "pointer",
+              fontSize: "0.6rem",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            ×
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+
   return (
     <>
       {/* 整个生成器卡片：flex 列，撑满父容器高度 */}
@@ -334,66 +374,38 @@ export default function VideoGenerator({ onCreated }: VideoGeneratorProps) {
           >
             {/* 可滚动的表单内容区 */}
             <div style={{ flex: 1, overflowY: "auto", padding: "16px 16px 8px", display: "flex", flexDirection: "column", gap: 16 }}>
-              <div>
-                <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "inherit", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
-                  PROMPT
-                </label>
-                <textarea
-                  className="input-field"
-                  value={prompt}
-                  onChange={(event) => setPrompt(event.target.value)}
-                  placeholder="描述视频动作和镜头效果..."
-                  rows={3}
-                  style={{ resize: "none", minHeight: 80 }}
-                />
-              </div>
-
               {renderModelSelect("MODEL")}
 
-              {/* 图片来源 */}
+              {/* 图片来源（可多选） */}
               <div>
                 <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "inherit", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
-                  INPUT IMAGE
+                  INPUT IMAGES（可多选，最多 9 张）
                 </label>
 
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                   <button type="button" className="btn-ghost" onClick={() => openLibrary("single")}>
-                    {selectedMaterial ? "重新选择" : "从素材库选择"}
+                    {selectedMaterials.length > 0 ? `已选 ${selectedMaterials.length} 张，重新选择` : "从素材库选择"}
                   </button>
-                  {selectedMaterial && (
+                  {selectedMaterials.length > 0 && (
                     <button
                       type="button"
                       className="btn-ghost"
-                      onClick={() => { setSelectedMaterial(null); setError(""); }}
+                      onClick={() => { setSelectedMaterials([]); setError(""); }}
                     >
                       清除
                     </button>
                   )}
                 </div>
 
-                {selectedMaterial && (
-                  <div
-                    style={{
-                      marginTop: 10,
-                      border: "1px solid var(--border)",
-                      borderRadius: 10,
-                      overflow: "hidden",
-                      background: "var(--bg-raised)",
-                    }}
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={selectedMaterial.url}
-                      alt={selectedMaterial.name}
-                      style={{ width: "100%", display: "block", maxHeight: 180, objectFit: "cover" }}
-                    />
-                    <div style={{ padding: "8px 12px", fontSize: "0.75rem", color: "var(--text-muted)" }}>
-                      {selectedMaterial.name}
-                    </div>
+                {selectedMaterials.length > 0 && (
+                  <div style={{ marginTop: 10 }}>
+                    {renderThumbGrid(selectedMaterials, (id) =>
+                      setSelectedMaterials((prev) => prev.filter((x) => x.id !== id)),
+                    )}
                   </div>
                 )}
 
-                {!selectedMaterial && (
+                {selectedMaterials.length === 0 && (
                   <input
                     className="input-field"
                     type="url"
@@ -407,6 +419,20 @@ export default function VideoGenerator({ onCreated }: VideoGeneratorProps) {
 
               {renderSizeSelect(size, setSize)}
               {renderDurationSelect(duration, setDuration)}
+
+              <div>
+                <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "inherit", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
+                  PROMPT
+                </label>
+                <textarea
+                  className="input-field"
+                  value={prompt}
+                  onChange={(event) => setPrompt(event.target.value)}
+                  placeholder="描述视频动作和镜头效果..."
+                  rows={5}
+                  style={{ resize: "vertical", minHeight: 120 }}
+                />
+              </div>
 
               {error && (
                 <div style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.18)", borderRadius: 8, padding: "10px 12px", fontSize: "0.8rem", color: "var(--error)" }}>
@@ -436,20 +462,6 @@ export default function VideoGenerator({ onCreated }: VideoGeneratorProps) {
 
               <div>
                 <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "inherit", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
-                  PROMPT（统一应用于所有素材）
-                </label>
-                <textarea
-                  className="input-field"
-                  value={batchPrompt}
-                  onChange={(e) => setBatchPrompt(e.target.value)}
-                  placeholder="描述视频动作和镜头效果，将应用于所有选中的素材..."
-                  rows={3}
-                  style={{ resize: "none", minHeight: 80 }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "inherit", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
                   SELECT MATERIALS（可多选）
                 </label>
                 <button type="button" className="btn-ghost" onClick={() => openLibrary("batch")}>
@@ -462,46 +474,28 @@ export default function VideoGenerator({ onCreated }: VideoGeneratorProps) {
                   <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: 8 }}>
                     已选 {batchMaterials.length} 张，将串行生成 {batchMaterials.length} 个任务：
                   </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(64px, 1fr))", gap: 6 }}>
-                    {batchMaterials.map((m) => (
-                      <div key={m.id} style={{ position: "relative", borderRadius: 6, overflow: "hidden", border: "1px solid var(--border)", paddingBottom: "100%", background: "var(--bg-raised)" }}>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={m.url}
-                          alt={m.name}
-                          loading="lazy"
-                          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setBatchMaterials((prev) => prev.filter((x) => x.id !== m.id))}
-                          style={{
-                            position: "absolute",
-                            top: 2,
-                            right: 2,
-                            width: 16,
-                            height: 16,
-                            borderRadius: "50%",
-                            background: "rgba(0,0,0,0.6)",
-                            color: "#fff",
-                            border: "none",
-                            cursor: "pointer",
-                            fontSize: "0.6rem",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                          }}
-                        >
-                          ×
-                        </button>
-                      </div>
-                    ))}
-                  </div>
+                  {renderThumbGrid(batchMaterials, (id) =>
+                    setBatchMaterials((prev) => prev.filter((x) => x.id !== id)),
+                  )}
                 </div>
               )}
 
               {renderSizeSelect(batchSize, setBatchSize)}
               {renderDurationSelect(batchDuration, setBatchDuration)}
+
+              <div>
+                <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "inherit", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
+                  PROMPT（统一应用于所有素材）
+                </label>
+                <textarea
+                  className="input-field"
+                  value={batchPrompt}
+                  onChange={(e) => setBatchPrompt(e.target.value)}
+                  placeholder="描述视频动作和镜头效果，将应用于所有选中的素材..."
+                  rows={5}
+                  style={{ resize: "vertical", minHeight: 120 }}
+                />
+              </div>
 
               {batchSubmitting && batchProgress.total > 0 && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -546,10 +540,10 @@ export default function VideoGenerator({ onCreated }: VideoGeneratorProps) {
 
       <MaterialLibraryModal
         open={libraryOpen}
-        mode={libraryMode}
+        mode="batch"
         selectedIds={
-          libraryMode === "single"
-            ? selectedMaterial ? [selectedMaterial.id] : []
+          libraryTarget === "single"
+            ? selectedMaterials.map((m) => m.id)
             : batchMaterials.map((m) => m.id)
         }
         onClose={() => setLibraryOpen(false)}

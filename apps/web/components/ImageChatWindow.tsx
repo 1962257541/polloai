@@ -58,6 +58,11 @@ export default function ImageChatWindow({
   const [videoModalImageUrl, setVideoModalImageUrl] = useState("");
   const [videoPrompt, setVideoPrompt] = useState("");
   const [videoSubmitting, setVideoSubmitting] = useState(false);
+  // 视频模型/参数（弹窗内选择）
+  const [videoModels, setVideoModels] = useState<string[]>([]);
+  const [videoModel, setVideoModel] = useState("");
+  const [videoDuration, setVideoDuration] = useState(5);
+  const [videoSize, setVideoSize] = useState("1280x720");
   const bottomRef = useRef<HTMLDivElement>(null);
   const stopStreamRef = useRef<(() => void) | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -69,6 +74,24 @@ export default function ImageChatWindow({
     setPendingPreviews(urls);
     return () => urls.forEach((u) => URL.revokeObjectURL(u));
   }, [pendingFiles]);
+
+  // 加载账号的视频模型（用于"生成视频"弹窗）
+  useEffect(() => {
+    if (!token) return;
+    let active = true;
+    void (async () => {
+      try {
+        const info = await api.getMyInfo(token);
+        if (!active) return;
+        const models = info.videoModels || (info.videoModel ? [info.videoModel] : []);
+        setVideoModels(models);
+        setVideoModel((current) => (current && models.includes(current) ? current : models[0] || ""));
+      } catch {
+        /* 静默：弹窗内会提示未配置 */
+      }
+    })();
+    return () => { active = false; };
+  }, [token]);
 
   // Ctrl+V 粘贴追加参考图
   useEffect(() => {
@@ -339,6 +362,10 @@ export default function ImageChatWindow({
   // 提交生成视频
   const handleVideoSubmit = async () => {
     if (!videoPrompt.trim() || videoSubmitting) return;
+    if (!videoModel) {
+      alert("请先在系统设置中配置视频模型。");
+      return;
+    }
 
     setVideoSubmitting(true);
     try {
@@ -347,6 +374,10 @@ export default function ImageChatWindow({
         {
           prompt: videoPrompt.trim(),
           imageUrl: videoModalImageUrl,
+          model: videoModel,
+          durationSec: videoDuration,
+          size: videoSize,
+          aspectRatio: videoSize === "720x1280" ? "9:16" : "16:9",
         },
       );
       setVideoModalOpen(false);
@@ -770,8 +801,8 @@ export default function ImageChatWindow({
                 }
               }}
               placeholder="描述你想要生成的图片... (Enter 发送，Shift+Enter 换行，Ctrl+V 粘贴参考图)"
-              rows={3}
-              style={{ resize: "none", paddingRight: 44, minHeight: 72 }}
+              rows={5}
+              style={{ resize: "vertical", paddingRight: 44, minHeight: 120 }}
               disabled={submitting || !selectedModel}
             />
             {/* 参考图上传按钮 */}
@@ -887,6 +918,87 @@ export default function ImageChatWindow({
               />
             </div>
 
+            {/* 视频模型 */}
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: 8, fontFamily: "inherit", letterSpacing: "0.05em" }}>
+                视频模型
+              </label>
+              <select
+                className="input-field"
+                value={videoModel}
+                onChange={(e) => setVideoModel(e.target.value)}
+                disabled={videoModels.length === 0}
+                style={{ width: "100%" }}
+              >
+                {videoModels.length === 0 ? (
+                  <option value="">未配置可用视频模型</option>
+                ) : (
+                  videoModels.map((m) => (
+                    <option key={m} value={m}>{m}</option>
+                  ))
+                )}
+              </select>
+            </div>
+
+            {/* 时长 / 比例 */}
+            <div style={{ display: "flex", gap: 16, marginBottom: 16 }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: 8, fontFamily: "inherit", letterSpacing: "0.05em" }}>
+                  时长
+                </label>
+                <div style={{ display: "flex", gap: 8 }}>
+                  {[5, 10, 15].map((sec) => (
+                    <button
+                      key={sec}
+                      type="button"
+                      onClick={() => setVideoDuration(sec)}
+                      style={{
+                        padding: "6px 12px",
+                        borderRadius: 20,
+                        border: `1px solid ${videoDuration === sec ? "var(--accent)" : "var(--border)"}`,
+                        background: videoDuration === sec ? "var(--accent-glow)" : "transparent",
+                        color: videoDuration === sec ? "var(--accent)" : "var(--text-secondary)",
+                        fontSize: "0.8rem",
+                        cursor: "pointer",
+                        fontFamily: "inherit",
+                      }}
+                    >
+                      {sec}s
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: 8, fontFamily: "inherit", letterSpacing: "0.05em" }}>
+                  比例
+                </label>
+                <div style={{ display: "flex", gap: 8 }}>
+                  {[
+                    { value: "1280x720", label: "16:9" },
+                    { value: "720x1280", label: "9:16" },
+                  ].map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setVideoSize(opt.value)}
+                      style={{
+                        padding: "6px 12px",
+                        borderRadius: 20,
+                        border: `1px solid ${videoSize === opt.value ? "var(--accent)" : "var(--border)"}`,
+                        background: videoSize === opt.value ? "var(--accent-glow)" : "transparent",
+                        color: videoSize === opt.value ? "var(--accent)" : "var(--text-secondary)",
+                        fontSize: "0.8rem",
+                        cursor: "pointer",
+                        fontFamily: "inherit",
+                      }}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
             <div style={{ marginBottom: 16 }}>
               <label
                 style={{
@@ -940,7 +1052,7 @@ export default function ImageChatWindow({
               <button
                 type="button"
                 onClick={handleVideoSubmit}
-                disabled={!videoPrompt.trim() || videoSubmitting}
+                disabled={!videoPrompt.trim() || videoSubmitting || !videoModel}
                 style={{
                   padding: "8px 16px",
                   borderRadius: 6,
@@ -948,8 +1060,8 @@ export default function ImageChatWindow({
                   background: "var(--accent)",
                   color: "var(--bg-base)",
                   fontSize: "0.85rem",
-                  cursor: !videoPrompt.trim() || videoSubmitting ? "not-allowed" : "pointer",
-                  opacity: !videoPrompt.trim() || videoSubmitting ? 0.5 : 1,
+                  cursor: !videoPrompt.trim() || videoSubmitting || !videoModel ? "not-allowed" : "pointer",
+                  opacity: !videoPrompt.trim() || videoSubmitting || !videoModel ? 0.5 : 1,
                 }}
               >
                 {videoSubmitting ? "提交中..." : "生成视频"}

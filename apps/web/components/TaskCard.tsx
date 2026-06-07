@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 export type Task = {
   id: string;
-  type: "text_to_image" | "image_to_video";
+  type: "text_to_image" | "image_to_video" | "video_upscale";
   status: "queued" | "running" | "succeeded" | "failed" | "cancelled";
   prompt: string;
   createdAt: string;
@@ -64,6 +64,7 @@ interface TaskCardProps {
   onDelete?: (taskId: string) => void;
   onCancel?: (taskId: string) => void;
   onRetry?: (task: Task) => void;
+  onUpscale?: (task: Task) => void;
 }
 
 export default function TaskCard({
@@ -74,6 +75,7 @@ export default function TaskCard({
   onDelete,
   onCancel,
   onRetry,
+  onUpscale,
 }: TaskCardProps) {
   const [clock, setClock] = useState(Date.now);
   const [mediaError, setMediaError] = useState(false);
@@ -91,6 +93,7 @@ export default function TaskCard({
   const progress = getProgress(task, clock);
   const output = task.assets.find((asset) => asset.role === "output");
   const isPending = task.status === "queued" || task.status === "running";
+  const canUpscale = task.status === "succeeded" && output?.mediaType === "video" && Boolean(onUpscale);
   const isInteractive = compact && Boolean(onSelect);
   const textResponse = task.responseText?.trim() || task.parameters?.responseText?.trim() || "";
   const hasTextResponse = task.status === "succeeded" && Boolean(textResponse);
@@ -282,6 +285,32 @@ export default function TaskCard({
             >
               下载
             </span>
+          )}
+
+          {canUpscale && (
+            <button
+              type="button"
+              title="画质提升"
+              onClick={(event) => {
+                event.stopPropagation();
+                onUpscale?.(task);
+              }}
+              style={{
+                flex: "0 0 auto",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "5px 8px",
+                borderRadius: 4,
+                border: "1px solid var(--accent)",
+                background: "rgba(37,99,235,0.06)",
+                color: "var(--accent)",
+                cursor: "pointer",
+                fontSize: "0.72rem",
+              }}
+            >
+              ✨高清
+            </button>
           )}
 
           {task.status === "failed" && onRetry && (
@@ -522,6 +551,28 @@ export default function TaskCard({
           </span>
 
           <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
+            {canUpscale && (
+              <button
+                type="button"
+                title="画质提升（火山引擎超分）"
+                onClick={() => onUpscale?.(task)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                  padding: "3px 10px",
+                  borderRadius: 4,
+                  border: "1px solid var(--accent)",
+                  background: "rgba(37,99,235,0.06)",
+                  color: "var(--accent)",
+                  cursor: "pointer",
+                  fontSize: "0.75rem",
+                }}
+              >
+                ✨ 画质提升
+              </button>
+            )}
+
             {task.status === "failed" && onRetry && (
               <button
                 type="button"

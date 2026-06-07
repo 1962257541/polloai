@@ -26,6 +26,10 @@ export default function VideoPage() {
   const [loadingTasks, setLoadingTasks] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  // 画质提升弹窗
+  const [upscaleTask, setUpscaleTask] = useState<Task | null>(null);
+  const [upscaleRes, setUpscaleRes] = useState<"1080p" | "2k" | "4k">("1080p");
+  const [upscaling, setUpscaling] = useState(false);
   const stopStreamRef = useRef<(() => void) | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -34,7 +38,7 @@ export default function VideoPage() {
     if (!token) return;
 
     try {
-      const res = await api.listTasks(token, "image_to_video", PAGE_SIZE, 0);
+      const res = await api.listTasks(token, "image_to_video,video_upscale", PAGE_SIZE, 0);
       const nextTasks: Task[] = res.items || [];
       setTotal(res.total ?? 0);
       setTasks((prev) => {
@@ -57,7 +61,7 @@ export default function VideoPage() {
     if (!token || loadingMore) return;
     setLoadingMore(true);
     try {
-      const res = await api.listTasks(token, "image_to_video", PAGE_SIZE, tasks.length);
+      const res = await api.listTasks(token, "image_to_video,video_upscale", PAGE_SIZE, tasks.length);
       const more: Task[] = res.items || [];
       setTotal(res.total ?? 0);
       setTasks((prev) => {
@@ -115,6 +119,32 @@ export default function VideoPage() {
       await loadTasks(true);
     } catch (error) {
       console.error("Failed to retry task:", error);
+    }
+  };
+
+  const handleUpscale = (task: Task) => {
+    setUpscaleTask(task);
+    setUpscaleRes("1080p");
+  };
+
+  const confirmUpscale = async () => {
+    const token = getToken();
+    if (!token || !upscaleTask) return;
+    const output = upscaleTask.assets.find((a) => a.role === "output" && a.mediaType === "video");
+    if (!output) return;
+    try {
+      setUpscaling(true);
+      await api.createVideoUpscale(token, {
+        sourceVideoUrl: output.url,
+        targetResolution: upscaleRes,
+        sourceTaskId: upscaleTask.id,
+      });
+      setUpscaleTask(null);
+      await loadTasks(true);
+    } catch (error) {
+      alert((error as Error).message);
+    } finally {
+      setUpscaling(false);
     }
   };
 
@@ -187,7 +217,7 @@ export default function VideoPage() {
             <span style={{ color: "var(--text-muted)", fontSize: "0.8rem" }}>加载中...</span>
           ) : selectedTask ? (
             <div style={{ width: "100%", height: "100%", overflowY: "auto" }}>
-              <TaskCard task={selectedTask} onDelete={handleDelete} onCancel={handleCancel} onRetry={handleRetry} />
+              <TaskCard task={selectedTask} onDelete={handleDelete} onCancel={handleCancel} onRetry={handleRetry} onUpscale={handleUpscale} />
             </div>
           ) : (
             <div
@@ -515,6 +545,103 @@ export default function VideoPage() {
           </div>
         </div>
       </div>
+
+      {/* 画质提升弹窗 */}
+      {upscaleTask && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.7)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+          }}
+          onClick={() => !upscaling && setUpscaleTask(null)}
+        >
+          <div
+            style={{
+              background: "var(--bg-surface)",
+              border: "1px solid var(--border)",
+              borderRadius: 12,
+              padding: 24,
+              width: "90%",
+              maxWidth: 420,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ margin: "0 0 8px", fontSize: "1.1rem", color: "var(--text-primary)" }}>画质提升</h3>
+            <p style={{ margin: "0 0 16px", fontSize: "0.8rem", color: "var(--text-muted)" }}>
+              使用火山引擎超分增强，将生成更高清的视频副本（原视频保留）。
+            </p>
+
+            <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: 8, letterSpacing: "0.05em" }}>
+              目标画质
+            </label>
+            <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+              {(["1080p", "2k", "4k"] as const).map((res) => (
+                <button
+                  key={res}
+                  type="button"
+                  onClick={() => setUpscaleRes(res)}
+                  style={{
+                    flex: 1,
+                    padding: "8px 12px",
+                    borderRadius: 8,
+                    border: `1px solid ${upscaleRes === res ? "var(--accent)" : "var(--border)"}`,
+                    background: upscaleRes === res ? "var(--accent-glow)" : "transparent",
+                    color: upscaleRes === res ? "var(--accent)" : "var(--text-secondary)",
+                    fontSize: "0.85rem",
+                    cursor: "pointer",
+                    fontFamily: "inherit",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  {res}
+                </button>
+              ))}
+            </div>
+
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              <button
+                type="button"
+                onClick={() => setUpscaleTask(null)}
+                disabled={upscaling}
+                style={{
+                  padding: "8px 16px",
+                  borderRadius: 6,
+                  border: "1px solid var(--border)",
+                  background: "transparent",
+                  color: "var(--text-secondary)",
+                  fontSize: "0.85rem",
+                  cursor: upscaling ? "not-allowed" : "pointer",
+                  opacity: upscaling ? 0.5 : 1,
+                }}
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                onClick={() => void confirmUpscale()}
+                disabled={upscaling}
+                style={{
+                  padding: "8px 16px",
+                  borderRadius: 6,
+                  border: "1px solid var(--accent)",
+                  background: "var(--accent)",
+                  color: "#fff",
+                  fontSize: "0.85rem",
+                  cursor: upscaling ? "not-allowed" : "pointer",
+                  opacity: upscaling ? 0.6 : 1,
+                }}
+              >
+                {upscaling ? "提交中..." : "开始提升"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

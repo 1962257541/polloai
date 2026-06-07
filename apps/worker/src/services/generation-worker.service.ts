@@ -5,6 +5,7 @@ import { EnvService } from "./env.service";
 import { PrismaService } from "./prisma.service";
 import { StorageService } from "./storage.service";
 import { GeminiService } from "./gemini.service";
+import { VolcEngineService } from "./volcengine.service";
 import { GenerationType } from "@packages/shared";
 
 const QUEUE_NAME = "generation-jobs";
@@ -32,6 +33,7 @@ export class GenerationWorkerService implements OnModuleInit, OnModuleDestroy {
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
     private readonly gemini: GeminiService,
+    private readonly volc: VolcEngineService,
   ) {
     this.publisher = new Redis(env.redisUrl);
   }
@@ -113,6 +115,8 @@ export class GenerationWorkerService implements OnModuleInit, OnModuleDestroy {
         await this.handleTextToImage(task.id, apiKey, apiUrl, imageApiType);
       } else if (task.type === "image_to_video") {
         await this.handleImageToVideo(task.id, apiKey, apiUrl);
+      } else if (task.type === "video_upscale") {
+        await this.handleVideoUpscale(task.id);
       }
     } catch (error) {
       if (error instanceof TaskCancelledError) return;
@@ -279,23 +283,24 @@ export class GenerationWorkerService implements OnModuleInit, OnModuleDestroy {
     });
     if (!task) return;
 
-    const inputAsset = task.assets.find((a) => a.role === "input" && a.mediaType === "image");
-    if (!inputAsset) {
+    const inputAssets = task.assets.filter((a) => a.role === "input" && a.mediaType === "image");
+    if (inputAssets.length === 0) {
       throw new Error("Input image asset is missing");
     }
 
     const params = task.parameters as any;
-    // 诊断日志：确认用户选择的秒数已正确传到 worker
+    const imageUrls = inputAssets.map((a) => a.url);
+    // 诊断日志：确认用户选择的秒数与参考图数量已正确传到 worker
     console.log(
-      `[handleImageToVideo] taskId=${taskId} params.durationSec=${params.durationSec} (${typeof params.durationSec}), env default=${this.env.geminiVideoSeconds}`,
+      `[handleImageToVideo] taskId=${taskId} images=${imageUrls.length} params.durationSec=${params.durationSec} (${typeof params.durationSec}), env default=${this.env.geminiVideoSeconds}`,
     );
     const operation = await this.gemini.createVideoFromImage({
       model: task.model,
       prompt: task.prompt,
-      imageUrl: inputAsset.url,
+      imageUrls,
       aspectRatio: params.aspectRatio,
       size: params.size,
-      // 用 ?? 而非 ||，避免未来 0 等假值边界（当前 schema 范围 4-8 暂不涉及，但更严谨）
+      // 用 ?? 而非 ||，避免未来 0 等假值边界
       seconds: params.durationSec ?? this.env.geminiVideoSeconds,
       apiKey,
       apiUrl,
@@ -365,6 +370,120 @@ export class GenerationWorkerService implements OnModuleInit, OnModuleDestroy {
       type: "image_to_video",
       assetUrl: uploaded.url,
     });
+  }
+
+  private async handleVideoUpscale(taskId: string) {
+    if (!this.volc.configured) {
+      throw new Error("未配置火山 AK/SK（VOLC_ACCESS_KEY / VOLC_SECRET_KEY），无法执行画质提升。");
+    }
+
+    const task = await this.prisma.generationTask.findUnique({
+      where: { id: taskId },
+      include: { assets: true },
+    });
+    if (!task) return;
+
+    const inputAsset = task.assets.find((a) => a.role === "input" && a.mediaType === "video");
+    if (!inputAsset) {
+      throw new Error("Input video asset is missing");
+    }
+
+    const params = task.parameters as any;
+    const targetResolution = params.targetResolution || this.env.volcEnhanceResolution;
+    console.log(`[handleVideoUpscale] taskId=${taskId} target=${targetResolution} source=${inputAsset.url}`);
+
+    const submit = await this.volc.submitEnhanceTask({
+      videoUrl: inputAsset.url,
+      targetResolution,
+    });
+
+    await this.prisma.generationTask.update({
+      where: { id: taskId },
+      data: { providerJobId: submit.taskId },
+    });
+
+    const result = await this.pollVolcEnhance(taskId, submit.taskId);
+    const buffer = await this.volc.downloadResult(result.outputVideoUrl!);
+
+    const latest = await this.prisma.generationTask.findUnique({
+      where: { id: taskId },
+      select: { status: true },
+    });
+    if (!latest || latest.status === "cancelled") {
+      throw new TaskCancelledError();
+    }
+
+    const uploaded = await this.storage.uploadBuffer(buffer, {
+      prefix: "outputs/videos",
+      extension: "mp4",
+      contentType: "video/mp4",
+    });
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.generationAsset.create({
+        data: {
+          taskId,
+          role: "output",
+          mediaType: "video",
+          url: uploaded.url,
+          storageKey: uploaded.key,
+          mimeType: "video/mp4",
+          sizeBytes: uploaded.sizeBytes,
+        },
+      });
+
+      await tx.generationTask.update({
+        where: { id: taskId },
+        data: { status: "succeeded", finishedAt: new Date() },
+      });
+    });
+
+    // 高清结果自动存入素材库（24h 后过期）
+    await this.prisma.material.create({
+      data: {
+        userId: task.userId,
+        name: `enhanced-${taskId}.mp4`,
+        url: uploaded.url,
+        storageKey: uploaded.key,
+        mimeType: "video/mp4",
+        sizeBytes: uploaded.sizeBytes,
+        mediaType: "video",
+        source: "generated",
+        taskId,
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      },
+    });
+
+    await this.publish({
+      taskId,
+      userId: task.userId,
+      status: "succeeded",
+      type: "video_upscale",
+      assetUrl: uploaded.url,
+    });
+  }
+
+  /** 轮询火山画质增强任务，直到完成 / 失败 / 取消 */
+  private async pollVolcEnhance(taskId: string, providerJobId: string) {
+    for (;;) {
+      await this.sleep(5000);
+
+      const task = await this.prisma.generationTask.findUnique({ where: { id: taskId } });
+      if (!task) throw new Error("Task not found while polling enhance");
+      if (task.status === "cancelled") throw new TaskCancelledError();
+
+      const result = await this.volc.queryEnhanceTask(providerJobId);
+      if (result.failed) {
+        throw new Error(`火山画质增强失败: ${JSON.stringify(result.raw).slice(0, 500)}`);
+      }
+      if (result.done) {
+        if (!result.outputVideoUrl) {
+          throw new Error(`火山画质增强完成但缺少结果视频地址: ${JSON.stringify(result.raw).slice(0, 500)}`);
+        }
+        return result;
+      }
+      // 其他状态继续轮询
+    }
   }
 
   private async pollVideoCompletion(taskId: string, providerJobId: string, apiKey: string, apiUrl?: string) {

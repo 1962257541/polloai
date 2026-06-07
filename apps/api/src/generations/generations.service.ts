@@ -15,10 +15,12 @@ import {
   TaskStatus,
   imageToVideoSchema,
   textToImageSchema,
+  videoUpscaleSchema,
 } from "@packages/shared";
 import { ZodError } from "zod";
 import { CreateImageDto } from "./dto/create-image.dto";
 import { CreateVideoFromImageDto } from "./dto/create-video-from-image.dto";
+import { CreateVideoUpscaleDto } from "./dto/create-video-upscale.dto";
 import { GENERATION_QUEUE } from "./constants";
 
 @Injectable()
@@ -145,22 +147,40 @@ export class GenerationsService {
   async createVideoFromImageTask(
     userId: string,
     payload: CreateVideoFromImageDto,
-    file?: Express.Multer.File,
+    files: Express.Multer.File[] = [],
   ) {
-    let imageUrl = payload.imageUrl;
-
-    if (file) {
+    // 上传所有参考图到 S3（支持多张）
+    const referenceImages: { key: string; url: string; sizeBytes: number; mimeType: string }[] = [];
+    for (const file of files) {
       const uploaded = await this.storageService.uploadBuffer(file.buffer, {
         prefix: "inputs/images",
         extension: this.extensionFromMime(file.mimetype),
         contentType: file.mimetype,
       });
-      imageUrl = uploaded.url;
+      referenceImages.push({ ...uploaded, mimeType: file.mimetype });
+    }
+
+    // 合并：文件上传的 URL + DTO 中直接传入的远程 URL（imageUrls 多值 / imageUrl 单值，向后兼容）
+    const uploadedUrls = referenceImages.map((r) => r.url);
+    const remoteUrls = payload.imageUrls
+      ? Array.isArray(payload.imageUrls)
+        ? payload.imageUrls
+        : [payload.imageUrls]
+      : [];
+    if (payload.imageUrl) remoteUrls.push(payload.imageUrl);
+    const allImageUrls = [...uploadedUrls, ...remoteUrls].filter(Boolean);
+
+    if (allImageUrls.length === 0) {
+      throw new BadRequestException("imageUrl/imageUrls or image files are required");
     }
 
     let parsed: ReturnType<typeof imageToVideoSchema.parse>;
     try {
-      parsed = imageToVideoSchema.parse({ ...payload, imageUrl });
+      parsed = imageToVideoSchema.parse({
+        ...payload,
+        imageUrl: allImageUrls[0],
+        imageUrls: allImageUrls,
+      });
     } catch (error) {
       if (error instanceof ZodError) {
         throw new BadRequestException(error.flatten());
@@ -187,6 +207,9 @@ export class GenerationsService {
       throw new BadRequestException("No video models are configured for this account");
     }
 
+    // 上传文件对应的 storageKey/元信息便于落库；远程 URL 用 url 自身作 storageKey
+    const uploadedByUrl = new Map(referenceImages.map((r) => [r.url, r]));
+
     const task = await this.prisma.$transaction(async (tx) => {
       const created = await tx.generationTask.create({
         data: {
@@ -201,17 +224,20 @@ export class GenerationsService {
         },
       });
 
-      await tx.generationAsset.create({
-        data: {
-          taskId: created.id,
-          role: "input",
-          mediaType: "image",
-          url: parsed.imageUrl!,
-          storageKey: parsed.imageUrl!,
-          mimeType: file?.mimetype,
-          sizeBytes: file?.size,
-        },
-      });
+      for (const url of allImageUrls) {
+        const meta = uploadedByUrl.get(url);
+        await tx.generationAsset.create({
+          data: {
+            taskId: created.id,
+            role: "input",
+            mediaType: "image",
+            url,
+            storageKey: meta?.key ?? url,
+            mimeType: meta?.mimeType,
+            sizeBytes: meta?.sizeBytes,
+          },
+        });
+      }
 
       return created;
     });
@@ -223,6 +249,59 @@ export class GenerationsService {
       userId,
       status: "queued",
       type: "image_to_video",
+    });
+
+    return { taskId: task.id, status: task.status, inputImageUrls: allImageUrls };
+  }
+
+  async createVideoUpscaleTask(userId: string, payload: CreateVideoUpscaleDto) {
+    let parsed: ReturnType<typeof videoUpscaleSchema.parse>;
+    try {
+      parsed = videoUpscaleSchema.parse(payload);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        throw new BadRequestException(error.flatten());
+      }
+      throw error;
+    }
+
+    // 火山画质增强使用平台级 AK/SK（worker env），不依赖用户的 apiKey/apiUrl
+    const task = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.generationTask.create({
+        data: {
+          userId,
+          type: "video_upscale",
+          status: "queued",
+          provider: "volcengine",
+          // model 字段复用为目标分辨率标识，便于列表展示与排查
+          model: `volc-enhance-${parsed.targetResolution}`,
+          prompt: `画质提升至 ${parsed.targetResolution}`,
+          parameters: parsed,
+        },
+      });
+
+      await tx.generationAsset.create({
+        data: {
+          taskId: created.id,
+          role: "input",
+          mediaType: "video",
+          url: parsed.sourceVideoUrl,
+          storageKey: parsed.sourceVideoUrl,
+          mimeType: "video/mp4",
+        },
+      });
+
+      return created;
+    });
+
+    // 火山鉴权走 worker env，无需用户 apiKey，传空串占位
+    await this.enqueueTaskOrFail(task.id, "");
+
+    await this.notificationsService.publish({
+      taskId: task.id,
+      userId,
+      status: "queued",
+      type: "video_upscale",
     });
 
     return { taskId: task.id, status: task.status };
@@ -245,10 +324,14 @@ export class GenerationsService {
     userId: string,
     input: { status?: string; type?: string; sessionId?: string; limit: number; offset: number },
   ) {
+    // type 支持逗号分隔多值（如 "image_to_video,video_upscale"），单值兼容
+    const types = input.type
+      ? input.type.split(",").map((t) => t.trim()).filter(Boolean)
+      : [];
     const where = {
       userId,
       ...(input.status ? { status: input.status as TaskStatus } : {}),
-      ...(input.type ? { type: input.type as GenerationType } : {}),
+      ...(types.length ? { type: { in: types as GenerationType[] } } : {}),
       ...(input.sessionId !== undefined ? { sessionId: input.sessionId } : {}),
     };
 
@@ -476,7 +559,11 @@ export class GenerationsService {
     opts: { type?: string; onlyTerminated?: boolean } = {},
   ) {
     const where: any = { userId };
-    if (opts.type) where.type = opts.type;
+    if (opts.type) {
+      const types = opts.type.split(",").map((t) => t.trim()).filter(Boolean);
+      if (types.length === 1) where.type = types[0];
+      else if (types.length > 1) where.type = { in: types };
+    }
     if (opts.onlyTerminated) {
       where.status = { in: ["succeeded", "failed", "cancelled"] };
     }

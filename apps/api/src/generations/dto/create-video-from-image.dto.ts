@@ -31,6 +31,10 @@ export class CreateVideoFromImageDto {
   @IsUrl({ require_tld: false })
   imageUrl?: string;
 
+  // multipart 单值为 string、多值为 string[]，与 CreateImageDto.referenceImageUrls 一致
+  @IsOptional()
+  imageUrls?: string | string[];
+
   @IsOptional()
   @IsIn(["1:1", "16:9", "9:16"])
   aspectRatio?: "1:1" | "16:9" | "9:16";
@@ -42,8 +46,8 @@ export class CreateVideoFromImageDto {
   @IsOptional()
   @Transform(({ value }) => (value !== undefined && value !== "" ? Number(value) : undefined))
   @IsInt()
-  @Min(4)
-  @Max(8)
+  @Min(1)
+  @Max(15)
   durationSec?: number;
 
   @IsOptional()

@@ -10,6 +10,7 @@ datasource db {
 enum GenerationType {
   text_to_image
   image_to_video
+  video_upscale
 }
 
 enum TaskStatus {

@@ -145,25 +145,46 @@ export const api = {
       prompt: string;
       model?: string;
       imageUrl?: string;
+      imageUrls?: string[];
       aspectRatio?: string;
       size?: string;
       durationSec?: number;
     },
-    file?: File,
+    files?: File[],
   ) => {
     const form = new FormData();
     form.append("prompt", payload.prompt);
     if (payload.model) form.append("model", payload.model);
     if (payload.imageUrl) form.append("imageUrl", payload.imageUrl);
+    if (payload.imageUrls) payload.imageUrls.forEach((url) => form.append("imageUrls", url));
     if (payload.aspectRatio) form.append("aspectRatio", payload.aspectRatio);
     if (payload.size) form.append("size", payload.size);
     if (payload.durationSec) form.append("durationSec", String(payload.durationSec));
-    if (file) form.append("image", file);
+    if (files) files.forEach((file) => form.append("images", file));
 
     const response = await fetch(`${API_BASE}/generations/video-from-image`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}` },
       body: form,
+    });
+
+    const text = await response.text();
+    const data = text ? JSON.parse(text) : null;
+    if (!response.ok) {
+      const msg = Array.isArray(data?.message) ? data.message.join("; ") : data?.message;
+      throw new Error(msg || `Request failed (${response.status})`);
+    }
+    return data;
+  },
+
+  createVideoUpscale: async (
+    token: string,
+    payload: { sourceVideoUrl: string; targetResolution?: "1080p" | "2k" | "4k"; sourceTaskId?: string },
+  ) => {
+    const response = await fetch(`${API_BASE}/generations/video-upscale`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
     });
 
     const text = await response.text();

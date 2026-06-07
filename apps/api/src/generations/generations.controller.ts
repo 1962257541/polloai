@@ -8,17 +8,17 @@ import {
   Patch,
   Post,
   Query,
-  UploadedFile,
   UploadedFiles,
   UseGuards,
   UseInterceptors,
 } from "@nestjs/common";
-import { FileInterceptor, FilesInterceptor } from "@nestjs/platform-express";
+import { FilesInterceptor } from "@nestjs/platform-express";
 import { memoryStorage } from "multer";
 import { JwtAuthGuard } from "../common/jwt-auth.guard";
 import { CurrentUser, JwtUser } from "../common/current-user.decorator";
 import { CreateImageDto } from "./dto/create-image.dto";
 import { CreateVideoFromImageDto } from "./dto/create-video-from-image.dto";
+import { CreateVideoUpscaleDto } from "./dto/create-video-upscale.dto";
 import { GenerationsService } from "./generations.service";
 
 @Controller("generations")
@@ -43,7 +43,7 @@ export class GenerationsController {
 
   @Post("video-from-image")
   @UseInterceptors(
-    FileInterceptor("image", {
+    FilesInterceptor("images", 9, {
       storage: memoryStorage(),
       limits: { fileSize: 20 * 1024 * 1024 },
     }),
@@ -51,12 +51,21 @@ export class GenerationsController {
   async createVideoFromImage(
     @CurrentUser() user: JwtUser,
     @Body() body: CreateVideoFromImageDto,
-    @UploadedFile() file?: Express.Multer.File,
+    @UploadedFiles() files?: Express.Multer.File[],
   ) {
-    if (!body.imageUrl && !file) {
-      throw new BadRequestException("imageUrl or image file is required");
+    const hasUrl = Boolean(body.imageUrl) || (Array.isArray(body.imageUrls) ? body.imageUrls.length > 0 : Boolean(body.imageUrls));
+    if (!hasUrl && (!files || files.length === 0)) {
+      throw new BadRequestException("imageUrl/imageUrls or image files are required");
     }
-    return this.generationsService.createVideoFromImageTask(user.sub, body, file);
+    return this.generationsService.createVideoFromImageTask(user.sub, body, files ?? []);
+  }
+
+  @Post("video-upscale")
+  async createVideoUpscale(
+    @CurrentUser() user: JwtUser,
+    @Body() body: CreateVideoUpscaleDto,
+  ) {
+    return this.generationsService.createVideoUpscaleTask(user.sub, body);
   }
 
   @Get("sessions")

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const generationTypeValues = ["text_to_image", "image_to_video"] as const;
+export const generationTypeValues = ["text_to_image", "image_to_video", "video_upscale"] as const;
 export type GenerationType = (typeof generationTypeValues)[number];
 
 export const taskStatusValues = [
@@ -45,14 +45,25 @@ export const imageToVideoSchema = z.object({
   negativePrompt: z.string().trim().max(1000).optional(),
   model: z.string().trim().optional(),
   imageUrl: z.string().url().optional(),
+  imageUrls: z.array(z.string().url()).max(9).optional(),
   aspectRatio: z.enum(aspectRatioValues).default("16:9"),
   size: z.enum(["1280x720", "720x1280"]).default("1280x720"),
-  durationSec: z.number().int().min(4).max(8).default(4),
+  durationSec: z.number().int().min(1).max(15).default(5),
   quality: z.enum(videoQualityValues).default("standard"),
+});
+
+export const videoUpscaleResolutionValues = ["1080p", "2k", "4k"] as const;
+export type VideoUpscaleResolution = (typeof videoUpscaleResolutionValues)[number];
+
+export const videoUpscaleSchema = z.object({
+  sourceVideoUrl: z.string().url(),
+  targetResolution: z.enum(videoUpscaleResolutionValues).default("1080p"),
+  sourceTaskId: z.string().optional(),
 });
 
 export type TextToImageInput = z.infer<typeof textToImageSchema>;
 export type ImageToVideoInput = z.infer<typeof imageToVideoSchema>;
+export type VideoUpscaleInput = z.infer<typeof videoUpscaleSchema>;
 
 export interface TextToImageParameters extends TextToImageInput {
   enhancedPrompt?: string;  // 增强后的 prompt

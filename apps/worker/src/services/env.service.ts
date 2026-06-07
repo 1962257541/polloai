@@ -41,8 +41,20 @@ const envSchema = z.object({
   GEMINI_BASE_URL: z.string().url().default("https://generativelanguage.googleapis.com/v1beta"),
   GEMINI_IMAGE_MODEL: z.string().default("gemini-2.5-flash-image"),
   GEMINI_VIDEO_MODEL: z.string().default("veo-3.1-generate-preview"),
-  GEMINI_VIDEO_SECONDS: z.coerce.number().int().min(4).max(8).default(4),
+  GEMINI_VIDEO_SECONDS: z.coerce.number().int().min(1).max(15).default(5),
   GEMINI_VIDEO_RESOLUTION: z.string().default("720p"),
+  // 火山引擎「智能处理 / 视频点播」画质增强（视频超分）配置
+  VOLC_ACCESS_KEY: z.string().optional(),
+  VOLC_SECRET_KEY: z.string().optional(),
+  VOLC_REGION: z.string().default("cn-north-1"),
+  VOLC_ENHANCE_HOST: z.string().default("open.volcengineapi.com"),
+  VOLC_ENHANCE_SERVICE: z.string().default("vod"),
+  VOLC_ENHANCE_VERSION: z.string().default("2023-01-01"),
+  VOLC_ENHANCE_SUBMIT_ACTION: z.string().default("SubmitEnhanceTask"),
+  VOLC_ENHANCE_QUERY_ACTION: z.string().default("QueryEnhanceTask"),
+  // 默认增强档位（standard/pro/turbo/llm）与目标分辨率
+  VOLC_ENHANCE_TIER: z.string().default("standard"),
+  VOLC_ENHANCE_RESOLUTION: z.string().default("1080p"),
 });
 
 @Injectable()
@@ -123,5 +135,50 @@ export class EnvService {
 
   get geminiVideoResolution() {
     return this.env.GEMINI_VIDEO_RESOLUTION;
+  }
+
+  // ---- 火山引擎画质增强 ----
+  get volcAccessKey() {
+    return this.env.VOLC_ACCESS_KEY;
+  }
+
+  get volcSecretKey() {
+    return this.env.VOLC_SECRET_KEY;
+  }
+
+  get volcEnhanceConfigured() {
+    return Boolean(this.env.VOLC_ACCESS_KEY && this.env.VOLC_SECRET_KEY);
+  }
+
+  get volcRegion() {
+    return this.env.VOLC_REGION;
+  }
+
+  get volcEnhanceHost() {
+    return this.env.VOLC_ENHANCE_HOST;
+  }
+
+  get volcEnhanceService() {
+    return this.env.VOLC_ENHANCE_SERVICE;
+  }
+
+  get volcEnhanceVersion() {
+    return this.env.VOLC_ENHANCE_VERSION;
+  }
+
+  get volcEnhanceSubmitAction() {
+    return this.env.VOLC_ENHANCE_SUBMIT_ACTION;
+  }
+
+  get volcEnhanceQueryAction() {
+    return this.env.VOLC_ENHANCE_QUERY_ACTION;
+  }
+
+  get volcEnhanceTier() {
+    return this.env.VOLC_ENHANCE_TIER;
+  }
+
+  get volcEnhanceResolution() {
+    return this.env.VOLC_ENHANCE_RESOLUTION;
   }
 }

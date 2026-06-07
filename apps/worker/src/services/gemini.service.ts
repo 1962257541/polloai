@@ -326,7 +326,8 @@ export class GeminiService {
   async createVideoFromImage(input: {
     model: string;
     prompt: string;
-    imageUrl: string;
+    imageUrl?: string;
+    imageUrls?: string[];
     aspectRatio?: string;
     size?: string;
     seconds?: number;
@@ -344,21 +345,30 @@ export class GeminiService {
 
     const aspectRatio = input.aspectRatio || this.videoAspectRatioFromSize(input.size);
 
-    // 诊断日志：记录原始 imageUrl 和 isImageProxyUrl 判断结果
-    console.log(`[createVideoFromImage] Original imageUrl: ${input.imageUrl}`);
-    console.log(`[createVideoFromImage] isImageProxyUrl check: ${this.isImageProxyUrl(input.imageUrl)}`);
+    // 合并多张参考图（imageUrls 优先，向后兼容单张 imageUrl），去重
+    const sourceUrls = Array.from(
+      new Set([...(input.imageUrls ?? []), ...(input.imageUrl ? [input.imageUrl] : [])].filter(Boolean)),
+    );
+    if (sourceUrls.length === 0) throw new Error("图生视频缺少参考图。");
 
-    const imageUrl = this.isImageProxyUrl(input.imageUrl)
-      ? input.imageUrl
-      : await this.withRetry(
-          () => this.uploadImageToImageProxy(input.imageUrl, input.apiKey),
-          3,
-          1000,
-          "uploadImageToImageProxy",
-        );
+    console.log(`[createVideoFromImage] reference images count=${sourceUrls.length}`);
 
-    // 诊断日志：记录最终使用的 imageUrl
-    console.log(`[createVideoFromImage] Final imageUrl for API: ${imageUrl}`);
+    // 逐张确保为 imageproxy 直链（非直链则上传），保持顺序
+    const proxyUrls: string[] = [];
+    for (const src of sourceUrls) {
+      console.log(`[createVideoFromImage] Original imageUrl: ${src}, isImageProxyUrl=${this.isImageProxyUrl(src)}`);
+      const proxied = this.isImageProxyUrl(src)
+        ? src
+        : await this.withRetry(
+            () => this.uploadImageToImageProxy(src, input.apiKey),
+            3,
+            1000,
+            "uploadImageToImageProxy",
+          );
+      proxyUrls.push(proxied);
+    }
+
+    console.log(`[createVideoFromImage] Final imageUrls for API: ${JSON.stringify(proxyUrls)}`);
 
     const base = new URL(input.apiUrl ?? this.env.geminiBaseUrl);
     const url = `${base.protocol}//${base.host}/v1/video/create`;
@@ -381,7 +391,7 @@ export class GeminiService {
       model: videoModel,
       prompt: input.prompt,
       aspect_ratio: aspectRatio,
-      images: [imageUrl],
+      images: proxyUrls,
       ...durationFields,
     };
 
@@ -781,9 +791,11 @@ export class GeminiService {
   }
 
   private normalizeVideoDuration(seconds: number) {
-    if (seconds <= 4) return 4;
-    if (seconds <= 6) return 6;
-    return 8;
+    // UI 仅提供 5/10/15 三档，吸附到最近的合法档位
+    const allowed = [5, 10, 15];
+    return allowed.reduce((best, cur) =>
+      Math.abs(cur - seconds) < Math.abs(best - seconds) ? cur : best,
+    );
   }
 
   private normalizeMimeType(value: string) {
