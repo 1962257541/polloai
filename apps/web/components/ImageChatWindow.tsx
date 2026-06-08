@@ -33,6 +33,14 @@ function easeProgress(current: number, target: number, step: number): number {
   return Math.min(next, target);
 }
 
+function isOmniFlashVideoModel(model: string) {
+  return /(^|[-_\/])omni[-_]?flash($|[-_\/])|gemini[-_]?omni[-_]?flash/i.test(model);
+}
+
+function videoDurationOptions(model: string) {
+  return isOmniFlashVideoModel(model) ? [6, 8] : [5, 10, 15];
+}
+
 export default function ImageChatWindow({
   availableModels,
   selectedModel,
@@ -67,6 +75,12 @@ export default function ImageChatWindow({
   const stopStreamRef = useRef<(() => void) | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const token = getToken() ?? "";
+
+  useEffect(() => {
+    if (videoModel && isOmniFlashVideoModel(videoModel) && ![6, 8].includes(videoDuration)) {
+      setVideoDuration(6);
+    }
+  }, [videoModel, videoDuration]);
 
   // 同步预览
   useEffect(() => {
@@ -947,7 +961,7 @@ export default function ImageChatWindow({
                   时长
                 </label>
                 <div style={{ display: "flex", gap: 8 }}>
-                  {[5, 10, 15].map((sec) => (
+                  {videoDurationOptions(videoModel).map((sec) => (
                     <button
                       key={sec}
                       type="button"

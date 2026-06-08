@@ -372,28 +372,14 @@ export class GeminiService {
 
     const base = new URL(input.apiUrl ?? this.env.geminiBaseUrl);
     const url = `${base.protocol}//${base.host}/v1/video/create`;
-    const durationSeconds = input.seconds ? this.normalizeVideoDuration(input.seconds) : undefined;
-    // yunwu.ai 中转的 /v1/video/create 接口未公开 duration 字段命名，
-    // 不同上游（Google Veo / 七牛 / 中转自定义）使用 duration_seconds、durationSeconds、
-    // duration、seconds 等多种命名，且类型要求也不同（Google 官方和 yunwu.ai 的 grok 要求 string，
-    // 部分后端可能接受 number）。这里冗余发送多种格式，确保中转和上游能识别其中之一。
-    const durationFields: JsonRecord = durationSeconds !== undefined
-      ? {
-          // string 格式：Google Veo 官方 + yunwu.ai grok 等要求
-          seconds: String(durationSeconds),
-          durationSeconds: String(durationSeconds),
-          // number 格式：备选兼容
-          duration: durationSeconds,
-          duration_seconds: durationSeconds,
-        }
-      : {};
-    const reqBody: JsonRecord = {
+    const durationSeconds = input.seconds ? this.normalizeVideoDuration(input.seconds, videoModel) : undefined;
+    const reqBody = this.buildVideoCreateBody({
       model: videoModel,
       prompt: input.prompt,
-      aspect_ratio: aspectRatio,
-      images: proxyUrls,
-      ...durationFields,
-    };
+      aspectRatio,
+      imageUrls: proxyUrls,
+      durationSeconds,
+    });
 
     // 诊断日志：记录完整请求体
     console.log(
@@ -401,29 +387,30 @@ export class GeminiService {
     );
     console.log(`[createVideoFromImage] Request body: ${JSON.stringify(reqBody)}`);
 
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${input.apiKey}`,
-      },
-      body: JSON.stringify(reqBody),
-      dispatcher: this.dispatcherFor(url),
-    });
-
-    const text = await response.text();
-    let data: any;
-    try { data = JSON.parse(text); } catch {
-      throw new Error(`Video create non-JSON response (${response.status}): ${text.slice(0, 500)}`);
-    }
-    if (!response.ok) {
-      throw new Error(`Video create failed (${response.status}): ${JSON.stringify(data).slice(0, 500)}`);
-    }
-    if (!data?.id) {
-      throw new Error(`Video create response missing id: ${JSON.stringify(data).slice(0, 500)}`);
+    let result = await this.postVideoCreate(url, input.apiKey, reqBody);
+    if (!result.ok && this.isOmniFlashVideoModel(videoModel) && this.isVideoImageFieldValidationError(result.data)) {
+      const fallbackBody = this.buildOmniFlashPromptOnlyVideoCreateBody({
+        model: videoModel,
+        prompt: input.prompt,
+        aspectRatio,
+        imageUrls: proxyUrls,
+        durationSeconds,
+      });
+      console.warn(
+        `[createVideoFromImage] Omni Flash rejected image URL fields, retrying with prompt-only references: ${JSON.stringify(result.data).slice(0, 500)}`,
+      );
+      console.log(`[createVideoFromImage] Fallback request body: ${JSON.stringify(fallbackBody)}`);
+      result = await this.postVideoCreate(url, input.apiKey, fallbackBody);
     }
 
-    return { name: data.id as string, done: false };
+    if (!result.ok) {
+      throw new Error(`Video create failed (${result.status}): ${JSON.stringify(result.data).slice(0, 500)}`);
+    }
+    if (!result.data?.id) {
+      throw new Error(`Video create response missing id: ${JSON.stringify(result.data).slice(0, 500)}`);
+    }
+
+    return { name: result.data.id as string, done: false };
   }
 
   async getVideo(operationName: string, apiKey: string, apiUrl?: string) {
@@ -790,7 +777,93 @@ export class GeminiService {
     return this.env.geminiVideoResolution;
   }
 
-  private normalizeVideoDuration(seconds: number) {
+  private buildVideoCreateBody(input: {
+    model: string;
+    prompt: string;
+    aspectRatio: string;
+    imageUrls: string[];
+    durationSeconds?: number;
+  }): JsonRecord {
+    if (this.isOmniFlashVideoModel(input.model)) {
+      const [imageUrl, ...extraImageUrls] = input.imageUrls;
+      const prompt = extraImageUrls.length > 0
+        ? `${input.prompt}\n\nAdditional reference image URLs:\n${extraImageUrls.join("\n")}`
+        : input.prompt;
+
+      return {
+        model: input.model,
+        prompt,
+        aspectRatio: input.aspectRatio,
+        imageUrl,
+        ...(input.durationSeconds !== undefined ? { durationSec: input.durationSeconds } : {}),
+      };
+    }
+
+    return {
+      model: input.model,
+      prompt: input.prompt,
+      aspect_ratio: input.aspectRatio,
+      images: input.imageUrls,
+      ...(input.durationSeconds !== undefined ? { duration_seconds: input.durationSeconds } : {}),
+    };
+  }
+
+  private buildOmniFlashPromptOnlyVideoCreateBody(input: {
+    model: string;
+    prompt: string;
+    aspectRatio: string;
+    imageUrls: string[];
+    durationSeconds?: number;
+  }): JsonRecord {
+    const referenceText = input.imageUrls.length > 0
+      ? `\n\nReference image URLs:\n${input.imageUrls.join("\n")}`
+      : "";
+
+    return {
+      model: input.model,
+      prompt: `${input.prompt}${referenceText}`,
+      aspectRatio: input.aspectRatio,
+      ...(input.durationSeconds !== undefined ? { durationSec: input.durationSeconds } : {}),
+    };
+  }
+
+  private async postVideoCreate(url: string, apiKey: string, body: JsonRecord) {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(body),
+      dispatcher: this.dispatcherFor(url),
+    });
+
+    const text = await response.text();
+    let data: any;
+    try { data = JSON.parse(text); } catch {
+      throw new Error(`Video create non-JSON response (${response.status}): ${text.slice(0, 500)}`);
+    }
+
+    return { ok: response.ok, status: response.status, data };
+  }
+
+  private isVideoImageFieldValidationError(data: unknown) {
+    const text = JSON.stringify(data).toLowerCase();
+    return /property\s+imageurls\s+should\s+not\s+exist|property\s+imageurl\s+should\s+not\s+exist|imageurls?\s+should\s+not\s+exist/.test(text);
+  }
+
+  private isOmniFlashVideoModel(model: string) {
+    return /(^|[-_\/])omni[-_]?flash($|[-_\/])|gemini[-_]?omni[-_]?flash/i.test(model);
+  }
+
+  private normalizeVideoDuration(seconds: number, model?: string) {
+    if (model && this.isOmniFlashVideoModel(model)) {
+      const allowed = [6, 8];
+      return allowed.reduce((best, cur) =>
+        Math.abs(cur - seconds) < Math.abs(best - seconds) ? cur : best,
+      );
+    }
+
     // UI 仅提供 5/10/15 三档，吸附到最近的合法档位
     const allowed = [5, 10, 15];
     return allowed.reduce((best, cur) =>

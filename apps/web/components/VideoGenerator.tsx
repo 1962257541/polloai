@@ -11,6 +11,11 @@ const DURATION_OPTIONS = [
   { value: 15, label: "15s" },
 ];
 
+const OMNI_FLASH_DURATION_OPTIONS = [
+  { value: 6, label: "6s" },
+  { value: 8, label: "8s" },
+];
+
 const SIZE_OPTIONS = [
   { value: "1280x720", label: "16:9", aspectRatio: "16:9" as const },
   { value: "720x1280", label: "9:16", aspectRatio: "9:16" as const },
@@ -24,6 +29,14 @@ interface VideoGeneratorProps {
 
 function sizeToAspectRatio(size: string) {
   return SIZE_OPTIONS.find((item) => item.value === size)?.aspectRatio || "16:9";
+}
+
+function isOmniFlashVideoModel(model: string) {
+  return /(^|[-_\/])omni[-_]?flash($|[-_\/])|gemini[-_]?omni[-_]?flash/i.test(model);
+}
+
+function videoDurationOptions(model: string) {
+  return isOmniFlashVideoModel(model) ? OMNI_FLASH_DURATION_OPTIONS : DURATION_OPTIONS;
 }
 
 export default function VideoGenerator({ onCreated }: VideoGeneratorProps) {
@@ -83,6 +96,12 @@ export default function VideoGenerator({ onCreated }: VideoGeneratorProps) {
 
     return () => { active = false; };
   }, []);
+
+  useEffect(() => {
+    if (!selectedModel || !isOmniFlashVideoModel(selectedModel)) return;
+    if (![6, 8].includes(duration)) setDuration(6);
+    if (![6, 8].includes(batchDuration)) setBatchDuration(6);
+  }, [selectedModel, duration, batchDuration]);
 
   const openLibrary = (target: "single" | "batch") => {
     setLibraryTarget(target);
@@ -249,7 +268,7 @@ export default function VideoGenerator({ onCreated }: VideoGeneratorProps) {
         DURATION
       </label>
       <div style={{ display: "flex", gap: 8 }}>
-        {DURATION_OPTIONS.map((option) => (
+        {videoDurationOptions(selectedModel).map((option) => (
           <button
             key={option.value}
             type="button"
