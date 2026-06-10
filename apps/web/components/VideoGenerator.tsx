@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import MaterialLibraryModal from "./MaterialLibraryModal";
 import { api, Material } from "../lib/api";
 import { getToken } from "../lib/auth";
@@ -68,7 +69,19 @@ export default function VideoGenerator({ onCreated }: VideoGeneratorProps) {
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [libraryTarget, setLibraryTarget] = useState<"single" | "batch">("single");
 
+  // 提示词输入区挂载点（位于页面中间预览栏底部，与文字生图一致）
+  const [promptHost, setPromptHost] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    setPromptHost(document.getElementById("video-prompt-slot"));
+  }, []);
+
   const canSubmit = Boolean(imageUrl.trim() || selectedMaterials.length > 0);
+
+  const isSingle = activeTab === "single";
+  const promptSubmitting = isSingle ? loading : batchSubmitting;
+  const promptSubmitDisabled = isSingle
+    ? loading || !prompt.trim() || !canSubmit || !selectedModel
+    : batchSubmitting || batchMaterials.length === 0 || !batchPrompt.trim() || !selectedModel;
 
   useEffect(() => {
     const token = getToken();
@@ -122,8 +135,7 @@ export default function VideoGenerator({ onCreated }: VideoGeneratorProps) {
     setLibraryOpen(false);
   };
 
-  const handleSingleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
+  const handleSingleSubmit = async () => {
     if (!prompt.trim() || !canSubmit) return;
 
     const token = getToken();
@@ -387,10 +399,7 @@ export default function VideoGenerator({ onCreated }: VideoGeneratorProps) {
 
         {/* 单个生成 */}
         {activeTab === "single" ? (
-          <form
-            onSubmit={handleSingleSubmit}
-            style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0, overflow: "hidden" }}
-          >
+          <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0, overflow: "hidden" }}>
             {/* 可滚动的表单内容区 */}
             <div style={{ flex: 1, overflowY: "auto", padding: "16px 16px 8px", display: "flex", flexDirection: "column", gap: 16 }}>
               {renderModelSelect("MODEL")}
@@ -439,39 +448,13 @@ export default function VideoGenerator({ onCreated }: VideoGeneratorProps) {
               {renderSizeSelect(size, setSize)}
               {renderDurationSelect(duration, setDuration)}
 
-              <div>
-                <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "inherit", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
-                  PROMPT
-                </label>
-                <textarea
-                  className="input-field"
-                  value={prompt}
-                  onChange={(event) => setPrompt(event.target.value)}
-                  placeholder="描述视频动作和镜头效果..."
-                  rows={5}
-                  style={{ resize: "vertical", minHeight: 120 }}
-                />
-              </div>
-
               {error && (
                 <div style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.18)", borderRadius: 8, padding: "10px 12px", fontSize: "0.8rem", color: "var(--error)" }}>
                   {error}
                 </div>
               )}
             </div>
-
-            {/* 生成按钮 — 固定底部，始终可见 */}
-            <div style={{ padding: "12px 16px", borderTop: "1px solid var(--border)", flexShrink: 0, background: "var(--bg-surface)" }}>
-              <button
-                className="btn-primary"
-                type="submit"
-                disabled={loading || !prompt.trim() || !canSubmit || !selectedModel}
-                style={{ width: "100%" }}
-              >
-                {loading ? "提交中..." : "生成视频"}
-              </button>
-            </div>
-          </form>
+          </div>
         ) : (
           /* 批量生成 */
           <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0, overflow: "hidden" }}>
@@ -502,20 +485,6 @@ export default function VideoGenerator({ onCreated }: VideoGeneratorProps) {
               {renderSizeSelect(batchSize, setBatchSize)}
               {renderDurationSelect(batchDuration, setBatchDuration)}
 
-              <div>
-                <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "inherit", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
-                  PROMPT（统一应用于所有素材）
-                </label>
-                <textarea
-                  className="input-field"
-                  value={batchPrompt}
-                  onChange={(e) => setBatchPrompt(e.target.value)}
-                  placeholder="描述视频动作和镜头效果，将应用于所有选中的素材..."
-                  rows={5}
-                  style={{ resize: "vertical", minHeight: 120 }}
-                />
-              </div>
-
               {batchSubmitting && batchProgress.total > 0 && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", fontFamily: "inherit" }}>
@@ -538,24 +507,57 @@ export default function VideoGenerator({ onCreated }: VideoGeneratorProps) {
               {batchResult && <div style={{ fontSize: "0.8rem", color: "var(--success)" }}>{batchResult}</div>}
               {batchError && <div style={{ fontSize: "0.8rem", color: "var(--error)" }}>{batchError}</div>}
             </div>
-
-            {/* 批量生成按钮 — 固定底部 */}
-            <div style={{ padding: "12px 16px", borderTop: "1px solid var(--border)", flexShrink: 0, background: "var(--bg-surface)" }}>
-              <button
-                type="button"
-                className="btn-primary"
-                onClick={() => void handleBatchSubmit()}
-                disabled={batchSubmitting || batchMaterials.length === 0 || !selectedModel || !batchPrompt.trim()}
-                style={{ width: "100%" }}
-              >
-                {batchSubmitting
-                  ? `提交中（${batchProgress.current}/${batchProgress.total}）...`
-                  : `批量生成视频（${batchMaterials.length} 个任务）`}
-              </button>
-            </div>
           </div>
         )}
       </div>
+
+      {/* 提示词输入区 — 渲染到中间预览栏底部（与文字生图布局一致） */}
+      {promptHost &&
+        createPortal(
+          <div style={{ borderTop: "1px solid var(--border)", padding: "16px 20px", background: "var(--bg-surface)" }}>
+            <div style={{ display: "flex", gap: 10, alignItems: "stretch" }}>
+              <textarea
+                className="input-field"
+                value={isSingle ? prompt : batchPrompt}
+                onChange={(e) => (isSingle ? setPrompt(e.target.value) : setBatchPrompt(e.target.value))}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    if (!promptSubmitDisabled) void (isSingle ? handleSingleSubmit() : handleBatchSubmit());
+                  }
+                }}
+                placeholder={
+                  isSingle
+                    ? "描述视频动作和镜头效果... (Enter 发送，Shift+Enter 换行)"
+                    : "描述视频动作和镜头效果，将应用于所有选中的素材... (Enter 发送，Shift+Enter 换行)"
+                }
+                rows={3}
+                style={{ flex: 1, resize: "vertical", minHeight: 76 }}
+                disabled={promptSubmitting}
+              />
+              <button
+                className="btn-primary"
+                type="button"
+                onClick={() => void (isSingle ? handleSingleSubmit() : handleBatchSubmit())}
+                disabled={promptSubmitDisabled}
+                title={isSingle ? "生成视频" : `批量生成视频（${batchMaterials.length} 个任务）`}
+                style={{ minWidth: 64, flexShrink: 0, alignSelf: "stretch", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
+              >
+                {promptSubmitting ? (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" style={{ animation: "spin 1s linear infinite" }}>
+                    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                  </svg>
+                ) : (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="22" y1="2" x2="11" y2="13" />
+                    <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                  </svg>
+                )}
+              </button>
+            </div>
+          </div>,
+          promptHost,
+        )}
 
       <MaterialLibraryModal
         open={libraryOpen}

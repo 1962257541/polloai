@@ -200,7 +200,7 @@ export default function VideoPage() {
           <VideoGenerator onCreated={handleCreated} />
         </div>
 
-        {/* 中：当前任务预览 */}
+        {/* 中：当前任务预览 + 底部提示词输入区（与文字生图布局一致） */}
         <div
           style={{
             background: "var(--bg-surface)",
@@ -209,43 +209,57 @@ export default function VideoPage() {
             boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
             overflow: "hidden",
             display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
+            flexDirection: "column",
+            minHeight: 0,
           }}
         >
-          {loadingTasks ? (
-            <span style={{ color: "var(--text-muted)", fontSize: "0.8rem" }}>加载中...</span>
-          ) : selectedTask ? (
-            <div style={{ width: "100%", height: "100%", overflowY: "auto" }}>
-              <TaskCard task={selectedTask} onDelete={handleDelete} onCancel={handleCancel} onRetry={handleRetry} onUpscale={handleUpscale} />
-            </div>
-          ) : (
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                gap: 12,
-              }}
-            >
-              <svg
-                width="40"
-                height="40"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="var(--text-muted)"
-                strokeWidth={1}
-                strokeLinecap="round"
-                strokeLinejoin="round"
+          <div
+            style={{
+              flex: 1,
+              minHeight: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              overflow: "hidden",
+            }}
+          >
+            {loadingTasks ? (
+              <span style={{ color: "var(--text-muted)", fontSize: "0.8rem" }}>加载中...</span>
+            ) : selectedTask ? (
+              <div style={{ width: "100%", height: "100%", overflowY: "auto" }}>
+                <TaskCard task={selectedTask} onDelete={handleDelete} onCancel={handleCancel} onRetry={handleRetry} onUpscale={handleUpscale} />
+              </div>
+            ) : (
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: 12,
+                }}
               >
-                <polygon points="23 7 16 12 23 17 23 7" />
-                <rect x="1" y="5" width="15" height="14" rx="2" />
-              </svg>
-              <p style={{ color: "var(--text-muted)", fontSize: "0.8rem", margin: 0 }}>
-                选择图片并填写描述后点击生成
-              </p>
-            </div>
-          )}
+                <svg
+                  width="40"
+                  height="40"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="var(--text-muted)"
+                  strokeWidth={1}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <polygon points="23 7 16 12 23 17 23 7" />
+                  <rect x="1" y="5" width="15" height="14" rx="2" />
+                </svg>
+                <p style={{ color: "var(--text-muted)", fontSize: "0.8rem", margin: 0 }}>
+                  选择图片，在下方输入提示词生成视频
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* VideoGenerator 通过 portal 把提示词输入区渲染到这里 */}
+          <div id="video-prompt-slot" style={{ flexShrink: 0 }} />
         </div>
 
         {/* 右：历史列表 */}

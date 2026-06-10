@@ -10,3 +10,4 @@ apps/*/dist/
 apps/*/.next/
 *.log
 .DS_Store
+.spec-workflow/
