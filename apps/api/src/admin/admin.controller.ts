@@ -18,6 +18,7 @@ import {
   MinLength,
 } from "class-validator";
 import { AdminService } from "./admin.service";
+import { SystemConfigService } from "./system-config.service";
 import { JwtAuthGuard } from "../common/jwt-auth.guard";
 import { RolesGuard } from "../common/roles.guard";
 import { Roles } from "../common/roles.decorator";
@@ -61,10 +62,20 @@ class UpdateModelConfigBody {
   videoModels!: string[];
 }
 
+class UpdateVolcConfigBody {
+  @IsOptional() @IsString() apiKey?: string;
+  @IsOptional() @IsString() host?: string;
+  @IsOptional() @IsString() toolVersion?: string;
+  @IsOptional() @IsString() resolution?: string;
+}
+
 @Controller("admin")
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class AdminController {
-  constructor(private readonly adminService: AdminService) {}
+  constructor(
+    private readonly adminService: AdminService,
+    private readonly systemConfigService: SystemConfigService,
+  ) {}
 
   @Get("salespersons")
   @Roles("admin")
@@ -104,6 +115,18 @@ export class AdminController {
   @Roles("admin")
   updateUserModelConfig(@Param("id") id: string, @Body() body: UpdateModelConfigBody) {
     return this.adminService.updateModelConfig(id, body.imageModels, body.videoModels);
+  }
+
+  @Get("system-config/volc")
+  @Roles("admin")
+  getVolcConfig() {
+    return this.systemConfigService.getVolcConfig();
+  }
+
+  @Put("system-config/volc")
+  @Roles("admin")
+  updateVolcConfig(@CurrentUser() user: JwtUser, @Body() body: UpdateVolcConfigBody) {
+    return this.systemConfigService.updateVolcConfig({ ...body }, user.sub);
   }
 
   @Get("me")

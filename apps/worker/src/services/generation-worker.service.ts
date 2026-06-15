@@ -373,8 +373,8 @@ export class GenerationWorkerService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async handleVideoUpscale(taskId: string) {
-    if (!this.volc.configured) {
-      throw new Error("未配置火山 AK/SK（VOLC_ACCESS_KEY / VOLC_SECRET_KEY），无法执行画质提升。");
+    if (!(await this.volc.isConfigured())) {
+      throw new Error("未配置火山 MediaKit API Key（系统设置→画质提升，或 VOLC_API_KEY），无法执行画质提升。");
     }
 
     const task = await this.prisma.generationTask.findUnique({
@@ -389,12 +389,13 @@ export class GenerationWorkerService implements OnModuleInit, OnModuleDestroy {
     }
 
     const params = task.parameters as any;
-    const targetResolution = params.targetResolution || this.env.volcEnhanceResolution;
-    console.log(`[handleVideoUpscale] taskId=${taskId} target=${targetResolution} source=${inputAsset.url}`);
+    // 目标分辨率来自任务参数；缺省时由 VolcEngineService 内部按 DB/env 配置兜底
+    const resolution = params.targetResolution || undefined;
+    console.log(`[handleVideoUpscale] taskId=${taskId} resolution=${resolution} source=${inputAsset.url}`);
 
     const submit = await this.volc.submitEnhanceTask({
       videoUrl: inputAsset.url,
-      targetResolution,
+      resolution,
     });
 
     await this.prisma.generationTask.update({

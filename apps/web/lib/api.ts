@@ -40,6 +40,23 @@ export type MyInfo = {
   videoModels?: string[];
 };
 
+// 火山引擎 AI MediaKit 画质增强配置（API Key 脱敏回显）
+export type VolcConfigView = {
+  apiKey: string;
+  hasApiKey: boolean;
+  host: string;
+  toolVersion: string;
+  resolution: string;
+  configured: boolean;
+};
+
+export type VolcConfigUpdate = Partial<{
+  apiKey: string;
+  host: string;
+  toolVersion: string;
+  resolution: string;
+}>;
+
 export type Material = {
   id: string;
   userId: string;
@@ -279,6 +296,16 @@ export const api = {
 
   getMyInfo: (token: string) =>
     request("/admin/me", {}, token) as Promise<MyInfo>,
+
+  getVolcConfig: (token: string) =>
+    request("/admin/system-config/volc", {}, token) as Promise<VolcConfigView>,
+
+  updateVolcConfig: (token: string, payload: VolcConfigUpdate) =>
+    request(
+      "/admin/system-config/volc",
+      { method: "PUT", body: JSON.stringify(payload) },
+      token,
+    ) as Promise<VolcConfigView>,
 
   // Materials API
   listMaterials: (
