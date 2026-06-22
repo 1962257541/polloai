@@ -74,7 +74,7 @@ export class GenerationsService {
 
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { apiKey: true, apiUrl: true, imageModel: true, imageModels: true },
+      select: { apiKey: true, apiUrl: true, apiProvider: true, imageModel: true, imageModels: true },
     });
 
     if (!user?.apiKey || !user?.apiUrl) {
@@ -128,6 +128,7 @@ export class GenerationsService {
       user.apiKey,
       user.apiUrl ?? undefined,
       parsed.imageApiType ?? "gemini-native",
+      user.apiProvider,
     );
 
     await this.notificationsService.publish({
@@ -190,7 +191,7 @@ export class GenerationsService {
 
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { apiKey: true, apiUrl: true, videoModel: true, videoModels: true },
+      select: { apiKey: true, apiUrl: true, apiProvider: true, videoModel: true, videoModels: true },
     });
 
     if (!user?.apiKey || !user?.apiUrl) {
@@ -242,7 +243,13 @@ export class GenerationsService {
       return created;
     });
 
-    await this.enqueueTaskOrFail(task.id, user.apiKey, user.apiUrl ?? undefined);
+    await this.enqueueTaskOrFail(
+      task.id,
+      user.apiKey,
+      user.apiUrl ?? undefined,
+      undefined,
+      user.apiProvider,
+    );
 
     await this.notificationsService.publish({
       taskId: task.id,
@@ -584,11 +591,17 @@ export class GenerationsService {
     return { deleted: count };
   }
 
-  private async enqueueTaskOrFail(taskId: string, apiKey: string, apiUrl?: string, imageApiType?: string) {
+  private async enqueueTaskOrFail(
+    taskId: string,
+    apiKey: string,
+    apiUrl?: string,
+    imageApiType?: string,
+    provider?: string,
+  ) {
     try {
       await this.queue.add(
         "process-generation",
-        { taskId, apiKey, apiUrl, imageApiType },
+        { taskId, apiKey, apiUrl, imageApiType, provider },
         {
           jobId: taskId,
           attempts: 3,

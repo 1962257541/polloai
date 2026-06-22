@@ -2,6 +2,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:3001/api/
 
 export type UserRole = "admin" | "salesperson";
 export type ImageApiType = "openai-images" | "gemini-native";
+export type ApiProvider = "yunwu" | "apimart";
 
 export type AuthPayload = {
   token: string;
@@ -21,6 +22,7 @@ export type SalespersonInfo = {
   hasApiKey: boolean;
   hasApiUrl: boolean;
   apiUrl?: string | null;
+  apiProvider?: ApiProvider | null;
   imageModel?: string | null;
   imageModels?: string[];
   videoModel?: string | null;
@@ -34,6 +36,7 @@ export type MyInfo = {
   role: UserRole;
   hasApiKey: boolean;
   hasApiUrl: boolean;
+  apiProvider?: ApiProvider | null;
   imageModel?: string | null;
   imageModels?: string[];
   videoModel?: string | null;
@@ -270,17 +273,34 @@ export const api = {
   deleteSalesperson: (token: string, userId: string) =>
     request(`/admin/salespersons/${userId}`, { method: "DELETE" }, token),
 
-  updateSalespersonApiConfig: (token: string, userId: string, apiKey: string | undefined, apiUrl: string) =>
+  updateSalespersonApiConfig: (
+    token: string,
+    userId: string,
+    apiKey: string | undefined,
+    apiUrl: string,
+    apiProvider?: ApiProvider,
+  ) =>
     request(
       `/admin/salespersons/${userId}/apikey`,
-      { method: "PUT", body: JSON.stringify({ ...(apiKey ? { apiKey } : {}), apiUrl }) },
+      {
+        method: "PUT",
+        body: JSON.stringify({ ...(apiKey ? { apiKey } : {}), apiUrl, ...(apiProvider ? { apiProvider } : {}) }),
+      },
       token,
     ),
 
-  updateMyApiConfig: (token: string, apiKey: string | undefined, apiUrl: string) =>
+  updateMyApiConfig: (
+    token: string,
+    apiKey: string | undefined,
+    apiUrl: string,
+    apiProvider?: ApiProvider,
+  ) =>
     request(
       "/admin/me/apikey",
-      { method: "PUT", body: JSON.stringify({ ...(apiKey ? { apiKey } : {}), apiUrl }) },
+      {
+        method: "PUT",
+        body: JSON.stringify({ ...(apiKey ? { apiKey } : {}), apiUrl, ...(apiProvider ? { apiProvider } : {}) }),
+      },
       token,
     ),
 

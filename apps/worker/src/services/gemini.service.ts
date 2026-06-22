@@ -1,28 +1,16 @@
 import { Injectable } from "@nestjs/common";
 import { Agent, Dispatcher, fetch, ProxyAgent } from "undici";
 import { EnvService } from "./env.service";
+import {
+  GenerationProvider,
+  ImageGenerationResult,
+  InlineImagePart,
+} from "./generation-provider";
 
 type JsonRecord = Record<string, unknown>;
 
-type InlineImagePart = {
-  mimeType?: string;
-  data?: string;
-};
-
-type ImageGenerationResult =
-  | {
-      kind: "image";
-      buffer: Buffer;
-      mimeType: "image/png" | "image/jpeg" | "image/webp";
-      revisedPrompt?: string;
-    }
-  | {
-      kind: "text";
-      responseText: string;
-    };
-
 @Injectable()
-export class GeminiService {
+export class GeminiService implements GenerationProvider {
   private readonly remoteDispatcher?: Dispatcher;
   private readonly directDispatcher = new Agent();
 

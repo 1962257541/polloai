@@ -232,6 +232,7 @@ export default function ImagePage() {
             setCurrentSessionId(id);
             setSessionRefreshTrigger((n) => n + 1);
           }}
+          onGenerationSettled={() => setSessionRefreshTrigger((n) => n + 1)}
         />
 
         {/* 右：历史会话列表 */}

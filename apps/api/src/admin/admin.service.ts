@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
-import { CreateSalespersonDto, SalespersonInfo } from "@packages/shared";
+import { ApiProvider, CreateSalespersonDto, SalespersonInfo } from "@packages/shared";
 import bcrypt from "bcryptjs";
 
 @Injectable()
@@ -22,6 +22,7 @@ export class AdminService {
         role: true,
         apiKey: true,
         apiUrl: true,
+        apiProvider: true,
         imageModel: true,
         imageModels: true,
         videoModel: true,
@@ -38,6 +39,7 @@ export class AdminService {
       hasApiKey: Boolean(u.apiKey),
       hasApiUrl: Boolean(u.apiUrl),
       apiUrl: u.apiUrl,
+      apiProvider: u.apiProvider as ApiProvider,
       imageModel: u.imageModel,
       imageModels: this.normalizeConfiguredModels(u.imageModels, u.imageModel),
       videoModel: u.videoModel,
@@ -78,7 +80,12 @@ export class AdminService {
     return { success: true };
   }
 
-  async updateApiConfig(targetUserId: string, apiKey: string | undefined, apiUrl: string) {
+  async updateApiConfig(
+    targetUserId: string,
+    apiKey: string | undefined,
+    apiUrl: string,
+    apiProvider?: string,
+  ) {
     const user = await this.prisma.user.findUnique({ where: { id: targetUserId } });
     if (!user) {
       throw new NotFoundException("User not found");
@@ -89,16 +96,36 @@ export class AdminService {
       data: {
         ...(apiKey ? { apiKey } : {}),
         apiUrl,
+        ...(apiProvider ? { apiProvider } : {}),
       },
     });
 
     return { success: true };
   }
 
+  // APIMart（apib.ai）无标准 /v1/models 目录接口，提供内置候选清单作为种子，
+  // 用户也可在配置界面手动添加任意模型 ID。
+  private static readonly APIMART_MODEL_CATALOG = [
+    // 图片
+    "gemini-3.1-flash-image-preview",
+    "gemini-3.1-flash-image-preview-official",
+    "gpt-image-2",
+    "qwen-image",
+    "imagen-4.0",
+    "midjourney",
+    // 视频
+    "veo3.1-fast",
+    "veo3.1-quality",
+    "veo3.1-lite",
+    "sora-2",
+    "kling-v3",
+    "wan2.7",
+  ];
+
   async listRemoteModels(targetUserId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: targetUserId },
-      select: { apiKey: true, apiUrl: true },
+      select: { apiKey: true, apiUrl: true, apiProvider: true },
     });
 
     if (!user) {
@@ -107,6 +134,11 @@ export class AdminService {
 
     if (!user.apiKey || !user.apiUrl) {
       throw new BadRequestException("API key and API URL must be configured before loading models");
+    }
+
+    // apimart 没有远端模型目录接口，直接返回内置候选清单
+    if (user.apiProvider === "apimart") {
+      return { models: [...AdminService.APIMART_MODEL_CATALOG].sort((a, b) => a.localeCompare(b)) };
     }
 
     const response = await fetch(this.modelsUrl(user.apiUrl), {
@@ -170,6 +202,7 @@ export class AdminService {
         role: true,
         apiKey: true,
         apiUrl: true,
+        apiProvider: true,
         imageModel: true,
         imageModels: true,
         videoModel: true,
@@ -188,6 +221,7 @@ export class AdminService {
       role: user.role,
       hasApiKey: Boolean(user.apiKey),
       hasApiUrl: Boolean(user.apiUrl),
+      apiProvider: user.apiProvider,
       imageModel: user.imageModel,
       imageModels: this.normalizeConfiguredModels(user.imageModels, user.imageModel),
       videoModel: user.videoModel,

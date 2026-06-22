@@ -5,11 +5,22 @@ import { EnvService } from "./env.service";
 import { PrismaService } from "./prisma.service";
 import { StorageService } from "./storage.service";
 import { GeminiService } from "./gemini.service";
+import { ApimartService } from "./apimart.service";
+import { GenerationProvider } from "./generation-provider";
 import { VolcEngineService } from "./volcengine.service";
 import { GenerationType } from "@packages/shared";
 
 const QUEUE_NAME = "generation-jobs";
 const CHANNEL = "generation-status";
+
+/** 入队任务负载：provider 决定走 yunwu(GeminiService) 还是 apimart(ApimartService) */
+type GenerationJobData = {
+  taskId: string;
+  apiKey: string;
+  apiUrl?: string;
+  imageApiType?: string;
+  provider?: string;
+};
 
 class TaskCancelledError extends Error {
   constructor() {
@@ -33,9 +44,15 @@ export class GenerationWorkerService implements OnModuleInit, OnModuleDestroy {
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
     private readonly gemini: GeminiService,
+    private readonly apimart: ApimartService,
     private readonly volc: VolcEngineService,
   ) {
     this.publisher = new Redis(env.redisUrl);
+  }
+
+  /** 按账号供应商选择具体适配器（策略模式）；默认 yunwu */
+  private providerFor(provider?: string): GenerationProvider {
+    return provider === "apimart" ? this.apimart : this.gemini;
   }
 
   async onModuleInit() {
@@ -88,8 +105,8 @@ export class GenerationWorkerService implements OnModuleInit, OnModuleDestroy {
     await this.publisher.quit();
   }
 
-  private async process(job: Job<{ taskId: string; apiKey: string; apiUrl?: string; imageApiType?: string }>) {
-    const { taskId, apiKey, apiUrl, imageApiType } = job.data;
+  private async process(job: Job<GenerationJobData>) {
+    const { taskId, apiKey, apiUrl, imageApiType, provider } = job.data;
     const task = await this.prisma.generationTask.findUnique({
       where: { id: taskId },
       include: { assets: true },
@@ -112,9 +129,9 @@ export class GenerationWorkerService implements OnModuleInit, OnModuleDestroy {
 
     try {
       if (task.type === "text_to_image") {
-        await this.handleTextToImage(task.id, apiKey, apiUrl, imageApiType);
+        await this.handleTextToImage(task.id, apiKey, apiUrl, imageApiType, provider);
       } else if (task.type === "image_to_video") {
-        await this.handleImageToVideo(task.id, apiKey, apiUrl);
+        await this.handleImageToVideo(task.id, apiKey, apiUrl, provider);
       } else if (task.type === "video_upscale") {
         await this.handleVideoUpscale(task.id);
       }
@@ -139,13 +156,20 @@ export class GenerationWorkerService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async handleTextToImage(taskId: string, apiKey: string, apiUrl?: string, imageApiType?: string) {
+  private async handleTextToImage(
+    taskId: string,
+    apiKey: string,
+    apiUrl?: string,
+    imageApiType?: string,
+    provider?: string,
+  ) {
     const task = await this.prisma.generationTask.findUnique({
       where: { id: taskId },
       include: { assets: true },
     });
     if (!task) return;
 
+    const svc = this.providerFor(provider);
     const params = task.parameters as any;
     const inputAsset = task.assets.find((asset) => asset.role === "input" && asset.mediaType === "image");
 
@@ -159,7 +183,7 @@ export class GenerationWorkerService implements OnModuleInit, OnModuleDestroy {
     if (referenceImageUrls.length > 0) {
       console.log(`[handleTextToImage] Attempting prompt enhancement with ${referenceImageUrls.length} reference images`);
       try {
-        enhancedPrompt = await this.gemini.enhancePrompt({
+        enhancedPrompt = await svc.enhancePrompt({
           originalPrompt: task.prompt,
           referenceImageUrls,
           apiKey,
@@ -177,7 +201,7 @@ export class GenerationWorkerService implements OnModuleInit, OnModuleDestroy {
       }
     }
 
-    const image = await this.gemini.generateImage({
+    const image = await svc.generateImage({
       model: task.model,
       prompt: finalPrompt,
       size: params.size,
@@ -276,13 +300,14 @@ export class GenerationWorkerService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  private async handleImageToVideo(taskId: string, apiKey: string, apiUrl?: string) {
+  private async handleImageToVideo(taskId: string, apiKey: string, apiUrl?: string, provider?: string) {
     const task = await this.prisma.generationTask.findUnique({
       where: { id: taskId },
       include: { assets: true },
     });
     if (!task) return;
 
+    const svc = this.providerFor(provider);
     const inputAssets = task.assets.filter((a) => a.role === "input" && a.mediaType === "image");
     if (inputAssets.length === 0) {
       throw new Error("Input image asset is missing");
@@ -294,7 +319,7 @@ export class GenerationWorkerService implements OnModuleInit, OnModuleDestroy {
     console.log(
       `[handleImageToVideo] taskId=${taskId} images=${imageUrls.length} params.durationSec=${params.durationSec} (${typeof params.durationSec}), env default=${this.env.geminiVideoSeconds}`,
     );
-    const operation = await this.gemini.createVideoFromImage({
+    const operation = await svc.createVideoFromImage({
       model: task.model,
       prompt: task.prompt,
       imageUrls,
@@ -311,8 +336,8 @@ export class GenerationWorkerService implements OnModuleInit, OnModuleDestroy {
       data: { providerJobId: operation.name },
     });
 
-    const finalStatus = await this.pollVideoCompletion(taskId, operation.name, apiKey, apiUrl);
-    const buffer = await this.gemini.downloadVideo(finalStatus, apiKey, apiUrl);
+    const finalStatus = await this.pollVideoCompletion(taskId, operation.name, apiKey, apiUrl, provider);
+    const buffer = await svc.downloadVideo(finalStatus, apiKey, apiUrl);
 
     const latest = await this.prisma.generationTask.findUnique({
       where: { id: taskId },
@@ -487,7 +512,14 @@ export class GenerationWorkerService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async pollVideoCompletion(taskId: string, providerJobId: string, apiKey: string, apiUrl?: string) {
+  private async pollVideoCompletion(
+    taskId: string,
+    providerJobId: string,
+    apiKey: string,
+    apiUrl?: string,
+    provider?: string,
+  ) {
+    const svc = this.providerFor(provider);
     for (;;) {
       await this.sleep(5000);
 
@@ -495,11 +527,11 @@ export class GenerationWorkerService implements OnModuleInit, OnModuleDestroy {
       if (!task) throw new Error("Task not found while polling video");
 
       if (task.status === "cancelled") {
-        await this.gemini.cancelVideo(providerJobId, apiKey, apiUrl);
+        await svc.cancelVideo(providerJobId, apiKey, apiUrl);
         throw new TaskCancelledError();
       }
 
-      const status = await this.gemini.getVideo(providerJobId, apiKey, apiUrl);
+      const status = await svc.getVideo(providerJobId, apiKey, apiUrl);
       const state = String(status?.status || "").toLowerCase();
 
       if (["failed", "error", "video_generation_failed", "video_upsampling_failed"].includes(state)) {
@@ -581,20 +613,20 @@ export class GenerationWorkerService implements OnModuleInit, OnModuleDestroy {
   }
 
   private shouldRetry(
-    job: Job<{ taskId: string; apiKey: string; apiUrl?: string; imageApiType?: string }>,
+    job: Job<GenerationJobData>,
     error: unknown,
   ) {
     return error instanceof RetryableGenerationError && this.currentAttempt(job) < this.maxAttempts(job);
   }
 
   private currentAttempt(
-    job: Job<{ taskId: string; apiKey: string; apiUrl?: string; imageApiType?: string }>,
+    job: Job<GenerationJobData>,
   ) {
     return job.attemptsMade + 1;
   }
 
   private maxAttempts(
-    job: Job<{ taskId: string; apiKey: string; apiUrl?: string; imageApiType?: string }>,
+    job: Job<GenerationJobData>,
   ) {
     return Math.max(job.opts.attempts ?? 1, 1);
   }

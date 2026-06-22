@@ -24,6 +24,7 @@ interface ImageChatWindowProps {
   imageApiType: string;
   sessionId: string | null;                    // null = 新会话
   onSessionCreated: (id: string) => void;      // 第一次提交后传出 sessionId
+  onGenerationSettled?: () => void;            // 任务进入成功终态后通知父组件（刷新会话缩略图）
 }
 
 // 进度缓动：target 越近推进越慢，不会超过 target
@@ -49,6 +50,7 @@ export default function ImageChatWindow({
   imageApiType,
   sessionId,
   onSessionCreated,
+  onGenerationSettled,
 }: ImageChatWindowProps) {
   const [rounds, setRounds] = useState<ChatRound[]>([]);
   const [prompt, setPrompt] = useState("");
@@ -74,6 +76,9 @@ export default function ImageChatWindow({
   const bottomRef = useRef<HTMLDivElement>(null);
   const stopStreamRef = useRef<(() => void) | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // 持有最新的完成回调，避免把它放进 SSE 订阅依赖里导致反复重订阅
+  const onSettledRef = useRef(onGenerationSettled);
+  onSettledRef.current = onGenerationSettled;
   const token = getToken() ?? "";
 
   useEffect(() => {
@@ -182,6 +187,11 @@ export default function ImageChatWindow({
           return updated;
         }),
       );
+      // 任务成功完成 → 通知父组件刷新右侧会话列表，使缩略图从占位更新为成品图。
+      // 不做 round 匹配判断：SSE 按用户维度推送，会话列表重取很轻量，避免依赖惰性更新器的时序。
+      if (event.status === "succeeded") {
+        onSettledRef.current?.();
+      }
     });
 
     return () => stopStreamRef.current?.();

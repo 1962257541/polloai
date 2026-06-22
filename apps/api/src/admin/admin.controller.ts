@@ -13,6 +13,7 @@ import {
   ArrayUnique,
   IsArray,
   IsEmail,
+  IsIn,
   IsOptional,
   IsString,
   MinLength,
@@ -46,6 +47,11 @@ class UpdateApiKeyBody {
   @IsString()
   @MinLength(1)
   apiUrl!: string;
+
+  // 中转站供应商：yunwu（默认）| apimart（apib.ai）
+  @IsOptional()
+  @IsIn(["yunwu", "apimart"])
+  apiProvider?: string;
 }
 
 class UpdateModelConfigBody {
@@ -102,7 +108,7 @@ export class AdminController {
   @Put("salespersons/:id/apikey")
   @Roles("admin")
   updateSalespersonApiKey(@Param("id") id: string, @Body() body: UpdateApiKeyBody) {
-    return this.adminService.updateApiConfig(id, body.apiKey, body.apiUrl);
+    return this.adminService.updateApiConfig(id, body.apiKey, body.apiUrl, body.apiProvider);
   }
 
   @Get("users/:id/models/catalog")
@@ -136,6 +142,6 @@ export class AdminController {
 
   @Put("me/apikey")
   updateMyApiKey(@CurrentUser() user: JwtUser, @Body() body: UpdateApiKeyBody) {
-    return this.adminService.updateApiConfig(user.sub, body.apiKey, body.apiUrl);
+    return this.adminService.updateApiConfig(user.sub, body.apiKey, body.apiUrl, body.apiProvider);
   }
 }

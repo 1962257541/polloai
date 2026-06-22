@@ -34,6 +34,17 @@ export default function SearchableMultiSelect({
     onChange([...value, item]);
   };
 
+  // 手动添加目录外的模型 ID（如 apib.ai 未在内置清单中的模型）
+  const addCustom = () => {
+    const candidate = query.trim();
+    if (!candidate || value.includes(candidate)) {
+      setQuery("");
+      return;
+    }
+    onChange([...value, candidate]);
+    setQuery("");
+  };
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
@@ -69,13 +80,31 @@ export default function SearchableMultiSelect({
         </div>
       </div>
 
-      <input
-        className="input-field"
-        type="text"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder="搜索模型..."
-      />
+      <div style={{ display: "flex", gap: 8 }}>
+        <input
+          className="input-field"
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              addCustom();
+            }
+          }}
+          placeholder="搜索或输入模型 ID..."
+          style={{ flex: 1 }}
+        />
+        <button
+          type="button"
+          className="btn-ghost"
+          style={{ padding: "4px 12px", fontSize: "0.72rem", whiteSpace: "nowrap" }}
+          onClick={addCustom}
+          disabled={!query.trim()}
+        >
+          添加
+        </button>
+      </div>
 
       {value.length > 0 && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>

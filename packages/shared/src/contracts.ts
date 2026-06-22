@@ -27,6 +27,10 @@ export type VideoQuality = (typeof videoQualityValues)[number];
 export const imageApiTypeValues = ["openai-images", "gemini-native"] as const;
 export type ImageApiType = (typeof imageApiTypeValues)[number];
 
+// 中转站供应商：yunwu（默认，原有同步/yunwu-video 范式）| apimart（apib.ai，异步任务制 /v1/tasks 轮询）
+export const apiProviderValues = ["yunwu", "apimart"] as const;
+export type ApiProvider = (typeof apiProviderValues)[number];
+
 export const textToImageSchema = z.object({
   prompt: z.string().trim().min(1).max(4000),
   negativePrompt: z.string().trim().max(1000).optional(),
@@ -95,6 +99,7 @@ export interface SalespersonInfo {
   hasApiKey: boolean;
   hasApiUrl: boolean;
   apiUrl?: string | null;
+  apiProvider?: ApiProvider | null;
   imageModel?: string | null;
   imageModels?: string[];
   videoModel?: string | null;

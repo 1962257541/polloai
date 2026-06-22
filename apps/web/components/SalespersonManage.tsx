@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { api, SalespersonInfo } from "../lib/api";
+import { api, ApiProvider, SalespersonInfo } from "../lib/api";
 import { getToken } from "../lib/auth";
 
 interface ModalState {
@@ -24,6 +24,7 @@ export default function SalespersonManage() {
 
   const [apiKeyInput, setApiKeyInput] = useState("");
   const [apiUrlInput, setApiUrlInput] = useState("");
+  const [apiProviderInput, setApiProviderInput] = useState<ApiProvider>("yunwu");
   const [submitting, setSubmitting] = useState(false);
 
   const load = useCallback(async () => {
@@ -50,6 +51,7 @@ export default function SalespersonManage() {
     setError("");
     setApiKeyInput("");
     setApiUrlInput("");
+    setApiProviderInput("yunwu");
   };
 
   const handleCreate = async () => {
@@ -83,7 +85,7 @@ export default function SalespersonManage() {
     try {
       setSubmitting(true);
       setError("");
-      await api.updateSalespersonApiConfig(token, modal.userId, apiKeyInput || undefined, apiUrlInput);
+      await api.updateSalespersonApiConfig(token, modal.userId, apiKeyInput || undefined, apiUrlInput, apiProviderInput);
       resetModalState();
       await load();
     } catch (e) {
@@ -191,6 +193,7 @@ export default function SalespersonManage() {
                   onClick={() => {
                     setApiKeyInput("");
                     setApiUrlInput(user.apiUrl || "");
+                    setApiProviderInput(user.apiProvider || "yunwu");
                     setModal({
                       type: "apikey",
                       userId: user.id,
@@ -300,6 +303,19 @@ export default function SalespersonManage() {
                   <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                     <div>
                       <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "inherit", color: "var(--text-muted)", marginBottom: 6, letterSpacing: "0.05em" }}>
+                        中转站供应商 *
+                      </label>
+                      <select
+                        className="input-field"
+                        value={apiProviderInput}
+                        onChange={(e) => setApiProviderInput(e.target.value as ApiProvider)}
+                      >
+                        <option value="yunwu">yunwu（同步图片 / create-query 视频）</option>
+                        <option value="apimart">apib.ai（APIMart 异步任务制）</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "inherit", color: "var(--text-muted)", marginBottom: 6, letterSpacing: "0.05em" }}>
                         API KEY *
                       </label>
                       <input
@@ -319,8 +335,13 @@ export default function SalespersonManage() {
                         type="text"
                         value={apiUrlInput}
                         onChange={(e) => setApiUrlInput(e.target.value)}
-                        placeholder="https://your-proxy.example.com/v1beta"
+                        placeholder={apiProviderInput === "apimart" ? "https://api.apib.ai/v1" : "https://your-proxy.example.com/v1beta"}
                       />
+                      <p style={{ margin: "6px 0 0", fontSize: "0.7rem", color: "var(--text-muted)" }}>
+                        {apiProviderInput === "apimart"
+                          ? "apib.ai 请填 https://api.apib.ai/v1，图片/视频走异步任务制"
+                          : "yunwu 等保持原有地址格式"}
+                      </p>
                     </div>
                     {error && <div style={{ fontSize: "0.8rem", color: "var(--error)" }}>{error}</div>}
                     <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
