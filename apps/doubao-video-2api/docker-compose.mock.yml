@@ -1,0 +1,17 @@
+# Mock 模式轻量部署：仅 app 容器，端口直出 8088→8000，无 nginx、无 chromium。
+# 用法：docker compose -f docker-compose.mock.yml up -d --build
+# 真实豆包视频请改用 docker-compose.yml（含 nginx + 标准 Dockerfile）。
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.mock
+    container_name: doubao-2api-app
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "${NGINX_PORT:-8088}:8000"
+    volumes:
+      - ./.env:/app/.env
+      - ./.generated:/app/.generated

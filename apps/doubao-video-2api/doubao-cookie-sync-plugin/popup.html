@@ -1,0 +1,89 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>豆包 Cookie 同步</title>
+  <style>
+    :root { color-scheme: light; }
+    body {
+      width: 360px;
+      margin: 0;
+      padding: 16px;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #111827;
+      background: #f8f7f3;
+    }
+    h1 { margin: 0 0 14px; font-size: 18px; }
+    label { display: block; margin: 12px 0 6px; font-size: 12px; font-weight: 700; color: #4b5563; }
+    input {
+      width: 100%;
+      height: 34px;
+      border: 1px solid #d6d3cb;
+      border-radius: 8px;
+      padding: 0 10px;
+      box-sizing: border-box;
+      background: #fff;
+      color: #111827;
+    }
+    .grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+    .actions { display: flex; gap: 8px; margin-top: 14px; }
+    button {
+      height: 34px;
+      border: 1px solid #111827;
+      border-radius: 999px;
+      background: #111827;
+      color: #fff;
+      padding: 0 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    button.secondary { background: #fff; color: #111827; }
+    button:disabled { opacity: .6; cursor: wait; }
+    .status {
+      margin-top: 12px;
+      min-height: 20px;
+      font-size: 12px;
+      color: #4b5563;
+      white-space: pre-wrap;
+    }
+    .logs {
+      margin-top: 10px;
+      max-height: 150px;
+      overflow: auto;
+      padding: 8px;
+      border-radius: 8px;
+      background: #fff;
+      border: 1px solid #ecebe7;
+      font-size: 11px;
+      line-height: 1.45;
+    }
+  </style>
+</head>
+<body>
+  <h1>豆包 Cookie 同步</h1>
+
+  <label for="apiUrl">后端同步地址</label>
+  <input id="apiUrl" type="text" autocomplete="off" />
+
+  <label for="connectionToken">连接令牌</label>
+  <input id="connectionToken" type="password" autocomplete="off" />
+
+  <label>每日同步时间（小时 / 分钟 / 等待秒）</label>
+  <div class="grid">
+    <input id="syncHour" type="number" min="0" max="23" step="1" />
+    <input id="syncMinute" type="number" min="0" max="59" step="1" />
+    <input id="settleSeconds" type="number" min="0" max="30" step="1" />
+  </div>
+
+  <div class="actions">
+    <button id="save">保存配置</button>
+    <button id="test" class="secondary">立即同步</button>
+    <button id="clearLogs" class="secondary">清空日志</button>
+  </div>
+
+  <div id="status" class="status"></div>
+  <div id="logs" class="logs"></div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

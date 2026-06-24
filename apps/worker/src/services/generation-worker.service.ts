@@ -6,6 +6,7 @@ import { PrismaService } from "./prisma.service";
 import { StorageService } from "./storage.service";
 import { GeminiService } from "./gemini.service";
 import { ApimartService } from "./apimart.service";
+import { DoubaoService } from "./doubao.service";
 import { GenerationProvider } from "./generation-provider";
 import { VolcEngineService } from "./volcengine.service";
 import { GenerationType } from "@packages/shared";
@@ -45,6 +46,7 @@ export class GenerationWorkerService implements OnModuleInit, OnModuleDestroy {
     private readonly storage: StorageService,
     private readonly gemini: GeminiService,
     private readonly apimart: ApimartService,
+    private readonly doubao: DoubaoService,
     private readonly volc: VolcEngineService,
   ) {
     this.publisher = new Redis(env.redisUrl);
@@ -52,7 +54,9 @@ export class GenerationWorkerService implements OnModuleInit, OnModuleDestroy {
 
   /** 按账号供应商选择具体适配器（策略模式）；默认 yunwu */
   private providerFor(provider?: string): GenerationProvider {
-    return provider === "apimart" ? this.apimart : this.gemini;
+    if (provider === "apimart") return this.apimart;
+    if (provider === "doubao") return this.doubao;
+    return this.gemini;
   }
 
   async onModuleInit() {

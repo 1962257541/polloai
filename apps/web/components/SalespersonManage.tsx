@@ -312,6 +312,7 @@ export default function SalespersonManage() {
                       >
                         <option value="yunwu">yunwu（同步图片 / create-query 视频）</option>
                         <option value="apimart">apib.ai（APIMart 异步任务制）</option>
+                        <option value="doubao">doubao（自部署反代，豆包 Seedance 视频）</option>
                       </select>
                     </div>
                     <div>
@@ -335,12 +336,20 @@ export default function SalespersonManage() {
                         type="text"
                         value={apiUrlInput}
                         onChange={(e) => setApiUrlInput(e.target.value)}
-                        placeholder={apiProviderInput === "apimart" ? "https://api.apib.ai/v1" : "https://your-proxy.example.com/v1beta"}
+                        placeholder={
+                          apiProviderInput === "apimart"
+                            ? "https://api.apib.ai/v1"
+                            : apiProviderInput === "doubao"
+                              ? "http://doubao-2api:8088"
+                              : "https://your-proxy.example.com/v1beta"
+                        }
                       />
                       <p style={{ margin: "6px 0 0", fontSize: "0.7rem", color: "var(--text-muted)" }}>
                         {apiProviderInput === "apimart"
                           ? "apib.ai 请填 https://api.apib.ai/v1，图片/视频走异步任务制"
-                          : "yunwu 等保持原有地址格式"}
+                          : apiProviderInput === "doubao"
+                            ? "填反代部署地址（含端口，如 http://doubao-2api:8088）；API KEY 填该服务的 API_MASTER_KEY；仅支持视频"
+                            : "yunwu 等保持原有地址格式"}
                       </p>
                     </div>
                     {error && <div style={{ fontSize: "0.8rem", color: "var(--error)" }}>{error}</div>}

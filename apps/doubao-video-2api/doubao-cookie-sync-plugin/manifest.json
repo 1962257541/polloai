@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "豆包 Cookie 同步",
+  "version": "1.0.2",
+  "description": "把当前浏览器已登录的豆包 Cookie 同步到 Doubao2API。",
+  "permissions": [
+    "alarms",
+    "cookies",
+    "notifications",
+    "storage",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://*.doubao.com/*",
+    "https://doubao.com/*",
+    "http://*/*",
+    "https://*/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html"
+  }
+}

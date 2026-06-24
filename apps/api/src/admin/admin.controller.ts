@@ -48,9 +48,9 @@ class UpdateApiKeyBody {
   @MinLength(1)
   apiUrl!: string;
 
-  // 中转站供应商：yunwu（默认）| apimart（apib.ai）
+  // 中转站供应商：yunwu（默认）| apimart（apib.ai）| doubao（自部署 doubao-video-2api 反代）
   @IsOptional()
-  @IsIn(["yunwu", "apimart"])
+  @IsIn(["yunwu", "apimart", "doubao"])
   apiProvider?: string;
 }
 

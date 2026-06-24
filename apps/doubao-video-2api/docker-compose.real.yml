@@ -1,0 +1,17 @@
+# 真实模式部署：基于 mock 镜像扩展的 Dockerfile.real（含 chromium），端口直出 8088→8000。
+# 用法：docker compose -f docker-compose.real.yml up -d --build
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.real
+    container_name: doubao-2api-app
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "${NGINX_PORT:-8088}:8000"
+    volumes:
+      - ./.env:/app/.env
+      - ./.generated:/app/.generated
+    shm_size: "1gb"

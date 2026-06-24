@@ -57,7 +57,7 @@ model User {
   role         UserRole         @default(salesperson)
   apiKey       String?
   apiUrl       String?
-  // 中转站供应商：yunwu（默认）| apimart（apib.ai 异步任务制）
+  // 中转站供应商：yunwu（默认）| apimart（apib.ai 异步任务制）| doubao（自部署 doubao-video-2api 反代，仅视频）
   apiProvider  String           @default("yunwu")
   imageModel   String?
   imageModels  String[]         @default([])

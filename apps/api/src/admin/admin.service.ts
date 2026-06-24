@@ -122,6 +122,9 @@ export class AdminService {
     "wan2.7",
   ];
 
+  // doubao-video-2api 反代仅暴露豆包 Seedance 一个视频模型（见其 VIDEO_MODEL_MAPPING）。
+  private static readonly DOUBAO_MODEL_CATALOG = ["doubao-seedance-2-0"];
+
   async listRemoteModels(targetUserId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: targetUserId },
@@ -139,6 +142,11 @@ export class AdminService {
     // apimart 没有远端模型目录接口，直接返回内置候选清单
     if (user.apiProvider === "apimart") {
       return { models: [...AdminService.APIMART_MODEL_CATALOG].sort((a, b) => a.localeCompare(b)) };
+    }
+
+    // doubao 反代无 /v1/models 目录，仅有 Seedance 一个视频模型，直接返回内置清单
+    if (user.apiProvider === "doubao") {
+      return { models: [...AdminService.DOUBAO_MODEL_CATALOG] };
     }
 
     const response = await fetch(this.modelsUrl(user.apiUrl), {

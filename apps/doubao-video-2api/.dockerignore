@@ -1,0 +1,11 @@
+.git
+.pytest_cache
+__pycache__
+*.pyc
+*.pyo
+*.log
+.env
+.generated
+uvicorn-*.out.log
+uvicorn-*.err.log
+tests

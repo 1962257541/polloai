@@ -1,0 +1,3222 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Doubao2API - 账户管理</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --page: #f8f7f3;
+      --panel: #ffffff;
+      --text: #050505;
+      --muted: #7a8190;
+      --soft: #f2f1ed;
+      --line: #ecebe7;
+      --line-strong: #deddd8;
+      --black: #050505;
+      --green: #00a35c;
+      --orange: #ff5a1f;
+      --red: #ef233c;
+      --blue: #2f64ff;
+      --purple: #8b5cf6;
+      --brown: #b86b23;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--page);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", Arial, sans-serif;
+      font-size: 14px;
+      letter-spacing: 0;
+    }
+
+    button,
+    input,
+    select,
+    textarea {
+      font: inherit;
+      letter-spacing: 0;
+    }
+
+    .app {
+      width: min(1224px, calc(100vw - 48px));
+      margin: 0 auto;
+      min-height: 100vh;
+      padding: 22px 0 54px;
+      position: relative;
+    }
+
+    .topbar {
+      height: 34px;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      margin-bottom: 34px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .brand-mark {
+      width: 16px;
+      height: 16px;
+      display: inline-grid;
+      place-items: center;
+      border: 1.5px solid #242424;
+      border-radius: 50%;
+      font-size: 10px;
+      line-height: 1;
+    }
+
+    .brand small {
+      color: #5d6470;
+      font-weight: 500;
+      margin-left: 2px;
+    }
+
+    .main-nav {
+      display: inline-flex;
+      gap: 34px;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .nav-button {
+      border: 0;
+      background: transparent;
+      padding: 0;
+      min-height: 28px;
+      color: #4c5360;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    .nav-button.active {
+      color: #000;
+      font-weight: 800;
+    }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 16px;
+    }
+
+    .version-chip {
+      height: 34px;
+      padding: 0 16px;
+      border-radius: 999px;
+      background: #eee9df;
+      color: #6d665e;
+      display: inline-flex;
+      align-items: center;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .lang {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      color: #1f2937;
+      font-size: 13px;
+    }
+
+    .logout {
+      min-width: 44px;
+      height: 28px;
+      padding: 0 6px;
+      border: 0;
+      background: transparent;
+      color: #323842;
+      cursor: default;
+      font-size: 14px;
+      white-space: nowrap;
+    }
+
+    .hero-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: start;
+      gap: 18px;
+      margin-bottom: 28px;
+    }
+
+    h1 {
+      margin: 0 0 6px;
+      font-size: 25px;
+      line-height: 1.25;
+      font-weight: 850;
+    }
+
+    .subtitle {
+      color: #5f6673;
+      font-size: 14px;
+      line-height: 1.65;
+    }
+
+    .toolbar {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      padding-top: 2px;
+    }
+
+    .btn {
+      height: 34px;
+      border-radius: 999px;
+      border: 1px solid var(--line-strong);
+      background: #fff;
+      color: #1f2937;
+      padding: 0 15px;
+      font-size: 13px;
+      font-weight: 760;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      white-space: nowrap;
+    }
+
+    .btn:hover:not(:disabled) {
+      border-color: #c9c7c1;
+      background: #faf9f6;
+    }
+
+    .btn.primary {
+      border-color: #050505;
+      background: #050505;
+      color: #fff;
+    }
+
+    .btn.muted {
+      border-color: transparent;
+      background: #e7e5e0;
+      color: #77746e;
+    }
+
+    .btn:disabled {
+      opacity: .55;
+      cursor: wait;
+    }
+
+    .view { display: none; }
+    .view.active { display: block; }
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 24px 0 14px;
+      font-weight: 800;
+    }
+
+    .count-chip {
+      min-width: 22px;
+      height: 22px;
+      padding: 0 8px;
+      border-radius: 999px;
+      background: #eeeae2;
+      color: #5e6571;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .overview {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .metric-card {
+      min-height: 88px;
+      background: var(--panel);
+      border-radius: 10px;
+      padding: 18px 16px;
+      border: 1px solid rgba(236, 235, 231, .3);
+    }
+
+    .metric-label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: #858c99;
+      font-size: 12px;
+      margin-bottom: 17px;
+    }
+
+    .metric-icon {
+      width: 16px;
+      height: 16px;
+      display: inline-grid;
+      place-items: center;
+      color: currentColor;
+      font-size: 13px;
+      font-weight: 900;
+    }
+
+    .metric-value {
+      font-size: 26px;
+      line-height: 1;
+      font-weight: 820;
+    }
+
+    .green { color: var(--green); }
+    .orange { color: var(--orange); }
+    .red { color: var(--red); }
+    .blue { color: var(--blue); }
+    .purple { color: var(--purple); }
+    .brown { color: var(--brown); }
+
+    .table-tools {
+      min-height: 34px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 18px 0 8px;
+      color: #8b929e;
+      font-size: 13px;
+    }
+
+    .pager,
+    .list-actions {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .tool-icon {
+      border: 0;
+      background: transparent;
+      color: #9aa0aa;
+      font-size: 17px;
+      min-width: 22px;
+      height: 26px;
+      cursor: pointer;
+      padding: 0;
+    }
+
+    .page-size {
+      border: 0;
+      background: transparent;
+      color: #8b929e;
+      min-width: 72px;
+      outline: none;
+    }
+
+    .batch-select {
+      min-width: 104px;
+    }
+
+    .table-card {
+      background: var(--panel);
+      border-radius: 12px;
+      overflow-x: auto;
+      overflow-y: hidden;
+      min-height: 158px;
+      border: 1px solid rgba(236, 235, 231, .4);
+    }
+
+    table {
+      width: 100%;
+      min-width: 1180px;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+
+    th,
+    td {
+      height: 52px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: middle;
+      padding: 0 14px;
+      font-size: 12px;
+    }
+
+    th {
+      color: #9aa0aa;
+      font-weight: 760;
+      background: #fff;
+    }
+
+    tr:last-child td { border-bottom: 0; }
+
+    .check-cell { width: 44px; text-align: center; }
+
+    .checkbox {
+      width: 14px;
+      height: 14px;
+      border: 1px solid #aab0ba;
+      border-radius: 3px;
+      display: inline-block;
+      position: relative;
+      vertical-align: middle;
+    }
+
+    .checkbox-button {
+      padding: 0;
+      background: #fff;
+      cursor: pointer;
+    }
+
+    .checkbox-button:disabled {
+      opacity: .45;
+      cursor: not-allowed;
+    }
+
+    .checkbox.checked,
+    .checkbox.mixed {
+      border-color: #050505;
+      background: #050505;
+    }
+
+    .checkbox.checked::after {
+      content: "";
+      position: absolute;
+      left: 3px;
+      top: 1px;
+      width: 5px;
+      height: 8px;
+      border: solid #fff;
+      border-width: 0 2px 2px 0;
+      transform: rotate(45deg);
+    }
+
+    .checkbox.mixed::after {
+      content: "";
+      position: absolute;
+      left: 3px;
+      right: 3px;
+      top: 6px;
+      height: 2px;
+      border-radius: 999px;
+      background: #fff;
+    }
+
+    .token {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      color: #374151;
+      font-size: 12px;
+    }
+
+    .status-pill {
+      height: 24px;
+      padding: 0 10px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 780;
+      font-size: 12px;
+      background: #f0f1f3;
+      color: #68707d;
+    }
+
+    .status-available { background: #e9f9f0; color: var(--green); }
+    .status-busy { background: #eef3ff; color: var(--blue); }
+    .status-cooling_down { background: #fff2e9; color: var(--orange); }
+    .status-disabled { background: #f0f1f3; color: #5f6673; }
+    .status-verification_required { background: #ffe9ed; color: #d61f45; }
+    .status-login_required { background: #fff4dc; color: #a15c00; }
+
+    .quota-badges {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .quota-badge {
+      width: 21px;
+      height: 21px;
+      border-radius: 50%;
+      display: inline-grid;
+      place-items: center;
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .quota-a { color: #2f64ff; background: #e9efff; }
+    .quota-f { color: #009f61; background: #e6f7ed; }
+    .quota-e { color: #8b5cf6; background: #f0eaff; }
+    .quota-h { color: #b86b23; background: #fff0e3; }
+
+    .quota-cell {
+      display: grid;
+      gap: 3px;
+      min-width: 0;
+    }
+
+    .quota-main {
+      font-size: 13px;
+      font-weight: 820;
+      color: #1f2630;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .quota-meta {
+      font-size: 11px;
+      color: #8b929e;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .quota-refresh-state {
+      min-height: 28px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #69717f;
+      font-size: 12px;
+      font-weight: 720;
+    }
+
+    .quota-refresh-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #aab0ba;
+      flex: 0 0 auto;
+    }
+
+    .quota-refresh-dot.on { background: var(--green); }
+    .quota-refresh-dot.running { background: var(--blue); }
+    .quota-refresh-dot.error { background: var(--red); }
+
+    .actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .mini-btn {
+      height: 28px;
+      border-radius: 999px;
+      border: 1px solid #e5e2dc;
+      background: #fff;
+      color: #313844;
+      padding: 0 10px;
+      font-size: 12px;
+      font-weight: 760;
+      cursor: pointer;
+    }
+
+    .mini-btn.dark {
+      border-color: #050505;
+      background: #050505;
+      color: #fff;
+    }
+
+    .mini-btn.warn { color: #a94f12; }
+    .mini-btn.danger { color: #d11f35; }
+
+    .mini-btn:disabled {
+      opacity: .5;
+      cursor: wait;
+    }
+
+    .empty {
+      height: 96px;
+      color: #7d8490;
+      display: grid;
+      place-items: center;
+      font-size: 14px;
+    }
+
+    .field-input {
+      width: 86px;
+      height: 32px;
+      border: 1px solid #e4e2dc;
+      border-radius: 8px;
+      background: #fbfbfa;
+      padding: 0 10px;
+      text-align: right;
+      outline: none;
+    }
+
+    .api-key-list {
+      border-top: 1px solid var(--line);
+      padding: 8px 16px 14px;
+      display: grid;
+      gap: 8px;
+    }
+
+    .api-key-row,
+    .secret-box {
+      min-height: 52px;
+      border: 1px solid #eeeae4;
+      border-radius: 10px;
+      background: #fbfbfa;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 14px;
+      padding: 10px 12px;
+    }
+
+    .api-key-name {
+      font-weight: 820;
+      margin-bottom: 4px;
+    }
+
+    .api-key-meta {
+      color: #858c99;
+      font-size: 12px;
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .secret-box {
+      margin: 10px 16px 14px;
+      background: #fff;
+    }
+
+    .secret-box[hidden] {
+      display: none;
+    }
+
+    .secret-input {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      text-align: left;
+    }
+
+    .config-tabs {
+      display: flex;
+      gap: 8px;
+      margin: 18px 0 16px;
+      flex-wrap: wrap;
+    }
+
+    .config-tab {
+      height: 34px;
+      border-radius: 999px;
+      border: 0;
+      background: #f1f0ec;
+      color: #747b87;
+      padding: 0 15px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    .config-tab.active {
+      background: #050505;
+      color: #fff;
+    }
+
+    .config-pane { display: none; }
+    .config-pane.active { display: block; }
+
+    .config-card {
+      background: #fff;
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 14px;
+      border: 1px solid rgba(236, 235, 231, .4);
+    }
+
+    .config-heading {
+      padding: 14px 16px 8px;
+      color: #898f9a;
+      font-weight: 830;
+      font-size: 13px;
+    }
+
+    .config-row {
+      min-height: 58px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 390px;
+      gap: 24px;
+      align-items: center;
+      padding: 12px 16px;
+      border-top: 1px solid var(--line);
+    }
+
+    .config-row:first-of-type { border-top: 0; }
+
+    .config-name {
+      font-weight: 800;
+      margin-bottom: 4px;
+    }
+
+    .config-help {
+      color: #8b929e;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .config-control {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .wide-input,
+    .wide-select,
+    .wide-textarea {
+      width: 100%;
+      border: 1px solid #e4e2dc;
+      background: #fbfbfa;
+      border-radius: 9px;
+      outline: none;
+    }
+
+    .wide-input,
+    .wide-select {
+      height: 34px;
+      padding: 0 12px;
+      text-align: right;
+    }
+
+    .wide-textarea {
+      min-height: 76px;
+      padding: 10px 12px;
+      resize: vertical;
+    }
+
+    .switch {
+      width: 38px;
+      height: 22px;
+      border-radius: 999px;
+      border: 0;
+      background: #d8d8d8;
+      position: relative;
+      cursor: pointer;
+      padding: 0;
+    }
+
+    .switch::after {
+      content: "";
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #fff;
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      transition: transform .16s ease;
+    }
+
+    .switch.on {
+      background: #171717;
+    }
+
+    .switch.on::after {
+      transform: translateX(16px);
+    }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background: rgba(5, 5, 5, .24);
+    }
+
+    .modal-backdrop[hidden] {
+      display: none;
+    }
+
+    .modal-panel {
+      width: min(560px, 100%);
+      background: #fff;
+      border: 1px solid rgba(236, 235, 231, .7);
+      border-radius: 12px;
+      box-shadow: 0 24px 70px rgba(20, 20, 20, .18);
+      overflow: hidden;
+    }
+
+    .modal-header,
+    .modal-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 16px 18px;
+    }
+
+    .modal-header {
+      border-bottom: 1px solid var(--line);
+    }
+
+    .modal-title {
+      font-size: 16px;
+      font-weight: 850;
+    }
+
+    .modal-close {
+      width: 28px;
+      height: 28px;
+      border: 0;
+      border-radius: 50%;
+      background: #f1f0ec;
+      color: #4b5563;
+      cursor: pointer;
+      font-size: 18px;
+      line-height: 1;
+    }
+
+    .modal-body {
+      padding: 4px 18px 0;
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 130px minmax(0, 1fr);
+      gap: 16px;
+      align-items: center;
+      padding: 13px 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .form-row:last-child {
+      border-bottom: 0;
+    }
+
+    .form-label {
+      font-weight: 800;
+    }
+
+    .form-help {
+      margin-top: 5px;
+      color: #8b929e;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .form-inline {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .modal-actions {
+      justify-content: flex-end;
+      border-top: 1px solid var(--line);
+      background: #fbfaf8;
+    }
+
+    .verification-panel {
+      width: min(980px, 100%);
+    }
+
+    .verification-body {
+      padding: 16px 18px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .verification-status {
+      min-height: 32px;
+      border: 1px solid #ecebe7;
+      border-radius: 8px;
+      background: #fbfbfa;
+      padding: 8px 10px;
+      color: #394150;
+      font-size: 13px;
+      line-height: 1.35;
+    }
+
+    .verification-meta {
+      color: #8b929e;
+      font-size: 12px;
+      line-height: 1.4;
+      word-break: break-all;
+    }
+
+    .verification-alert {
+      border: 1px solid #ffd08a;
+      border-radius: 8px;
+      background: #fff7e8;
+      color: #8a5200;
+      padding: 10px 12px;
+      font-size: 13px;
+      line-height: 1.45;
+      font-weight: 700;
+    }
+
+    .verification-alert.ok {
+      border-color: #a5dfba;
+      background: #effbf3;
+      color: #1c7c3f;
+    }
+
+    .verification-shot-wrap {
+      min-height: 280px;
+      border: 1px solid #ecebe7;
+      border-radius: 8px;
+      background: #f7f8fb;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+    }
+
+    .verification-shot {
+      width: 100%;
+      max-height: 68vh;
+      object-fit: contain;
+      display: block;
+      cursor: crosshair;
+      touch-action: none;
+    }
+
+    .notice {
+      min-height: 34px;
+      color: #69717f;
+      font-size: 13px;
+      margin-top: 12px;
+    }
+
+    .footer {
+      position: fixed;
+      right: 34px;
+      bottom: 18px;
+      color: #8d929b;
+      font-size: 12px;
+      pointer-events: none;
+    }
+
+    @media (max-width: 1020px) {
+      .app {
+        width: min(100vw - 28px, 1224px);
+      }
+
+      .topbar {
+        grid-template-columns: 1fr;
+        height: auto;
+        gap: 16px;
+      }
+
+      .main-nav,
+      .top-actions {
+        justify-content: flex-start;
+      }
+
+      .hero-row,
+      .config-row {
+        grid-template-columns: 1fr;
+      }
+
+      .overview {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .config-control {
+        justify-content: flex-start;
+      }
+
+      .form-row,
+      .form-inline,
+      .api-key-row,
+      .secret-box {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark">D</span>
+        Doubao2API
+        <small>@local</small>
+      </div>
+      <nav class="main-nav">
+        <button class="nav-button active" data-view="accounts">账户管理</button>
+        <button class="nav-button" data-view="config">配置管理</button>
+        <button class="nav-button" data-view="config" data-config-pane="pluginPane">插件同步</button>
+        <button class="nav-button" data-view="cache">缓存管理</button>
+      </nav>
+      <div class="top-actions">
+        <span class="version-chip">v1.0.0</span>
+        <span class="lang">CN</span>
+        <button class="logout" type="button" aria-label="退出">退出</button>
+      </div>
+    </header>
+
+    <section id="accountsView" class="view active">
+      <div class="hero-row">
+        <div>
+          <h1>账户管理</h1>
+          <div class="subtitle">统一管理 Doubao2API 的 Cookie 账号、额度探测与调度状态</div>
+        </div>
+        <div class="toolbar">
+          <input id="apiKey" class="wide-input" type="password" autocomplete="off" placeholder="API Key" style="width: 172px; text-align:left;" />
+          <button id="openAddAccount" class="btn primary" type="button">+ 新增</button>
+          <button id="openBulkAccount" class="btn" type="button">批量导入</button>
+          <button id="refreshPool" class="btn" type="button">刷新</button>
+          <button id="autoRefresh" class="btn" type="button">自动刷新</button>
+        </div>
+      </div>
+
+      <div class="section-title">概览</div>
+      <div class="overview">
+        <article class="metric-card">
+          <div class="metric-label"><span>账号总数</span><span class="metric-icon">#</span></div>
+          <div id="metricTotal" class="metric-value">0</div>
+        </article>
+        <article class="metric-card">
+          <div class="metric-label"><span>可用账号</span><span class="metric-icon green">A</span></div>
+          <div id="metricAvailable" class="metric-value green">0</div>
+        </article>
+        <article class="metric-card">
+          <div class="metric-label"><span>冷却中</span><span class="metric-icon orange">L</span></div>
+          <div id="metricCooling" class="metric-value orange">0</div>
+        </article>
+        <article class="metric-card">
+          <div class="metric-label"><span>执行中</span><span class="metric-icon red">!</span></div>
+          <div id="metricBusy" class="metric-value red">0</div>
+        </article>
+        <article class="metric-card">
+          <div class="metric-label"><span>已禁用</span><span class="metric-icon">X</span></div>
+          <div id="metricDisabled" class="metric-value" style="color:#5d6673">0</div>
+        </article>
+      </div>
+      <div class="overview">
+        <article class="metric-card">
+          <div class="metric-label"><span>调用总数</span><span class="metric-icon">T</span></div>
+          <div id="metricCalls" class="metric-value">0</div>
+        </article>
+        <article class="metric-card">
+          <div class="metric-label"><span>当前并发</span><span class="metric-icon blue">C</span></div>
+          <div id="metricInFlight" class="metric-value blue">0</div>
+        </article>
+        <article class="metric-card">
+          <div class="metric-label"><span>全局上限</span><span class="metric-icon green">G</span></div>
+          <div id="metricGlobal" class="metric-value green">0</div>
+        </article>
+        <article class="metric-card">
+          <div class="metric-label"><span>熔断阈值</span><span class="metric-icon purple">F</span></div>
+          <div id="metricThreshold" class="metric-value purple">0</div>
+        </article>
+        <article class="metric-card">
+          <div class="metric-label"><span>冷却时间</span><span class="metric-icon brown">S</span></div>
+          <div id="metricCooldown" class="metric-value brown">0</div>
+        </article>
+      </div>
+
+      <div class="section-title">账号列表 <span id="accountCount" class="count-chip">0</span></div>
+      <div class="table-tools">
+        <div class="pager">
+          <button class="tool-icon" id="accountPrevPage" type="button" title="上一页">&lt;</button>
+          <span id="accountPagerText">第 0 / 1 页</span>
+          <button class="tool-icon" id="accountNextPage" type="button" title="下一页">&gt;</button>
+        </div>
+        <div class="list-actions">
+          <button class="tool-icon" id="healthAll" type="button" title="健康检查">H</button>
+          <button class="tool-icon" id="refreshAllQuotas" type="button" title="刷新全部额度">Q</button>
+          <button class="tool-icon" id="resetAll" type="button" title="重置健康">R</button>
+          <select class="page-size batch-select" id="accountBatchAction" title="批量操作">
+            <option value="health-check">检查</option>
+            <option value="quota-refresh">刷新额度</option>
+            <option value="reset-health">重置健康</option>
+            <option value="clear-cooldown">清冷却</option>
+            <option value="enable">启用</option>
+            <option value="disable">禁用</option>
+          </select>
+          <button class="mini-btn" id="runBatchSelected" type="button">跑选中</button>
+          <button class="mini-btn" id="runBatchVisible" type="button">跑当前页</button>
+          <select class="page-size" id="accountPageSize" title="每页数量">
+            <option value="20">20 / 页</option>
+            <option value="50" selected>50 / 页</option>
+            <option value="100">100 / 页</option>
+          </select>
+        </div>
+      </div>
+      <div id="quotaRefreshState" class="quota-refresh-state">
+        <span class="quota-refresh-dot"></span>
+        <span>正在刷新额度与状态...</span>
+      </div>
+
+      <div class="table-card">
+        <table>
+          <thead>
+            <tr>
+              <th class="check-cell"><button class="checkbox checkbox-button" id="selectVisibleAccounts" type="button" title="选择当前页"></button></th>
+              <th style="width:180px;">TOKEN</th>
+              <th style="width:112px;">状态</th>
+              <th style="width:170px;">真实额度</th>
+              <th style="width:156px;">权重/并发</th>
+              <th style="width:88px;">调度</th>
+              <th style="width:86px;">成功</th>
+              <th style="width:86px;">失败</th>
+              <th style="width:86px;">冷却</th>
+              <th style="width:112px;">验证状态</th>
+              <th style="width:380px; text-align:right;">操作</th>
+            </tr>
+          </thead>
+          <tbody id="accountsBody">
+            <tr><td colspan="11"><div class="empty">正在加载账号...</div></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div id="accountNotice" class="notice"></div>
+    </section>
+
+    <section id="configView" class="view">
+      <div class="hero-row">
+        <div>
+          <h1>配置管理</h1>
+          <div class="subtitle">调整 Doubao2API 的认证、调度和视频参数</div>
+        </div>
+        <div class="toolbar">
+          <button id="resetConfig" class="btn" type="button">重置</button>
+          <button id="savePoolConfig" class="btn muted" type="button">保存</button>
+        </div>
+      </div>
+
+      <div class="config-tabs">
+        <button class="config-tab" data-pane="pluginPane">插件同步</button>
+        <button class="config-tab active" data-pane="systemPane">系统认证</button>
+        <button class="config-tab" data-pane="dispatchPane">调度策略</button>
+        <button class="config-tab" data-pane="failurePane">失败处理</button>
+        <button class="config-tab" data-pane="videoPane">视频测试</button>
+      </div>
+
+      <div id="systemPane" class="config-pane active">
+        <section class="config-card">
+          <div class="config-heading">API 认证</div>
+          <div class="config-row">
+            <div>
+              <div class="config-name">管理 API Key</div>
+              <div class="config-help">用于访问本服务接口。默认使用 .env 中的 API_MASTER_KEY。</div>
+            </div>
+            <div class="config-control"><input id="configApiKey" class="wide-input" type="password" placeholder="主 API Key" /></div>
+          </div>
+          <div class="config-row">
+            <div>
+              <div class="config-name">创建 API Key</div>
+              <div class="config-help">创建一个 OpenAI 兼容的 Bearer Key，用于外部客户端调用。</div>
+            </div>
+            <div class="config-control">
+              <input id="newApiKeyName" class="wide-input" type="text" placeholder="名称 prod-client" style="text-align:left;" />
+              <button id="createApiKey" class="btn primary" type="button">+ 新建</button>
+            </div>
+          </div>
+          <div id="newApiKeySecret" class="secret-box" hidden>
+            <div>
+              <div class="config-name">新密钥</div>
+              <input id="createdApiKeyValue" class="wide-input secret-input" readonly />
+            </div>
+            <div class="actions">
+              <button id="useCreatedApiKey" class="mini-btn dark" type="button">使用</button>
+              <button id="copyCreatedApiKey" class="mini-btn" type="button">复制</button>
+            </div>
+          </div>
+          <div id="apiKeyList" class="api-key-list">
+            <div class="empty">正在加载 API Key...</div>
+          </div>
+        </section>
+
+        <section class="config-card">
+          <div class="config-heading">自动刷新</div>
+          <div class="config-row">
+            <div>
+              <div class="config-name">开启自动刷新</div>
+              <div class="config-help">每隔 5 秒刷新账号、额度和调度状态。</div>
+            </div>
+            <div class="config-control"><button id="configAutoRefresh" class="switch" type="button"></button></div>
+          </div>
+        </section>
+
+        <section class="config-card">
+          <div class="config-heading">默认账号参数</div>
+          <div class="config-row">
+            <div>
+              <div class="config-name">默认并发数</div>
+              <div class="config-help">新增账号时使用的默认并发上限，影响单账号同时任务数。</div>
+            </div>
+            <div class="config-control"><input id="configAccountConcurrency" class="wide-input" type="number" min="1" step="1" value="1" /></div>
+          </div>
+          <div class="config-row">
+            <div>
+              <div class="config-name">默认权重</div>
+              <div class="config-help">新增账号时使用的调度权重，权重越高越优先。</div>
+            </div>
+            <div class="config-control"><input id="configAccountWeight" class="wide-input" type="number" min="1" step="1" value="1" /></div>
+          </div>
+        </section>
+      </div>
+
+      <div id="pluginPane" class="config-pane">
+        <section class="config-card">
+          <div class="config-heading">浏览器 Cookie 插件</div>
+          <div class="config-row">
+            <div>
+              <div class="config-name">连接地址</div>
+              <div class="config-help">给浏览器插件使用的本地同步接口地址。</div>
+            </div>
+            <div class="config-control">
+              <input id="pluginConnectionUrl" class="wide-input" type="text" readonly style="text-align:left;" />
+              <button id="copyPluginUrl" class="btn" type="button">复制</button>
+            </div>
+          </div>
+          <div class="config-row">
+            <div>
+              <div class="config-name">连接令牌</div>
+              <div class="config-help">插件同步 Cookie 时需要携带的安全令牌。</div>
+            </div>
+            <div class="config-control">
+              <input id="pluginConnectionToken" class="wide-input" type="password" autocomplete="off" style="text-align:left;" />
+              <button id="copyPluginToken" class="btn" type="button">复制</button>
+            </div>
+          </div>
+          <div class="config-row">
+            <div>
+              <div class="config-name">启用插件</div>
+              <div class="config-help">关闭后插件请求会被拒绝。</div>
+            </div>
+            <div class="config-control"><button id="pluginEnabled" class="switch" type="button"></button></div>
+          </div>
+          <div class="config-row">
+            <div>
+              <div class="config-name">插件目录</div>
+              <div class="config-help">在 Chrome/Edge 扩展管理中加载这个目录。</div>
+            </div>
+            <div class="config-control"><input id="pluginExtensionPath" class="wide-input" type="text" readonly style="text-align:left;" /></div>
+          </div>
+          <div class="config-row">
+            <div>
+              <div class="config-name">令牌指纹</div>
+              <div id="pluginTokenFingerprint" class="config-help">-</div>
+            </div>
+            <div class="config-control">
+              <button id="savePluginConfig" class="btn primary" type="button">保存配置</button>
+              <button id="rotatePluginToken" class="btn" type="button">轮换令牌</button>
+              <button id="reloadPluginConfig" class="btn" type="button">重新加载</button>
+            </div>
+          </div>
+          <div id="pluginNotice" class="notice"></div>
+        </section>
+      </div>
+
+      <div id="dispatchPane" class="config-pane">
+        <section class="config-card">
+          <div class="config-heading">全局调度</div>
+          <div class="config-row">
+            <div>
+              <div class="config-name">全局并发</div>
+              <div class="config-help">所有账号共享的总并发上限，0 表示不限制。</div>
+            </div>
+            <div class="config-control"><input id="globalConcurrency" class="wide-input" type="number" min="0" step="1" /></div>
+          </div>
+          <div class="config-row">
+            <div>
+              <div class="config-name">等待账号超时</div>
+              <div class="config-help">没有可用账号时等待池子的最长秒数。</div>
+            </div>
+            <div class="config-control"><input id="acquireTimeout" class="wide-input" type="number" min="0.1" step="0.1" /></div>
+          </div>
+        </section>
+      </div>
+
+      <div id="failurePane" class="config-pane">
+        <section class="config-card">
+          <div class="config-heading">失败熔断</div>
+          <div class="config-row">
+            <div>
+              <div class="config-name">熔断阈值</div>
+              <div class="config-help">连续失败达到该值后账号进入冷却。</div>
+            </div>
+            <div class="config-control"><input id="failureThreshold" class="wide-input" type="number" min="1" step="1" /></div>
+          </div>
+          <div class="config-row">
+            <div>
+              <div class="config-name">冷却秒数</div>
+              <div class="config-help">熔断后账号暂停参与调度的秒数。</div>
+            </div>
+            <div class="config-control"><input id="cooldownSeconds" class="wide-input" type="number" min="0" step="1" /></div>
+          </div>
+        </section>
+      </div>
+
+      <div id="videoPane" class="config-pane">
+        <section class="config-card">
+          <div class="config-heading">视频生成测试</div>
+          <div class="config-row">
+            <div>
+              <div class="config-name">提示词</div>
+              <div class="config-help">使用当前配置快速发起一个视频任务。</div>
+            </div>
+            <div class="config-control"><textarea id="prompt" class="wide-textarea">Animate the reference image with a natural smile, slight head turn, slow camera push-in, realistic stable shot.</textarea></div>
+          </div>
+          <div class="config-row">
+            <div>
+              <div class="config-name">模型参数</div>
+              <div class="config-help">模型、时长、比例和清晰度。</div>
+            </div>
+            <div class="config-control" style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+              <select id="model" class="wide-select"><option value="doubao-seedance-2-0">doubao-seedance-2-0</option></select>
+              <select id="duration" class="wide-select"><option value="5">5s</option><option value="10">10s</option><option value="15">15s</option><option value="20">20s</option><option value="25">25s</option><option value="30">30s</option></select>
+              <select id="ratio" class="wide-select"><option value="9:16">9:16 portrait</option><option value="16:9">16:9 landscape</option><option value="1:1">1:1 square</option></select>
+              <select id="resolution" class="wide-select"><option value="1080p">1080p</option><option value="720p">720p</option></select>
+            </div>
+          </div>
+          <div class="config-row">
+            <div>
+              <div class="config-name">参考图</div>
+              <div class="config-help">可选，上传后随视频任务一起提交。</div>
+            </div>
+            <div class="config-control"><input id="referenceImage" class="wide-input" type="file" accept="image/png,image/jpeg,image/webp" style="text-align:left;" /></div>
+          </div>
+          <div class="config-row">
+            <div>
+              <div class="config-name">任务状态</div>
+              <div id="videoStatus" class="config-help">Ready</div>
+            </div>
+            <div class="config-control"><button id="generate" class="btn primary" type="button">生成视频</button></div>
+          </div>
+          <div class="config-row">
+            <div>
+              <div class="config-name">任务 ID</div>
+              <div id="taskId" class="config-help">No task</div>
+            </div>
+            <div class="config-control"><a id="download" href="#" download hidden>下载 MP4</a></div>
+          </div>
+        </section>
+      </div>
+
+      <div id="configNotice" class="notice"></div>
+    </section>
+
+    <section id="cacheView" class="view">
+      <div class="hero-row">
+        <div>
+          <h1>缓存管理</h1>
+          <div class="subtitle">管理本地缓存、输出目录和运行中状态。</div>
+        </div>
+      </div>
+      <section class="config-card">
+        <div class="config-heading">本地缓存</div>
+        <div class="config-row">
+          <div>
+            <div class="config-name">刷新运行缓存</div>
+            <div class="config-help">重新读取账号池和 Cookie 状态。</div>
+          </div>
+          <div class="config-control"><button id="cacheRefresh" class="btn" type="button">刷新</button></div>
+        </div>
+        <div class="config-row">
+          <div>
+            <div class="config-name">视频输出目录</div>
+            <div class="config-help">当前视频结果保存路径，由 VIDEO_OUTPUT_DIR 配置。</div>
+          </div>
+          <div class="config-control"><input class="wide-input" value=".generated/videos" readonly /></div>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <div id="addAccountModal" class="modal-backdrop" hidden>
+    <section class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="addAccountTitle">
+      <div class="modal-header">
+        <div class="modal-title" id="addAccountTitle">新增账号</div>
+        <button id="addClose" class="modal-close" type="button" aria-label="关闭">x</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-row">
+          <div>
+            <div class="form-label">Cookie</div>
+            <div class="form-help">粘贴完整 Cookie 或 token。</div>
+          </div>
+          <textarea id="addCookie" class="wide-textarea" autocomplete="off" spellcheck="false" placeholder="sessionid=...; msToken=..."></textarea>
+        </div>
+        <div class="form-row">
+          <div>
+            <div class="form-label">调度参数</div>
+            <div class="form-help">权重越高越优先；并发控制单账号任务数。</div>
+          </div>
+          <div class="form-inline">
+            <input id="addWeight" class="wide-input" type="number" min="1" step="1" value="1" placeholder="权重" />
+            <input id="addConcurrency" class="wide-input" type="number" min="1" step="1" value="1" placeholder="并发" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div>
+            <div class="form-label">禁用账号</div>
+            <div class="form-help">新增后先不参与调度。</div>
+          </div>
+          <button id="addDisabled" class="switch" type="button" aria-label="禁用账号"></button>
+        </div>
+        <div class="form-row">
+          <div>
+            <div class="form-label">写入 .env</div>
+            <div class="form-help">保存到环境文件，重启后仍可加载。</div>
+          </div>
+          <button id="addPersist" class="switch on" type="button" aria-label="写入 .env"></button>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button id="addCancel" class="btn" type="button">取消</button>
+        <button id="addSubmit" class="btn primary" type="button">保存账号</button>
+      </div>
+    </section>
+  </div>
+
+  <div id="bulkAccountModal" class="modal-backdrop" hidden>
+    <section class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="bulkAccountTitle">
+      <div class="modal-header">
+        <div class="modal-title" id="bulkAccountTitle">批量导入账号</div>
+        <button id="bulkClose" class="modal-close" type="button" aria-label="关闭">x</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-row">
+          <div>
+            <div class="form-label">Cookie / Token</div>
+            <div class="form-help">每行一个 Cookie 或 token，支持从文本文件导入。</div>
+          </div>
+          <textarea id="bulkCookies" class="wide-textarea" autocomplete="off" spellcheck="false" placeholder="sessionid=...; msToken=...&#10;sessionid=...; msToken=..."></textarea>
+        </div>
+        <div class="form-row">
+          <div>
+            <div class="form-label">文本文件</div>
+            <div class="form-help">选择 .txt 文件后会自动填入列表。</div>
+          </div>
+          <input id="bulkTextFile" class="wide-input" type="file" accept=".txt,.text,.csv,text/plain,text/csv" style="text-align:left;" />
+        </div>
+        <div class="form-row">
+          <div>
+            <div class="form-label">调度参数</div>
+            <div class="form-help">批量导入时统一设置权重和并发。</div>
+          </div>
+          <div class="form-inline">
+            <input id="bulkWeight" class="wide-input" type="number" min="1" step="1" value="1" placeholder="权重" />
+            <input id="bulkConcurrency" class="wide-input" type="number" min="1" step="1" value="1" placeholder="并发" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div>
+            <div class="form-label">禁用账号</div>
+            <div class="form-help">导入后先不参与调度。</div>
+          </div>
+          <button id="bulkDisabled" class="switch" type="button" aria-label="禁用账号"></button>
+        </div>
+        <div class="form-row">
+          <div>
+            <div class="form-label">写入 .env</div>
+            <div class="form-help">保存到环境文件，重启后仍可加载。</div>
+          </div>
+          <button id="bulkPersist" class="switch on" type="button" aria-label="写入 .env"></button>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button id="bulkCancel" class="btn" type="button">取消</button>
+        <button id="bulkSubmit" class="btn primary" type="button">开始导入</button>
+      </div>
+    </section>
+  </div>
+
+  <footer class="footer">Doubao2API - @local - v1.0.0</footer>
+
+  <div id="verificationModal" class="modal-backdrop" hidden>
+    <section class="modal-panel verification-panel" role="dialog" aria-modal="true" aria-labelledby="verificationTitle">
+      <div class="modal-header">
+        <div class="modal-title" id="verificationTitle">Manual Verify</div>
+        <button id="verificationClose" class="modal-close" type="button" aria-label="Close">x</button>
+      </div>
+      <div class="verification-body">
+        <div id="verificationStatus" class="verification-status">Idle</div>
+        <div id="verificationAlert" class="verification-alert" hidden></div>
+        <div id="verificationMeta" class="verification-meta"></div>
+        <div id="verificationContext" class="verification-meta"></div>
+        <div class="verification-shot-wrap">
+          <img id="verificationImage" class="verification-shot" alt="Verification snapshot" />
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button id="verificationTrigger" class="btn" type="button">Trigger</button>
+        <button id="verificationSnapshot" class="btn" type="button">Snapshot</button>
+        <button id="verificationCancel" class="btn" type="button">Cancel</button>
+        <button id="verificationComplete" class="btn primary" type="button">Done</button>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const state = {
+      pool: null,
+      autoTimer: null,
+      referenceImageData: null,
+      uploadedReferenceImage: null,
+      selectedAccounts: new Set(),
+      accountPage: 1,
+      accountPageSize: 50,
+      accountBatchRunning: false,
+      verificationIndex: null,
+      verificationTimer: null,
+      verificationImageUrl: null,
+      verificationPointer: null,
+    };
+
+    const $ = (id) => document.getElementById(id);
+    const apiKeyEl = $("apiKey");
+    const configApiKeyEl = $("configApiKey");
+
+    function headers() {
+      const value = (apiKeyEl.value || configApiKeyEl.value || "").trim();
+      const result = { "Content-Type": "application/json" };
+      if (value) result.Authorization = `Bearer ${value}`;
+      return result;
+    }
+
+    function setNotice(targetId, text, tone) {
+      const target = $(targetId);
+      target.textContent = text || "";
+      target.style.color = tone === "error" ? "#ef233c" : tone === "ok" ? "#00a35c" : "#69717f";
+    }
+
+    async function requestJson(url, options = {}) {
+      const response = await fetch(url, options);
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.detail || data.error?.message || response.statusText);
+      }
+      return data;
+    }
+
+    function statusClass(status) {
+      return `status-pill status-${String(status || "unknown").replace(/[^a-z0-9_]/gi, "_")}`;
+    }
+
+    function accountDisabledStatus(account = {}) {
+      return ["disabled", "login_required"].includes(String(account.status || ""));
+    }
+
+    function pct(success, failure) {
+      const total = success + failure;
+      if (!total) return "0%";
+      return `${Math.round((success / total) * 100)}%`;
+    }
+
+    function lastTime(value) {
+      if (!value) return "-";
+      try { return new Date(value * 1000).toLocaleTimeString(); }
+      catch { return "-"; }
+    }
+
+    function formatDateTime(value) {
+      if (!value) return "-";
+      try { return new Date(value * 1000).toLocaleString(); }
+      catch { return "-"; }
+    }
+
+    function quotaNumber(value) {
+      if (value === null || value === undefined || Number.isNaN(Number(value))) return null;
+      const numeric = Number(value);
+      return Number.isInteger(numeric) ? String(numeric) : numeric.toFixed(2).replace(/\.?0+$/, "");
+    }
+
+    /*
+    function quotaText(account) {
+      const quota = account.quota || {};
+      const status = quota.status || "unknown";
+      const unit = quota.unit || "video credits";
+      const remaining = quotaNumber(quota.remaining);
+      const total = quotaNumber(quota.total);
+      const used = quotaNumber(quota.used);
+      const delta = quotaNumber(quota.last_delta);
+      const updated = quota.updated_at ? `更新 ${lastTime(quota.updated_at)}` : "鏈埛鏂?;
+
+      if (status === "unsupported") {
+        return { main: "鏈帴鍏?, meta: "闇€配置额度接口" };
+      }
+      if (status === "error") {
+        return { main: "读取失败", meta: quota.last_error || updated };
+      }
+      if (status === "exhausted") {
+        return { main: "额度耗尽", meta: quota.last_error || updated };
+      }
+      if (status === "unknown" && remaining === null && total === null && used === null) {
+        return { main: "鏈煡", meta: updated };
+      }
+
+      let main = "宸茶鍙?;
+      if (remaining !== null && total !== null) main = `${remaining}/${total} ${unit}`;
+      else if (remaining !== null) main = `${remaining} ${unit}`;
+      else if (used !== null && total !== null) main = `已用 ${used}/${total} ${unit}`;
+      else if (used !== null) main = `已用 ${used} ${unit}`;
+
+      const metaParts = [];
+      if (status === "estimated") metaParts.push("鏈湴浼扮畻");
+      if (delta !== null && Number(delta) > 0) metaParts.push(`-${delta}`);
+      metaParts.push(updated);
+      return { main, meta: metaParts.join(" · ") };
+    }
+
+    function quotaRefreshSummary(pool) {
+      const status = pool?.quota_refresh || {};
+      const result = status.last_result || {};
+      const parts = [];
+      parts.push(status.enabled ? "鑷姩鎺㈡祴寮€鍚? : "鑷姩鎺㈡祴鍏抽棴");
+      if (status.in_progress || status.initial_refresh_running) {
+        parts.push("正在探测");
+      } else if (status.completed_at) {
+        parts.push(`涓婃 ${lastTime(status.completed_at)}`);
+      } else {
+        parts.push("尚未完成");
+      }
+      if (result.checked_count !== undefined && result.checked_count !== null) {
+        parts.push(
+          `妫€鏌?${result.checked_count || 0}`,
+          `鍙敤 ${result.available_count || 0}`,
+          `鑰楀敖 ${result.exhausted_count || 0}`,
+          `鏈煡 ${result.unknown_count || 0}`,
+        );
+      }
+      if (status.next_run_at) parts.push(`涓嬫 ${lastTime(status.next_run_at)}`);
+      if (status.last_error) parts.push(`閿欒 ${status.last_error}`);
+      return {
+        text: `棰濆害鎺㈡祴锛?{parts.join(" / ")}`,
+        tone: status.last_error ? "error" : (
+          status.in_progress || status.initial_refresh_running ? "running" : (status.enabled ? "on" : "")
+        ),
+      };
+    }
+
+    */
+    function quotaText(account) {
+      const quota = account.quota || {};
+      const status = quota.status || "unknown";
+      const unit = quota.unit || "video credits";
+      const remaining = quotaNumber(quota.remaining);
+      const total = quotaNumber(quota.total);
+      const used = quotaNumber(quota.used);
+      const delta = quotaNumber(quota.last_delta);
+      const updated = quota.updated_at ? `更新 ${lastTime(quota.updated_at)}` : "未刷新";
+
+      if (status === "unsupported") {
+        return { main: "未接入", meta: "需要配置额度接口" };
+      }
+      if (status === "error") {
+        return { main: "读取失败", meta: quota.last_error || updated };
+      }
+      if (status === "exhausted") {
+        return { main: "额度耗尽", meta: quota.last_error || updated };
+      }
+      if (status === "unknown" && remaining === null && total === null && used === null) {
+        return { main: "未知", meta: updated };
+      }
+
+      let main = "已读取";
+      if (remaining !== null && total !== null) main = `${remaining}/${total} ${unit}`;
+      else if (remaining !== null) main = `${remaining} ${unit}`;
+      else if (used !== null && total !== null) main = `已用 ${used}/${total} ${unit}`;
+      else if (used !== null) main = `已用 ${used} ${unit}`;
+
+      const metaParts = [];
+      if (status === "estimated") metaParts.push("本地估算");
+      if (delta !== null && Number(delta) > 0) metaParts.push(`-${delta}`);
+      metaParts.push(updated);
+      return { main, meta: metaParts.join(" / ") };
+    }
+
+    function quotaRefreshSummary(pool) {
+      const status = pool?.quota_refresh || {};
+      const result = status.last_result || {};
+      const parts = [];
+      parts.push(status.enabled ? "自动探测开启" : "自动探测关闭");
+      if (status.in_progress || status.initial_refresh_running) {
+        parts.push("正在探测");
+      } else if (status.completed_at) {
+        parts.push(`完成 ${lastTime(status.completed_at)}`);
+      } else {
+        parts.push("尚未完成");
+      }
+      if (result.checked_count !== undefined && result.checked_count !== null) {
+        parts.push(
+          `检查 ${result.checked_count || 0}`,
+          `可用 ${result.available_count || 0}`,
+          `耗尽 ${result.exhausted_count || 0}`,
+          `未知 ${result.unknown_count || 0}`,
+        );
+      }
+      if (status.next_run_at) parts.push(`下次 ${lastTime(status.next_run_at)}`);
+      if (status.last_error) parts.push(`错误 ${status.last_error}`);
+      return {
+        text: `额度探测：${parts.join(" / ")}`,
+        tone: status.last_error ? "error" : (
+          status.in_progress || status.initial_refresh_running ? "running" : (status.enabled ? "on" : "")
+        ),
+      };
+    }
+
+    function updateQuotaRefreshState(pool) {
+      const target = $("quotaRefreshState");
+      if (!target) return;
+      const summary = quotaRefreshSummary(pool);
+      const dot = document.createElement("span");
+      dot.className = `quota-refresh-dot ${summary.tone}`;
+      const text = document.createElement("span");
+      text.textContent = summary.text;
+      target.replaceChildren(dot, text);
+    }
+
+    function updateMetrics(pool) {
+      const accounts = pool.accounts || [];
+      const success = accounts.reduce((sum, item) => sum + (item.success_count || 0), 0);
+      const failure = accounts.reduce((sum, item) => sum + (item.failure_count || 0), 0);
+      $("metricTotal").textContent = accounts.length;
+      $("metricAvailable").textContent = accounts.filter(item => item.status === "available").length;
+      $("metricCooling").textContent = accounts.filter(item => item.status === "cooling_down").length;
+      $("metricBusy").textContent = accounts.filter(item => item.status === "busy").length;
+      $("metricDisabled").textContent = accounts.filter(item => accountDisabledStatus(item)).length;
+      $("metricCalls").textContent = success + failure;
+      $("metricInFlight").textContent = pool.global_in_flight || 0;
+      $("metricGlobal").textContent = pool.global_concurrency || 0;
+      $("metricThreshold").textContent = pool.failure_threshold || 0;
+      $("metricCooldown").textContent = pool.cooldown_seconds || 0;
+      $("accountCount").textContent = accounts.length;
+      $("globalConcurrency").value = pool.global_concurrency ?? 0;
+      $("failureThreshold").value = pool.failure_threshold ?? 1;
+      $("cooldownSeconds").value = pool.cooldown_seconds ?? 0;
+      $("acquireTimeout").value = pool.acquire_timeout ?? 30;
+      updateQuotaRefreshState(pool);
+    }
+
+    function accountList() {
+      return state.pool?.accounts || [];
+    }
+
+    function normalizeAccountSelection(accounts) {
+      const existing = new Set(accounts.map(account => account.index));
+      for (const index of [...state.selectedAccounts]) {
+        if (!existing.has(index)) state.selectedAccounts.delete(index);
+      }
+    }
+
+    function visibleAccounts(accounts = accountList()) {
+      const pageSize = state.accountPageSize;
+      const pageCount = Math.max(1, Math.ceil(accounts.length / pageSize));
+      state.accountPage = Math.min(Math.max(1, state.accountPage), pageCount);
+      const start = (state.accountPage - 1) * pageSize;
+      return accounts.slice(start, start + pageSize);
+    }
+
+    /*
+    function setAccountPager(accounts, visible) {
+      const total = accounts.length;
+      const pageCount = Math.max(1, Math.ceil(total / state.accountPageSize));
+      const start = total ? ((state.accountPage - 1) * state.accountPageSize) + 1 : 0;
+      const end = total ? Math.min(start + visible.length - 1, total) : 0;
+      $("accountPagerText").textContent = `绗?${state.accountPage} / ${pageCount} 椤?· ${start}-${end} / ${total}`;
+      $("accountPrevPage").disabled = state.accountPage <= 1;
+      $("accountNextPage").disabled = state.accountPage >= pageCount;
+    }
+
+    function updateSelectionControls(visible) {
+      const selector = $("selectVisibleAccounts");
+      const selectedOnPage = visible.filter(account => state.selectedAccounts.has(account.index)).length;
+      selector.classList.toggle("checked", visible.length > 0 && selectedOnPage === visible.length);
+      selector.classList.toggle("mixed", selectedOnPage > 0 && selectedOnPage < visible.length);
+      selector.disabled = !visible.length;
+      $("runBatchSelected").disabled = state.accountBatchRunning || state.selectedAccounts.size === 0;
+      $("runBatchVisible").disabled = state.accountBatchRunning || visible.length === 0;
+      $("accountBatchAction").disabled = state.accountBatchRunning;
+      $("accountPageSize").value = String(state.accountPageSize);
+    }
+
+    function batchActionLabel(action) {
+      return {
+        "health-check": "鍋ュ悍妫€鏌?,
+        "quota-refresh": "鍒锋柊棰濆害",
+        "reset-health": "重置健康",
+        "clear-cooldown": "娓呭喎鍗?,
+        enable: "鍚敤",
+        disable: "禁用",
+      }[action] || action;
+    }
+
+    async function runAccountBatch(action, indexes, scopeLabel) {
+      const uniqueIndexes = [...new Set(indexes)].filter(index => Number.isFinite(index));
+      if (!uniqueIndexes.length || state.accountBatchRunning) return;
+      state.accountBatchRunning = true;
+      renderAccounts(state.pool || { enabled: true, accounts: [] });
+      let ok = 0;
+      let failed = 0;
+      setNotice("accountNotice", `${scopeLabel}${batchActionLabel(action)}鎵ц涓細0/${uniqueIndexes.length}`, "");
+      try {
+        for (const index of uniqueIndexes) {
+          try {
+            await requestJson(`/v1/account-pool/accounts/${index}/${action}`, { method: "POST", headers: headers() });
+            ok += 1;
+          } catch {
+            failed += 1;
+          }
+          setNotice("accountNotice", `${scopeLabel}${batchActionLabel(action)}鎵ц涓細${ok + failed}/${uniqueIndexes.length}`, failed ? "error" : "");
+        }
+        await loadPool();
+        setNotice("accountNotice", `${scopeLabel}${batchActionLabel(action)}完成：成鍔?${ok}锛屽け璐?${failed}`, failed ? "error" : "ok");
+      } finally {
+        state.accountBatchRunning = false;
+        renderAccounts(state.pool || { enabled: true, accounts: [] });
+      }
+    }
+
+    function renderAccounts(pool) {
+      const accounts = pool.accounts || [];
+      normalizeAccountSelection(accounts);
+      const visible = visibleAccounts(accounts);
+      setAccountPager(accounts, visible);
+      updateSelectionControls(visible);
+      if (!pool.enabled) {
+        $("accountsBody").innerHTML = `<tr><td colspan="11"><div class="empty">璐﹀彿姹犳湭鍚敤锛岃点击右上瑙?+ 鏂板璐﹀彿銆?/div></td></tr>`;
+        return;
+      }
+      if (!accounts.length) {
+        $("accountsBody").innerHTML = `<tr><td colspan="11"><div class="empty">鏆傛棤璐︽埛锛岃点击右上瑙?+ 鏂板账号銆?/div></td></tr>`;
+        return;
+      }
+      $("accountsBody").innerHTML = visible.map(account => `
+        <tr data-index="${account.index}">
+          <td class="check-cell"><button class="checkbox checkbox-button ${state.selectedAccounts.has(account.index) ? "checked" : ""}" data-select-account="${account.index}" type="button" title="选择账号 #${account.index}"></button></td>
+          <td><span class="token">${account.fingerprint}</span></td>
+          <td><span class="${statusClass(account.status)}">${account.status}</span></td>
+          <td><div class="quota-cell"><div class="quota-main">${quotaText(account).main}</div><div class="quota-meta">${quotaText(account).meta}</div></div></td>
+          <td><span class="quota-badges"><span class="quota-badge quota-a">W</span><input class="field-input account-weight" type="number" min="1" value="${account.weight}"><span class="quota-badge quota-f">C</span><input class="field-input account-concurrency" type="number" min="1" value="${account.max_concurrency}"></span></td>
+          <td>${account.in_flight}/${account.max_concurrency}</td>
+          <td>${account.success_count}</td>
+          <td>${account.consecutive_failures}/${account.failure_count}</td>
+          <td>${pct(account.success_count, account.failure_count)}</td>
+          <td>${lastTime(account.last_used_at)}</td>
+          <td>
+            <div class="actions">
+              <button class="mini-btn dark" data-action="save" data-index="${account.index}" type="button">保存</button>
+              <button class="mini-btn ${accountDisabledStatus(account) ? "" : "danger"}" data-action="${accountDisabledStatus(account) ? "enable" : "disable"}" data-index="${account.index}" type="button">${accountDisabledStatus(account) ? "鍚敤" : "禁用"}</button>
+              <button class="mini-btn warn" data-action="clear-cooldown" data-index="${account.index}" type="button">清冷鍗?/button>
+              <button class="mini-btn" data-action="reset-health" data-index="${account.index}" type="button">重置</button>
+              <button class="mini-btn" data-action="health-check" data-index="${account.index}" type="button">妫€鏌?/button>
+              <button class="mini-btn ${account.requires_verification ? "warn" : ""}" data-action="verification-start" data-index="${account.index}" type="button">${account.requires_verification ? "Verify!" : "Verify"}</button>
+              <button class="mini-btn" data-action="quota-refresh" data-index="${account.index}" type="button">刷新额度</button>
+              <button class="mini-btn danger" data-action="delete" data-index="${account.index}" type="button">删除</button>
+            </div>
+          </td>
+        </tr>
+      `).join("");
+    }
+
+    async function loadPool(showMessage = false) {
+      const pool = await requestJson("/v1/account-pool", { headers: headers() });
+      state.pool = pool;
+      updateMetrics(pool);
+      renderAccounts(pool);
+      if (showMessage) setNotice("accountNotice", "账户池状态已刷新", "ok");
+    }
+
+    async function refreshAllQuotas() {
+      const button = $("refreshAllQuotas");
+      button.disabled = true;
+      setNotice("accountNotice", "正在鍒锋柊鍏ㄩ儴瑙嗛额度...", "");
+      try {
+        const pool = await requestJson("/v1/account-pool/quotas/refresh", {
+          method: "POST",
+          headers: headers(),
+        });
+        state.pool = pool;
+        updateMetrics(pool);
+        renderAccounts(pool);
+        const result = pool.data || {};
+        setNotice(
+          "accountNotice",
+          `棰濆害鍒锋柊瀹屾垚锛氭鏌?${result.checked_count || 0}，可鐢?${result.available_count || 0}锛岃€楀敖 ${result.exhausted_count || 0}锛屾湭鐭?${result.unknown_count || 0}`,
+          result.unknown_count ? "" : "ok",
+        );
+      } catch (error) {
+        setNotice("accountNotice", error.message, "error");
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    */
+    function setAccountPager(accounts, visible) {
+      const total = accounts.length;
+      const pageCount = Math.max(1, Math.ceil(total / state.accountPageSize));
+      const start = total ? ((state.accountPage - 1) * state.accountPageSize) + 1 : 0;
+      const end = total ? Math.min(start + visible.length - 1, total) : 0;
+      $("accountPagerText").textContent = `第 ${state.accountPage} / ${pageCount} 页 · ${start}-${end} / ${total}`;
+      $("accountPrevPage").disabled = state.accountPage <= 1;
+      $("accountNextPage").disabled = state.accountPage >= pageCount;
+    }
+
+    function updateSelectionControls(visible) {
+      const selector = $("selectVisibleAccounts");
+      const selectedOnPage = visible.filter(account => state.selectedAccounts.has(account.index)).length;
+      selector.classList.toggle("checked", visible.length > 0 && selectedOnPage === visible.length);
+      selector.classList.toggle("mixed", selectedOnPage > 0 && selectedOnPage < visible.length);
+      selector.disabled = !visible.length;
+      $("runBatchSelected").disabled = state.accountBatchRunning || state.selectedAccounts.size === 0;
+      $("runBatchVisible").disabled = state.accountBatchRunning || visible.length === 0;
+      $("accountBatchAction").disabled = state.accountBatchRunning;
+      $("accountPageSize").value = String(state.accountPageSize);
+    }
+
+    function batchActionLabel(action) {
+      return {
+        "health-check": "健康检查",
+        "quota-refresh": "刷新额度",
+        "reset-health": "重置健康",
+        "clear-cooldown": "清冷却",
+        enable: "启用",
+        disable: "禁用",
+      }[action] || action;
+    }
+
+    async function runAccountBatch(action, indexes, scopeLabel) {
+      const uniqueIndexes = [...new Set(indexes)].filter(index => Number.isFinite(index));
+      if (!uniqueIndexes.length || state.accountBatchRunning) return;
+      state.accountBatchRunning = true;
+      renderAccounts(state.pool || { enabled: true, accounts: [] });
+      let ok = 0;
+      let failed = 0;
+      setNotice("accountNotice", `${scopeLabel}${batchActionLabel(action)}执行中：0/${uniqueIndexes.length}`, "");
+      try {
+        for (const index of uniqueIndexes) {
+          try {
+            await requestJson(`/v1/account-pool/accounts/${index}/${action}`, { method: "POST", headers: headers() });
+            ok += 1;
+          } catch {
+            failed += 1;
+          }
+          setNotice("accountNotice", `${scopeLabel}${batchActionLabel(action)}执行中：${ok + failed}/${uniqueIndexes.length}`, failed ? "error" : "");
+        }
+        await loadPool();
+        setNotice("accountNotice", `${scopeLabel}${batchActionLabel(action)}完成：成功 ${ok}，失败 ${failed}`, failed ? "error" : "ok");
+      } finally {
+        state.accountBatchRunning = false;
+        renderAccounts(state.pool || { enabled: true, accounts: [] });
+      }
+    }
+
+    function renderAccounts(pool) {
+      const accounts = pool.accounts || [];
+      normalizeAccountSelection(accounts);
+      const visible = visibleAccounts(accounts);
+      setAccountPager(accounts, visible);
+      updateSelectionControls(visible);
+      if (!pool.enabled) {
+        $("accountsBody").innerHTML = `<tr><td colspan="11"><div class="empty">账号池未启用，请点击右上角 + 新增账号。</div></td></tr>`;
+        return;
+      }
+      if (!accounts.length) {
+        $("accountsBody").innerHTML = `<tr><td colspan="11"><div class="empty">暂无账号，请点击右上角 + 新增账号。</div></td></tr>`;
+        return;
+      }
+      $("accountsBody").innerHTML = visible.map(account => `
+        <tr data-index="${account.index}">
+          <td class="check-cell"><button class="checkbox checkbox-button ${state.selectedAccounts.has(account.index) ? "checked" : ""}" data-select-account="${account.index}" type="button" title="选择账号 #${account.index}"></button></td>
+          <td><span class="token">${account.fingerprint}</span></td>
+          <td><span class="${statusClass(account.status)}">${account.status}</span></td>
+          <td><div class="quota-cell"><div class="quota-main">${quotaText(account).main}</div><div class="quota-meta">${quotaText(account).meta}</div></div></td>
+          <td><span class="quota-badges"><span class="quota-badge quota-a">W</span><input class="field-input account-weight" type="number" min="1" value="${account.weight}"><span class="quota-badge quota-f">C</span><input class="field-input account-concurrency" type="number" min="1" value="${account.max_concurrency}"></span></td>
+          <td>${account.in_flight}/${account.max_concurrency}</td>
+          <td>${account.success_count}</td>
+          <td>${account.consecutive_failures}/${account.failure_count}</td>
+          <td>${pct(account.success_count, account.failure_count)}</td>
+          <td>${lastTime(account.last_used_at)}</td>
+          <td>
+            <div class="actions">
+              <button class="mini-btn dark" data-action="save" data-index="${account.index}" type="button">保存</button>
+              <button class="mini-btn ${accountDisabledStatus(account) ? "" : "danger"}" data-action="${accountDisabledStatus(account) ? "enable" : "disable"}" data-index="${account.index}" type="button">${accountDisabledStatus(account) ? "启用" : "禁用"}</button>
+              <button class="mini-btn warn" data-action="clear-cooldown" data-index="${account.index}" type="button">清冷却</button>
+              <button class="mini-btn" data-action="reset-health" data-index="${account.index}" type="button">重置</button>
+              <button class="mini-btn" data-action="health-check" data-index="${account.index}" type="button">检查</button>
+              <button class="mini-btn ${account.requires_verification ? "warn" : ""}" data-action="verification-start" data-index="${account.index}" type="button">${account.requires_verification ? "Verify!" : "Verify"}</button>
+              <button class="mini-btn" data-action="quota-refresh" data-index="${account.index}" type="button">刷新额度</button>
+              <button class="mini-btn danger" data-action="delete" data-index="${account.index}" type="button">删除</button>
+            </div>
+          </td>
+        </tr>
+      `).join("");
+    }
+
+    async function loadPool(showMessage = false) {
+      const pool = await requestJson("/v1/account-pool", { headers: headers() });
+      state.pool = pool;
+      updateMetrics(pool);
+      renderAccounts(pool);
+      if (showMessage) setNotice("accountNotice", "账号池状态已刷新", "ok");
+    }
+
+    async function refreshAllQuotas() {
+      const button = $("refreshAllQuotas");
+      button.disabled = true;
+      setNotice("accountNotice", "正在刷新全部视频额度...", "");
+      try {
+        const pool = await requestJson("/v1/account-pool/quotas/refresh", {
+          method: "POST",
+          headers: headers(),
+        });
+        state.pool = pool;
+        updateMetrics(pool);
+        renderAccounts(pool);
+        const result = pool.data || {};
+        setNotice(
+          "accountNotice",
+          `额度刷新完成：检查 ${result.checked_count || 0}，可用 ${result.available_count || 0}，耗尽 ${result.exhausted_count || 0}，未知 ${result.unknown_count || 0}`,
+          result.unknown_count ? "" : "ok",
+        );
+      } catch (error) {
+        setNotice("accountNotice", error.message, "error");
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    async function savePoolConfig() {
+      const payload = {
+        global_concurrency: Number($("globalConcurrency").value),
+        failure_threshold: Number($("failureThreshold").value),
+        cooldown_seconds: Number($("cooldownSeconds").value),
+        acquire_timeout: Number($("acquireTimeout").value),
+      };
+      const pool = await requestJson("/v1/account-pool", {
+        method: "PATCH",
+        headers: headers(),
+        body: JSON.stringify(payload),
+      });
+      state.pool = pool;
+      updateMetrics(pool);
+      renderAccounts(pool);
+      setNotice("configNotice", "配置已保存", "ok");
+    }
+
+    /*
+    function renderApiKeys(keys) {
+      if (!keys.length) {
+        $("apiKeyList").innerHTML = `<div class="empty">暂无 API Key</div>`;
+        return;
+      }
+      $("apiKeyList").innerHTML = keys.map(key => `
+        <div class="api-key-row" data-id="${key.id}">
+          <div>
+            <div class="api-key-name">${key.name}</div>
+            <div class="api-key-meta">
+              <span>${key.prefix}...</span>
+              <span>${key.fingerprint}</span>
+              <span>${key.disabled ? "宸插仠鐢? : "鍚敤涓?}</span>
+              <span>${formatDateTime(key.created_at)}</span>
+            </div>
+          </div>
+          <div class="actions">
+            <button class="mini-btn ${key.disabled ? "" : "warn"}" data-key-action="${key.disabled ? "enable" : "disable"}" data-id="${key.id}" type="button">${key.disabled ? "鍚敤" : "鍋滅敤"}</button>
+            <button class="mini-btn danger" data-key-action="delete" data-id="${key.id}" type="button">删除</button>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    async function loadApiKeys(showMessage = false) {
+      const result = await requestJson("/v1/api-keys", { headers: headers() });
+      renderApiKeys(result.data || []);
+      if (showMessage) setNotice("configNotice", "API Key 鍒楄〃宸插埛鏂?, "ok");
+    }
+
+    async function createApiKey() {
+      const button = $("createApiKey");
+      button.disabled = true;
+      try {
+        const result = await requestJson("/v1/api-keys", {
+          method: "POST",
+          headers: headers(),
+          body: JSON.stringify({ name: $("newApiKeyName").value }),
+        });
+        const key = result.data;
+        $("createdApiKeyValue").value = key.secret;
+        $("newApiKeySecret").hidden = false;
+        $("newApiKeyName").value = "";
+        await loadApiKeys();
+        setNotice("configNotice", "API Key 已创寤猴紝璇风珛鍗冲鍒朵繚瀛?, "ok");
+      } catch (error) {
+        setNotice("configNotice", error.message, "error");
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    async function copyCreatedApiKey() {
+      const value = $("createdApiKeyValue").value;
+      if (!value) return;
+      await navigator.clipboard.writeText(value);
+      setNotice("configNotice", "API Key 宸插鍒?, "ok");
+    }
+
+    function useCreatedApiKey() {
+      const value = $("createdApiKeyValue").value;
+      if (!value) return;
+      apiKeyEl.value = value;
+      configApiKeyEl.value = value;
+      setNotice("configNotice", "宸插～鍏ュ綋鍓嶈闂瘑閽?, "ok");
+    }
+
+    function renderPluginConfig(config) {
+      $("pluginConnectionUrl").value = config.connection_url || "";
+      $("pluginConnectionToken").value = config.connection_token || "";
+      $("pluginExtensionPath").value = config.extension_path || "doubao-cookie-sync-plugin";
+      $("pluginTokenFingerprint").textContent = config.token_fingerprint || "-";
+      setSwitch("pluginEnabled", config.enabled !== false);
+    }
+
+    async function loadPluginConfig(showMessage = false) {
+      const config = await requestJson("/v1/doubao-cookie-plugin/config", { headers: headers() });
+      renderPluginConfig(config);
+      if (showMessage) setNotice("pluginNotice", "鎻掍欢閰嶇疆宸插姞杞?, "ok");
+      return config;
+    }
+
+    async function savePluginConfig(rotate = false) {
+      const button = rotate ? $("rotatePluginToken") : $("savePluginConfig");
+      button.disabled = true;
+      try {
+        const config = await requestJson("/v1/doubao-cookie-plugin/config", {
+          method: "POST",
+          headers: headers(),
+          body: JSON.stringify({
+            rotate,
+            enabled: switchOn("pluginEnabled"),
+            connection_token: rotate ? undefined : $("pluginConnectionToken").value,
+          }),
+        });
+        renderPluginConfig(config);
+        setNotice("pluginNotice", rotate ? "杩炴帴浠ょ墝宸查噸缃? : "插件配置已保瀛?, "ok");
+      } catch (error) {
+        setNotice("pluginNotice", error.message, "error");
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    async function copyPluginField(id, label) {
+      const value = $(id).value;
+      if (!value) return;
+      await navigator.clipboard.writeText(value);
+      setNotice("pluginNotice", `${label}宸插制`, "ok");
+    }
+
+    async function apiKeyAction(action, id) {
+      const options = action === "delete" ? { method: "DELETE", headers: headers() } : { method: "POST", headers: headers() };
+      const url = action === "delete" ? `/v1/api-keys/${id}` : `/v1/api-keys/${id}/${action}`;
+      await requestJson(url, options);
+      await loadApiKeys();
+      setNotice("configNotice", "API Key 操作已完鎴?, "ok");
+    }
+
+    */
+    function renderApiKeys(keys) {
+      if (!keys.length) {
+        $("apiKeyList").innerHTML = `<div class="empty">暂无 API Key</div>`;
+        return;
+      }
+      $("apiKeyList").innerHTML = keys.map(key => `
+        <div class="api-key-row" data-id="${key.id}">
+          <div>
+            <div class="api-key-name">${key.name}</div>
+            <div class="api-key-meta">
+              <span>${key.prefix}...</span>
+              <span>${key.fingerprint}</span>
+              <span>${key.disabled ? "已停用" : "启用中"}</span>
+              <span>${formatDateTime(key.created_at)}</span>
+            </div>
+          </div>
+          <div class="actions">
+            <button class="mini-btn ${key.disabled ? "" : "warn"}" data-key-action="${key.disabled ? "enable" : "disable"}" data-id="${key.id}" type="button">${key.disabled ? "启用" : "停用"}</button>
+            <button class="mini-btn danger" data-key-action="delete" data-id="${key.id}" type="button">删除</button>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    async function loadApiKeys(showMessage = false) {
+      const result = await requestJson("/v1/api-keys", { headers: headers() });
+      renderApiKeys(result.data || []);
+      if (showMessage) setNotice("configNotice", "API Key 列表已刷新", "ok");
+    }
+
+    async function createApiKey() {
+      const button = $("createApiKey");
+      button.disabled = true;
+      try {
+        const result = await requestJson("/v1/api-keys", {
+          method: "POST",
+          headers: headers(),
+          body: JSON.stringify({ name: $("newApiKeyName").value }),
+        });
+        const key = result.data;
+        $("createdApiKeyValue").value = key.secret;
+        $("newApiKeySecret").hidden = false;
+        $("newApiKeyName").value = "";
+        await loadApiKeys();
+        setNotice("configNotice", "API Key 已创建，请立即复制保存", "ok");
+      } catch (error) {
+        setNotice("configNotice", error.message, "error");
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    async function copyCreatedApiKey() {
+      const value = $("createdApiKeyValue").value;
+      if (!value) return;
+      await navigator.clipboard.writeText(value);
+      setNotice("configNotice", "API Key 已复制", "ok");
+    }
+
+    function useCreatedApiKey() {
+      const value = $("createdApiKeyValue").value;
+      if (!value) return;
+      apiKeyEl.value = value;
+      configApiKeyEl.value = value;
+      setNotice("configNotice", "已填入当前访问密钥", "ok");
+    }
+
+    function renderPluginConfig(config) {
+      $("pluginConnectionUrl").value = config.connection_url || "";
+      $("pluginConnectionToken").value = config.connection_token || "";
+      $("pluginExtensionPath").value = config.extension_path || "doubao-cookie-sync-plugin";
+      $("pluginTokenFingerprint").textContent = config.token_fingerprint || "-";
+      setSwitch("pluginEnabled", config.enabled !== false);
+    }
+
+    async function loadPluginConfig(showMessage = false) {
+      const config = await requestJson("/v1/doubao-cookie-plugin/config", { headers: headers() });
+      renderPluginConfig(config);
+      if (showMessage) setNotice("pluginNotice", "插件配置已加载", "ok");
+      return config;
+    }
+
+    async function savePluginConfig(rotate = false) {
+      const button = rotate ? $("rotatePluginToken") : $("savePluginConfig");
+      button.disabled = true;
+      try {
+        const config = await requestJson("/v1/doubao-cookie-plugin/config", {
+          method: "POST",
+          headers: headers(),
+          body: JSON.stringify({
+            rotate,
+            enabled: switchOn("pluginEnabled"),
+            connection_token: rotate ? undefined : $("pluginConnectionToken").value,
+          }),
+        });
+        renderPluginConfig(config);
+        setNotice("pluginNotice", rotate ? "连接令牌已重置" : "插件配置已保存", "ok");
+      } catch (error) {
+        setNotice("pluginNotice", error.message, "error");
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    async function copyPluginField(id, label) {
+      const value = $(id).value;
+      if (!value) return;
+      await navigator.clipboard.writeText(value);
+      setNotice("pluginNotice", `${label}已复制`, "ok");
+    }
+
+    async function apiKeyAction(action, id) {
+      const options = action === "delete" ? { method: "DELETE", headers: headers() } : { method: "POST", headers: headers() };
+      const url = action === "delete" ? `/v1/api-keys/${id}` : `/v1/api-keys/${id}/${action}`;
+      await requestJson(url, options);
+      await loadApiKeys();
+      setNotice("configNotice", "API Key 操作已完成", "ok");
+    }
+
+    function clearVerificationPoll() {
+      if (state.verificationTimer) {
+        clearInterval(state.verificationTimer);
+        state.verificationTimer = null;
+      }
+    }
+
+    async function setVerificationImage(snapshotUrl) {
+      const image = $("verificationImage");
+      if (!snapshotUrl) {
+        image.removeAttribute("src");
+        return;
+      }
+      const separator = snapshotUrl.includes("?") ? "&" : "?";
+      const response = await fetch(`${snapshotUrl}${separator}t=${Date.now()}`, { headers: headers() });
+      if (!response.ok) throw new Error(`Snapshot load failed: ${response.status}`);
+      const blob = await response.blob();
+      if (state.verificationImageUrl) URL.revokeObjectURL(state.verificationImageUrl);
+      state.verificationImageUrl = URL.createObjectURL(blob);
+      image.src = state.verificationImageUrl;
+    }
+
+    function compactVerificationValue(value, limit = 180) {
+      if (value === null || value === undefined || value === "") return "";
+      const text = String(value);
+      return text.length > limit ? `${text.slice(0, limit)}...` : text;
+    }
+
+    function verificationContextLine(verification = {}) {
+      const context = verification.verification_context || {};
+      const account = verification.account || {};
+      const quota = account.quota || {};
+      const captcha = verification.captcha_probe || {};
+      const bdturing = verification.bdturing_render || {};
+      const autoSolve = verification.auto_solve_result || {};
+      const autoSolution = autoSolve.captcha_solution || {};
+      const classification = autoSolution.classification || {};
+      const template = verification.latest_context_template || {};
+      const parts = [];
+      const accountStatus = verification.account_status || account.status;
+      if (accountStatus) parts.push(`account=${accountStatus}`);
+      if (verification.login_required) parts.push("login_required=true");
+      if (verification.server_verification_only) parts.push("server_blocked=true");
+      if (verification.visible_challenge_detected !== undefined) {
+        parts.push(`visible_challenge=${verification.visible_challenge_detected ? "true" : "false"}`);
+      }
+      if (verification.trigger_visible_challenge !== undefined) {
+        parts.push(`trigger_visible_challenge=${verification.trigger_visible_challenge ? "true" : "false"}`);
+      }
+      if (verification.trigger_solver_compatible !== undefined) {
+        parts.push(`trigger_solver_compatible=${verification.trigger_solver_compatible ? "true" : "false"}`);
+      }
+      if (verification.zhenxun_drag_captcha_detected !== undefined) {
+        parts.push(`zhenxun_drag_captcha=${verification.zhenxun_drag_captcha_detected ? "true" : "false"}`);
+      }
+      if (verification.bdturing_token_rendered !== undefined) {
+        parts.push(`bdturing_render=${verification.bdturing_token_rendered ? "called" : "not_called"}`);
+      }
+      if (verification.auto_solve_attempted !== undefined) {
+        parts.push(`auto_solve_attempted=${verification.auto_solve_attempted ? "true" : "false"}`);
+      }
+      if (verification.auto_solve_solved !== undefined) {
+        parts.push(`auto_solve_solved=${verification.auto_solve_solved ? "true" : "false"}`);
+      }
+      if (Array.isArray(classification.indices) && classification.indices.length) {
+        parts.push(`captcha_indices=${classification.indices.join(",")}`);
+      }
+      if (autoSolution.error) parts.push(`auto_solve_error=${compactVerificationValue(autoSolution.error, 180)}`);
+      if (bdturing.render_method) parts.push(`bdturing_method=${compactVerificationValue(bdturing.render_method, 100)}`);
+      if (bdturing.container_present !== undefined) {
+        parts.push(`bdturing_container=${bdturing.container_visible ? "visible" : (bdturing.container_present ? "hidden" : "none")}`);
+      }
+      if (bdturing.error) parts.push(`bdturing_error=${compactVerificationValue(bdturing.error, 160)}`);
+      if (captcha.container_present !== undefined) {
+        parts.push(`captcha_container=${captcha.container_visible ? "visible" : (captcha.container_present ? "hidden" : "none")}`);
+      }
+      if (captcha.image_count !== undefined) parts.push(`captcha_images=${captcha.image_count}`);
+      if (captcha.prompt_text) parts.push(`captcha_prompt=${compactVerificationValue(captcha.prompt_text, 120)}`);
+      if (verification.context_capture_count !== undefined) parts.push(`context_captures=${verification.context_capture_count}`);
+      if (verification.latest_context_template_path) {
+        parts.push(`context_template=${compactVerificationValue(verification.latest_context_template_path, 160)}`);
+      }
+      if (template.client_meta) {
+        const cid = compactVerificationValue(template.client_meta.conversation_id || template.client_meta.local_conversation_id, 100);
+        if (cid) parts.push(`template_conversation=${cid}`);
+      }
+      if (template.ability_type !== undefined && template.ability_type !== null) parts.push(`template_ability=${template.ability_type}`);
+      if (template.block_types) parts.push(`template_blocks=${compactVerificationValue(JSON.stringify(template.block_types), 100)}`);
+      if (account.fingerprint) parts.push(`fingerprint=${account.fingerprint}`);
+      if (quota.remaining !== null && quota.remaining !== undefined) {
+        parts.push(`quota=${quota.remaining} ${quota.unit || ""}`.trim());
+      } else if (quota.status) {
+        parts.push(`quota=${quota.status}`);
+      }
+      ["verify_scene", "log_id", "from", "type", "subtype", "region", "code"].forEach(key => {
+        const value = compactVerificationValue(context[key], key === "log_id" ? 80 : 120);
+        if (value) parts.push(`${key}=${value}`);
+      });
+      ["trigger_captcha_container", "trigger_captcha_images", "trigger_probe_samples", "trigger_page_url"].forEach(key => {
+        const value = compactVerificationValue(context[key], key === "trigger_page_url" ? 160 : 80);
+        if (value) parts.push(`${key}=${value}`);
+      });
+      const triggerRequestUrl = compactVerificationValue(context.trigger_request_url, 180);
+      if (triggerRequestUrl) parts.push(`trigger_request=${triggerRequestUrl}`);
+      const triggerSnapshot = compactVerificationValue(context.trigger_snapshot_path, 180);
+      if (triggerSnapshot) parts.push(`trigger_snapshot=${triggerSnapshot}`);
+      const detail = compactVerificationValue(context.detail, 220);
+      if (detail) parts.push(`detail=${detail}`);
+      if (!parts.length && verification.verification_error) {
+        parts.push(`error=${compactVerificationValue(verification.verification_error, 260)}`);
+      }
+      return parts.join(" | ");
+    }
+
+    /*
+    function renderVerificationAlert(verification = {}) {
+      const alert = $("verificationAlert");
+      alert.hidden = true;
+      alert.className = "verification-alert";
+      alert.textContent = "";
+      if (verification.login_required) {
+        alert.hidden = false;
+        alert.textContent = "Doubao page is not logged in. Click Login in the snapshot page, sign in, then click Done to save the refreshed cookie.";
+        return;
+      }
+      if (verification.completion_blocked) {
+        alert.hidden = false;
+        alert.textContent = "杩樹笉鑳藉畬鎴愶細当前娌℃湁鍙搷浣滈獙璇佺晫闈紝涔熸病鏈夋测到鍚岄〉闈汉宸ヨ棰戠敓鎴愭垚鍔熴€?;
+        return;
+      }
+      const currentCaptcha = verification.captcha_probe || {};
+      const bdturing = verification.bdturing_render || {};
+      const autoSolve = verification.auto_solve_result || {};
+      const autoSolution = autoSolve.captcha_solution || {};
+      if (verification.auto_solve_solved || autoSolution.solved) {
+        alert.hidden = false;
+        alert.classList.add("ok");
+        alert.textContent = "已带 verify token 在当前账号页面触发并自动处理豆包拖拽验证，点击 Done 保存刷新后的会话。";
+        return;
+      }
+      if (verification.auto_solve_attempted || autoSolution.attempted) {
+        alert.hidden = false;
+        alert.textContent = `已尝试自动处理豆包验证：${autoSolution.error || "请查看状态行里的 auto_solve_result"}`;
+        return;
+      }
+      if (currentCaptcha.solver_compatible) {
+        alert.hidden = false;
+        alert.classList.add("ok");
+        alert.textContent = "宸叉娴嬪埌鍜?zhenxun-plugin-ai_creation 鍚屾鐨勮眴鍖呮嫋鎷介獙璇佺爜缁撴瀯锛屽彲浠ュ湪涓嬫柟椤甸潰閲屼汉宸ュ鐞嗐€?;
+        return;
+      }
+      if (bdturing.render_called && bdturing.container_visible) {
+        alert.hidden = false;
+        alert.classList.add("ok");
+        alert.textContent = "BDTuring verify_data rendered a visible Doubao verification challenge in this account page.";
+        return;
+      }
+      if (verification.trigger_solver_compatible || verification.trigger_visible_challenge) {
+        alert.hidden = false;
+        alert.textContent = "A Doubao challenge was observed during the original /chat/completion trigger, but it is not currently visible in this snapshot.";
+        return;
+      }
+      if (verification.server_verification_only) {
+        alert.hidden = false;
+        if (verification.manual_success_detected) {
+          alert.classList.add("ok");
+          alert.textContent = "宸叉测到鍚岄〉闈汉宸ヨ棰戠敓鎴愭垚鍔燂紝鍙互鐐?Done 保存浼氳瘽骞跺埛鏂拌处鍙枫€?;
+        } else {
+          alert.textContent = "当前娌℃湁鍙搷浣滅殑楠岃瘉鐣岄潰锛氳眴鍖呮湇鍔＄拦截浜?/chat/completion锛屼絾杩欎釜娴忚器页面没有弹鍑轰節瀹牸銆佹粦鍧楁垨楠岃瘉鐮併€?;
+        }
+        return;
+      }
+      if (verification.visible_challenge_detected) {
+        alert.hidden = false;
+        alert.classList.add("ok");
+        alert.textContent = "褰撳墠椤甸潰妫€娴嬪埌鍙验证元素，可以在下面的页面快照中人工处理銆?;
+      }
+    }
+
+    */
+    function renderVerificationAlert(verification = {}) {
+      const alert = $("verificationAlert");
+      alert.hidden = true;
+      alert.className = "verification-alert";
+      alert.textContent = "";
+      if (verification.login_required) {
+        alert.hidden = false;
+        alert.textContent = "豆包页面未登录。请在下面页面点登录，登录完成后点 Done 保存刷新后的 Cookie。";
+        return;
+      }
+      if (verification.completion_blocked) {
+        alert.hidden = false;
+        alert.textContent = "当前不能完成：豆包服务端拦截了 /chat/completion。请点击 Trigger，用失败任务里的 verify token 在同一个账号页面里触发真实验证弹窗。";
+        return;
+      }
+      const currentCaptcha = verification.captcha_probe || {};
+      const bdturing = verification.bdturing_render || {};
+      if (currentCaptcha.solver_compatible) {
+        alert.hidden = false;
+        alert.classList.add("ok");
+        alert.textContent = "已检测到和 zhenxun-plugin-ai_creation 同款的豆包拖拽验证结构，可以在下面页面中人工处理。";
+        return;
+      }
+      if (bdturing.render_called && bdturing.container_visible) {
+        alert.hidden = false;
+        alert.classList.add("ok");
+        alert.textContent = "已用 verify token 在当前账号页面渲染出可见验证弹窗。";
+        return;
+      }
+      if (verification.trigger_solver_compatible || verification.trigger_visible_challenge) {
+        alert.hidden = false;
+        alert.textContent = "原始触发请求里观测到验证结构，但当前快照页暂时不可见，请点 Trigger 重新触发。";
+        return;
+      }
+      if (verification.server_verification_only) {
+        alert.hidden = false;
+        if (verification.manual_success_detected) {
+          alert.classList.add("ok");
+          alert.textContent = "已检测到同页面人工视频生成成功，可以点 Done 保存会话并刷新账号。";
+        } else {
+          alert.textContent = "当前没有可操作的验证界面：豆包服务端要求验证，但浏览器页面还没有弹出滑块或九宫格。请点 Trigger 把 token 渲染到页面。";
+        }
+        return;
+      }
+      if (verification.visible_challenge_detected) {
+        alert.hidden = false;
+        alert.classList.add("ok");
+        alert.textContent = "当前页面检测到可见验证元素，可以在下面的页面快照中人工处理。";
+      }
+    }
+
+    function renderVerification(verification = {}) {
+      const index = verification.account_index ?? state.verificationIndex ?? "-";
+      const status = verification.status || "idle";
+      const message = verification.message || "";
+      const mode = verification.headless ? "headless" : "headed";
+      const updated = verification.updated_at ? formatDateTime(verification.updated_at) : "-";
+      const terms = (verification.detected_terms || []).join(", ") || "-";
+      $("verificationTitle").textContent = `Manual Verify #${index}`;
+      $("verificationStatus").textContent = `${status} | ${message}`;
+      renderVerificationAlert(verification);
+      $("verificationMeta").textContent = `mode=${mode} updated=${updated} terms=${terms} url=${verification.url || "-"}`;
+      $("verificationContext").textContent = verificationContextLine(verification);
+      if (verification.snapshot_url) {
+        setVerificationImage(verification.snapshot_url).catch(error => {
+          $("verificationMeta").textContent = `${$("verificationMeta").textContent} snapshot_error=${error.message}`;
+        });
+      }
+      if (status !== "active") clearVerificationPoll();
+    }
+
+    async function pollVerification(index) {
+      const verification = await requestJson(`/v1/account-pool/accounts/${index}/verification`, { headers: headers() });
+      renderVerification(verification);
+    }
+
+    function openVerificationModal(index, verification) {
+      state.verificationIndex = index;
+      $("verificationModal").hidden = false;
+      renderVerification(verification);
+      clearVerificationPoll();
+      state.verificationTimer = setInterval(() => {
+        pollVerification(index).catch(error => setNotice("accountNotice", error.message, "error"));
+      }, 3000);
+    }
+
+    function closeVerificationModal() {
+      $("verificationModal").hidden = true;
+      clearVerificationPoll();
+      if (state.verificationImageUrl) {
+        URL.revokeObjectURL(state.verificationImageUrl);
+        state.verificationImageUrl = null;
+      }
+      $("verificationImage").removeAttribute("src");
+    }
+
+    async function beginVerification(index) {
+      setNotice("accountNotice", `Account #${index} verification session opening...`, "");
+      const pool = await requestJson(`/v1/account-pool/accounts/${index}/verification/start`, {
+        method: "POST",
+        headers: headers(),
+        body: JSON.stringify({ timeout_seconds: 600, snapshot_interval_seconds: 3 }),
+      });
+      state.pool = pool;
+      updateMetrics(pool);
+      renderAccounts(pool);
+      openVerificationModal(index, pool.verification);
+      setNotice("accountNotice", `Account #${index} verification session opened.`, "ok");
+    }
+
+    async function refreshVerificationSnapshot() {
+      const index = state.verificationIndex;
+      if (index === null || index === undefined) return;
+      const verification = await requestJson(`/v1/account-pool/accounts/${index}/verification/snapshot`, {
+        method: "POST",
+        headers: headers(),
+      });
+      renderVerification(verification);
+    }
+
+    async function triggerVerificationChallenge() {
+      const index = state.verificationIndex;
+      if (index === null || index === undefined) return;
+      const button = $("verificationTrigger");
+      button.disabled = true;
+      try {
+        setNotice("accountNotice", `Account #${index} token auto-verify running...`, "");
+        let verification = await requestJson(`/v1/account-pool/accounts/${index}/verification/auto-verify`, {
+          method: "POST",
+          headers: headers(),
+          body: JSON.stringify({
+            mode: "video",
+            prompt: "生成一个简单的产品展示短视频",
+          }),
+        });
+        renderVerification(verification);
+        let rendered = verification.visible_challenge_detected || verification.captcha_probe?.solver_compatible;
+        if (!rendered) {
+          setNotice("accountNotice", `Account #${index} frontend trigger did not show a challenge; trying token render...`, "");
+          verification = await requestJson(`/v1/account-pool/accounts/${index}/verification/render-challenge`, {
+            method: "POST",
+            headers: headers(),
+          });
+          renderVerification(verification);
+          rendered = verification.bdturing_render?.container_visible || verification.captcha_probe?.solver_compatible;
+        }
+        setNotice("accountNotice", `Account #${index} token auto-verify completed.`, rendered ? "ok" : "");
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    function verificationImagePoint(event) {
+      const image = $("verificationImage");
+      if (!image.naturalWidth || !image.naturalHeight) return null;
+      const rect = image.getBoundingClientRect();
+      const naturalRatio = image.naturalWidth / image.naturalHeight;
+      const rectRatio = rect.width / rect.height;
+      let contentWidth = rect.width;
+      let contentHeight = rect.height;
+      let offsetX = 0;
+      let offsetY = 0;
+      if (rectRatio > naturalRatio) {
+        contentHeight = rect.height;
+        contentWidth = contentHeight * naturalRatio;
+        offsetX = (rect.width - contentWidth) / 2;
+      } else {
+        contentWidth = rect.width;
+        contentHeight = contentWidth / naturalRatio;
+        offsetY = (rect.height - contentHeight) / 2;
+      }
+      const x = (event.clientX - rect.left - offsetX) / contentWidth;
+      const y = (event.clientY - rect.top - offsetY) / contentHeight;
+      if (x < 0 || x > 1 || y < 0 || y > 1) return null;
+      return { x, y, normalized: true };
+    }
+
+    async function sendVerificationInput(payload) {
+      const index = state.verificationIndex;
+      if (index === null || index === undefined) return;
+      const verification = await requestJson(`/v1/account-pool/accounts/${index}/verification/input`, {
+        method: "POST",
+        headers: headers(),
+        body: JSON.stringify(payload),
+      });
+      renderVerification(verification);
+    }
+
+    async function completeVerification() {
+      const index = state.verificationIndex;
+      if (index === null || index === undefined) return;
+      const button = $("verificationComplete");
+      button.disabled = true;
+      try {
+        const pool = await requestJson(`/v1/account-pool/accounts/${index}/verification/complete`, {
+          method: "POST",
+          headers: headers(),
+        });
+        state.pool = pool;
+        updateMetrics(pool);
+        renderAccounts(pool);
+        renderVerification(pool.verification);
+        if (pool.verification?.completion_blocked) {
+          setNotice("accountNotice", `Account #${index} verification still pending.`, "error");
+          return;
+        }
+        closeVerificationModal();
+        const quota = pool.quota_refresh_result || {};
+        setNotice("accountNotice", `Account #${index} verification done; quota=${quota.status || quota.message || "refreshed"}`, quota.status === "error" ? "error" : "ok");
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    async function cancelVerification() {
+      const index = state.verificationIndex;
+      if (index === null || index === undefined) return;
+      const pool = await requestJson(`/v1/account-pool/accounts/${index}/verification/cancel`, {
+        method: "POST",
+        headers: headers(),
+      });
+      state.pool = pool;
+      updateMetrics(pool);
+      renderAccounts(pool);
+      renderVerification(pool.verification);
+      closeVerificationModal();
+      setNotice("accountNotice", `Account #${index} verification cancelled.`, "");
+    }
+
+    /*
+    async function accountAction(action, index, row) {
+      if (action === "verification-start") {
+        await beginVerification(index);
+        return;
+      }
+      let url = `/v1/account-pool/accounts/${index}/${action}`;
+      let options = { method: "POST", headers: headers() };
+      if (action === "save") {
+        url = `/v1/account-pool/accounts/${index}`;
+        options = {
+          method: "PATCH",
+          headers: headers(),
+          body: JSON.stringify({
+            weight: Number(row.querySelector(".account-weight").value),
+            max_concurrency: Number(row.querySelector(".account-concurrency").value),
+          }),
+        };
+      } else if (action === "delete") {
+        if (!confirm(`纭删除账号 #${index}？`)) return;
+        url = `/v1/account-pool/accounts/${index}`;
+        options = { method: "DELETE", headers: headers() };
+      }
+      const result = await requestJson(url, options);
+      await loadPool();
+      if (action === "health-check") {
+        const data = result.data;
+        setNotice("accountNotice", `账号 #${index} 鍋ュ悍妫€查：${data.healthy ? "正常" : "寮傚父"}锛?{data.status}）`, data.healthy ? "ok" : "error");
+      } else if (action === "quota-refresh") {
+        const data = result.data || {};
+        const quota = data.account?.quota || {};
+        setNotice("accountNotice", `账号 #${index} 棰濆害鍒锋柊锛?{data.message || quota.status || "完成"}`, quota.status === "error" ? "error" : "ok");
+      } else if (action === "delete") {
+        const envText = result.env_index ? `，已移除 DOUBAO_COOKIE_${result.env_index}` : "";
+        setNotice("accountNotice", `账号 #${index} 已删闄?{envText}`, "ok");
+      } else {
+        setNotice("accountNotice", `账号 #${index} 操作已完成`, "ok");
+      }
+    }
+
+    */
+    async function accountAction(action, index, row) {
+      if (action === "verification-start") {
+        await beginVerification(index);
+        return;
+      }
+      let url = `/v1/account-pool/accounts/${index}/${action}`;
+      let options = { method: "POST", headers: headers() };
+      if (action === "save") {
+        url = `/v1/account-pool/accounts/${index}`;
+        options = {
+          method: "PATCH",
+          headers: headers(),
+          body: JSON.stringify({
+            weight: Number(row.querySelector(".account-weight").value),
+            max_concurrency: Number(row.querySelector(".account-concurrency").value),
+          }),
+        };
+      } else if (action === "delete") {
+        if (!confirm(`确认删除账号 #${index}？`)) return;
+        url = `/v1/account-pool/accounts/${index}`;
+        options = { method: "DELETE", headers: headers() };
+      }
+      const result = await requestJson(url, options);
+      await loadPool();
+      if (action === "health-check") {
+        const data = result.data;
+        setNotice("accountNotice", `账号 #${index} 健康检查：${data.healthy ? "正常" : "异常"}（${data.status}）`, data.healthy ? "ok" : "error");
+      } else if (action === "quota-refresh") {
+        const data = result.data || {};
+        const quota = data.account?.quota || {};
+        setNotice("accountNotice", `账号 #${index} 额度刷新：${data.message || quota.status || "完成"}`, quota.status === "error" ? "error" : "ok");
+      } else if (action === "delete") {
+        const envText = result.env_index ? `，已移除 DOUBAO_COOKIE_${result.env_index}` : "";
+        setNotice("accountNotice", `账号 #${index} 已删除${envText}`, "ok");
+      } else {
+        setNotice("accountNotice", `账号 #${index} 操作已完成`, "ok");
+      }
+    }
+
+    function setAutoRefresh(enabled) {
+      const button = $("autoRefresh");
+      const configSwitch = $("configAutoRefresh");
+      if (state.autoTimer) {
+        clearInterval(state.autoTimer);
+        state.autoTimer = null;
+      }
+      if (enabled) {
+        state.autoTimer = setInterval(() => loadPool().catch(error => setNotice("accountNotice", error.message, "error")), 5000);
+        button.classList.add("primary");
+        button.textContent = "自动刷新中";
+        configSwitch.classList.add("on");
+      } else {
+        button.classList.remove("primary");
+        button.textContent = "自动刷新";
+        configSwitch.classList.remove("on");
+      }
+    }
+
+    function setSwitch(id, enabled) {
+      const target = $(id);
+      target.classList.toggle("on", Boolean(enabled));
+      target.setAttribute("aria-pressed", String(Boolean(enabled)));
+    }
+
+    function switchOn(id) {
+      return $(id).classList.contains("on");
+    }
+
+    function openAddAccountModal() {
+      $("addAccountModal").hidden = false;
+      $("addCookie").value = "";
+      $("addWeight").value = state.pool?.accounts?.[0]?.weight || $("configAccountWeight")?.value || 1;
+      $("addConcurrency").value = state.pool?.accounts?.[0]?.max_concurrency || $("configAccountConcurrency")?.value || 1;
+      setSwitch("addDisabled", false);
+      setSwitch("addPersist", true);
+      setNotice("accountNotice", "", "");
+      setTimeout(() => $("addCookie").focus(), 0);
+    }
+
+    function closeAddAccountModal() {
+      $("addAccountModal").hidden = true;
+    }
+
+    function openBulkAccountModal() {
+      $("bulkAccountModal").hidden = false;
+      $("bulkCookies").value = "";
+      $("bulkTextFile").value = "";
+      $("bulkWeight").value = state.pool?.accounts?.[0]?.weight || $("configAccountWeight")?.value || 1;
+      $("bulkConcurrency").value = state.pool?.accounts?.[0]?.max_concurrency || $("configAccountConcurrency")?.value || 1;
+      setSwitch("bulkDisabled", false);
+      setSwitch("bulkPersist", true);
+      setNotice("accountNotice", "", "");
+      setTimeout(() => $("bulkCookies").focus(), 0);
+    }
+
+    function closeBulkAccountModal() {
+      $("bulkAccountModal").hidden = true;
+    }
+
+    /*
+    async function submitAddAccount() {
+      const payload = {
+        cookie: $("addCookie").value,
+        weight: Number($("addWeight").value || 1),
+        max_concurrency: Number($("addConcurrency").value || 1),
+        disabled: switchOn("addDisabled"),
+        persist: switchOn("addPersist"),
+      };
+      const button = $("addSubmit");
+      button.disabled = true;
+      try {
+        const pool = await requestJson("/v1/account-pool/accounts", {
+          method: "POST",
+          headers: headers(),
+          body: JSON.stringify(payload),
+        });
+        state.pool = pool;
+        updateMetrics(pool);
+        renderAccounts(pool);
+        closeAddAccountModal();
+        const persistText = pool.persisted ? `，已写入 DOUBAO_COOKIE_${pool.env_index}` : "，仅当前进程生效";
+        setNotice("accountNotice", `账号宸叉坊鍔?{persistText}`, "ok");
+      } catch (error) {
+        setNotice("accountNotice", error.message, "error");
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    async function submitBulkAccounts() {
+      const payload = {
+        cookies: $("bulkCookies").value,
+        weight: Number($("bulkWeight").value || 1),
+        max_concurrency: Number($("bulkConcurrency").value || 1),
+        disabled: switchOn("bulkDisabled"),
+        persist: switchOn("bulkPersist"),
+      };
+      const button = $("bulkSubmit");
+      button.disabled = true;
+      try {
+        const pool = await requestJson("/v1/account-pool/accounts/bulk", {
+          method: "POST",
+          headers: headers(),
+          body: JSON.stringify(payload),
+        });
+        state.pool = pool;
+        updateMetrics(pool);
+        renderAccounts(pool);
+        closeBulkAccountModal();
+        setNotice(
+          "accountNotice",
+          `批量瀵煎叆瀹屾垚锛氭柊澧?${pool.added_count || 0}锛岃烦杩?${pool.skipped_count || 0}，失璐?${pool.failed_count || 0}`,
+          pool.failed_count ? "error" : "ok",
+        );
+      } catch (error) {
+        setNotice("accountNotice", error.message, "error");
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    */
+    async function submitAddAccount() {
+      const payload = {
+        cookie: $("addCookie").value,
+        weight: Number($("addWeight").value || 1),
+        max_concurrency: Number($("addConcurrency").value || 1),
+        disabled: switchOn("addDisabled"),
+        persist: switchOn("addPersist"),
+      };
+      const button = $("addSubmit");
+      button.disabled = true;
+      try {
+        const pool = await requestJson("/v1/account-pool/accounts", {
+          method: "POST",
+          headers: headers(),
+          body: JSON.stringify(payload),
+        });
+        state.pool = pool;
+        updateMetrics(pool);
+        renderAccounts(pool);
+        closeAddAccountModal();
+        const persistText = pool.persisted ? `，已写入 DOUBAO_COOKIE_${pool.env_index}` : "，仅当前进程生效";
+        setNotice("accountNotice", `账号已添加${persistText}`, "ok");
+      } catch (error) {
+        setNotice("accountNotice", error.message, "error");
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    async function submitBulkAccounts() {
+      const payload = {
+        cookies: $("bulkCookies").value,
+        weight: Number($("bulkWeight").value || 1),
+        max_concurrency: Number($("bulkConcurrency").value || 1),
+        disabled: switchOn("bulkDisabled"),
+        persist: switchOn("bulkPersist"),
+      };
+      const button = $("bulkSubmit");
+      button.disabled = true;
+      try {
+        const pool = await requestJson("/v1/account-pool/accounts/bulk", {
+          method: "POST",
+          headers: headers(),
+          body: JSON.stringify(payload),
+        });
+        state.pool = pool;
+        updateMetrics(pool);
+        renderAccounts(pool);
+        closeBulkAccountModal();
+        setNotice(
+          "accountNotice",
+          `批量导入完成：新增 ${pool.added_count || 0}，跳过 ${pool.skipped_count || 0}，失败 ${pool.failed_count || 0}`,
+          pool.failed_count ? "error" : "ok",
+        );
+      } catch (error) {
+        setNotice("accountNotice", error.message, "error");
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    async function readFileAsText(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result || "");
+        reader.onerror = () => reject(reader.error || new Error("Unable to read text file"));
+        reader.readAsText(file, "utf-8");
+      });
+    }
+
+    function activateConfigPane(paneId) {
+      document.querySelectorAll(".config-tab").forEach(item => item.classList.toggle("active", item.dataset.pane === paneId));
+      document.querySelectorAll(".config-pane").forEach(item => item.classList.toggle("active", item.id === paneId));
+    }
+
+    document.querySelectorAll(".nav-button").forEach(button => {
+      button.addEventListener("click", () => {
+        document.querySelectorAll(".nav-button").forEach(item => item.classList.remove("active"));
+        document.querySelectorAll(".view").forEach(item => item.classList.remove("active"));
+        button.classList.add("active");
+        $(`${button.dataset.view}View`).classList.add("active");
+        if (button.dataset.configPane) activateConfigPane(button.dataset.configPane);
+      });
+    });
+
+    document.querySelectorAll(".config-tab").forEach(button => {
+      button.addEventListener("click", () => activateConfigPane(button.dataset.pane));
+    });
+
+    if (location.pathname === "/plugin-sync" || location.hash === "#plugin-sync" || location.hash === "#plugin") {
+      document.querySelector('[data-config-pane="pluginPane"]')?.click();
+    }
+
+    $("refreshPool").addEventListener("click", () => loadPool(true).catch(error => setNotice("accountNotice", error.message, "error")));
+    $("openAddAccount").addEventListener("click", openAddAccountModal);
+    $("openBulkAccount").addEventListener("click", openBulkAccountModal);
+    $("addClose").addEventListener("click", closeAddAccountModal);
+    $("addCancel").addEventListener("click", closeAddAccountModal);
+    $("addSubmit").addEventListener("click", submitAddAccount);
+    $("addDisabled").addEventListener("click", () => setSwitch("addDisabled", !switchOn("addDisabled")));
+    $("addPersist").addEventListener("click", () => setSwitch("addPersist", !switchOn("addPersist")));
+    $("bulkClose").addEventListener("click", closeBulkAccountModal);
+    $("bulkCancel").addEventListener("click", closeBulkAccountModal);
+    $("bulkSubmit").addEventListener("click", submitBulkAccounts);
+    $("bulkDisabled").addEventListener("click", () => setSwitch("bulkDisabled", !switchOn("bulkDisabled")));
+    $("bulkPersist").addEventListener("click", () => setSwitch("bulkPersist", !switchOn("bulkPersist")));
+    $("verificationClose").addEventListener("click", closeVerificationModal);
+    $("verificationTrigger").addEventListener("click", () => triggerVerificationChallenge().catch(error => setNotice("accountNotice", error.message, "error")));
+    $("verificationSnapshot").addEventListener("click", () => refreshVerificationSnapshot().catch(error => setNotice("accountNotice", error.message, "error")));
+    $("verificationComplete").addEventListener("click", () => completeVerification().catch(error => setNotice("accountNotice", error.message, "error")));
+    $("verificationCancel").addEventListener("click", () => cancelVerification().catch(error => setNotice("accountNotice", error.message, "error")));
+    $("verificationImage").addEventListener("pointerdown", event => {
+      const point = verificationImagePoint(event);
+      if (!point) return;
+      state.verificationPointer = { point, clientX: event.clientX, clientY: event.clientY };
+      $("verificationImage").setPointerCapture?.(event.pointerId);
+      event.preventDefault();
+    });
+    $("verificationImage").addEventListener("pointerup", event => {
+      const start = state.verificationPointer;
+      state.verificationPointer = null;
+      if (!start) return;
+      const endPoint = verificationImagePoint(event);
+      if (!endPoint) return;
+      const distance = Math.hypot(event.clientX - start.clientX, event.clientY - start.clientY);
+      const payload = distance < 6
+        ? { type: "click", ...endPoint }
+        : { type: "drag", from: start.point, to: endPoint };
+      sendVerificationInput(payload).catch(error => setNotice("accountNotice", error.message, "error"));
+      event.preventDefault();
+    });
+    $("verificationImage").addEventListener("pointercancel", () => {
+      state.verificationPointer = null;
+    });
+    $("bulkTextFile").addEventListener("change", async () => {
+      const file = $("bulkTextFile").files && $("bulkTextFile").files[0];
+      if (!file) return;
+      try {
+        $("bulkCookies").value = await readFileAsText(file);
+        setNotice("accountNotice", `宸茶鍙栨枃鏈枃浠讹細${file.name}`, "ok");
+      } catch (error) {
+        setNotice("accountNotice", error.message, "error");
+      }
+    });
+    $("addAccountModal").addEventListener("click", event => {
+      if (event.target === $("addAccountModal")) closeAddAccountModal();
+    });
+    $("bulkAccountModal").addEventListener("click", event => {
+      if (event.target === $("bulkAccountModal")) closeBulkAccountModal();
+    });
+    $("verificationModal").addEventListener("click", event => {
+      if (event.target === $("verificationModal")) closeVerificationModal();
+    });
+    document.addEventListener("keydown", event => {
+      if (event.key === "Escape" && !$("addAccountModal").hidden) closeAddAccountModal();
+      if (event.key === "Escape" && !$("bulkAccountModal").hidden) closeBulkAccountModal();
+      if (event.key === "Escape" && !$("verificationModal").hidden) closeVerificationModal();
+    });
+    $("autoRefresh").addEventListener("click", () => setAutoRefresh(!state.autoTimer));
+    $("configAutoRefresh").addEventListener("click", () => setAutoRefresh(!state.autoTimer));
+    $("createApiKey").addEventListener("click", createApiKey);
+    $("copyCreatedApiKey").addEventListener("click", () => copyCreatedApiKey().catch(error => setNotice("configNotice", error.message, "error")));
+    $("useCreatedApiKey").addEventListener("click", useCreatedApiKey);
+    $("reloadPluginConfig").addEventListener("click", () => loadPluginConfig(true).catch(error => setNotice("pluginNotice", error.message, "error")));
+    $("savePluginConfig").addEventListener("click", () => savePluginConfig(false));
+    $("rotatePluginToken").addEventListener("click", () => savePluginConfig(true));
+    $("copyPluginUrl").addEventListener("click", () => copyPluginField("pluginConnectionUrl", "鍚屾地址").catch(error => setNotice("pluginNotice", error.message, "error")));
+    $("copyPluginToken").addEventListener("click", () => copyPluginField("pluginConnectionToken", "连接令牌").catch(error => setNotice("pluginNotice", error.message, "error")));
+    $("pluginEnabled").addEventListener("click", () => setSwitch("pluginEnabled", !switchOn("pluginEnabled")));
+    $("savePoolConfig").addEventListener("click", () => savePoolConfig().catch(error => setNotice("configNotice", error.message, "error")));
+    $("resetConfig").addEventListener("click", () => {
+      if (state.pool) updateMetrics(state.pool);
+      setNotice("configNotice", "宸叉仮澶嶄负褰撳墠杩愯配置", "ok");
+    });
+    $("cacheRefresh").addEventListener("click", () => loadPool(true).catch(error => setNotice("accountNotice", error.message, "error")));
+    $("configApiKey").addEventListener("input", () => { apiKeyEl.value = configApiKeyEl.value; });
+    apiKeyEl.addEventListener("input", () => { configApiKeyEl.value = apiKeyEl.value; });
+
+    $("apiKeyList").addEventListener("click", async event => {
+      const target = event.target.closest("button[data-key-action]");
+      if (!target) return;
+      target.disabled = true;
+      try {
+        await apiKeyAction(target.dataset.keyAction, target.dataset.id);
+      } catch (error) {
+        setNotice("configNotice", error.message, "error");
+      } finally {
+        target.disabled = false;
+      }
+    });
+
+    $("accountsBody").addEventListener("click", async event => {
+      const selectTarget = event.target.closest("button[data-select-account]");
+      if (selectTarget) {
+        const index = Number(selectTarget.dataset.selectAccount);
+        if (state.selectedAccounts.has(index)) state.selectedAccounts.delete(index);
+        else state.selectedAccounts.add(index);
+        renderAccounts(state.pool || { enabled: true, accounts: [] });
+        return;
+      }
+
+      const target = event.target.closest("button[data-action]");
+      if (!target) return;
+      const row = target.closest("tr");
+      target.disabled = true;
+      try {
+        await accountAction(target.dataset.action, Number(target.dataset.index), row);
+      } catch (error) {
+        setNotice("accountNotice", error.message, "error");
+      } finally {
+        target.disabled = false;
+      }
+    });
+
+    $("selectVisibleAccounts").addEventListener("click", () => {
+      const visible = visibleAccounts();
+      const allSelected = visible.length > 0 && visible.every(account => state.selectedAccounts.has(account.index));
+      for (const account of visible) {
+        if (allSelected) state.selectedAccounts.delete(account.index);
+        else state.selectedAccounts.add(account.index);
+      }
+      renderAccounts(state.pool || { enabled: true, accounts: [] });
+    });
+
+    $("accountPrevPage").addEventListener("click", () => {
+      state.accountPage -= 1;
+      renderAccounts(state.pool || { enabled: true, accounts: [] });
+    });
+
+    $("accountNextPage").addEventListener("click", () => {
+      state.accountPage += 1;
+      renderAccounts(state.pool || { enabled: true, accounts: [] });
+    });
+
+    $("accountPageSize").addEventListener("change", () => {
+      state.accountPageSize = Number($("accountPageSize").value || 50);
+      state.accountPage = 1;
+      renderAccounts(state.pool || { enabled: true, accounts: [] });
+    });
+
+    $("runBatchSelected").addEventListener("click", () => {
+      const action = $("accountBatchAction").value;
+      runAccountBatch(action, [...state.selectedAccounts], "选中账号").catch(error => setNotice("accountNotice", error.message, "error"));
+    });
+
+    $("runBatchVisible").addEventListener("click", () => {
+      const action = $("accountBatchAction").value;
+      runAccountBatch(action, visibleAccounts().map(account => account.index), "当前页账号").catch(error => setNotice("accountNotice", error.message, "error"));
+    });
+
+    $("healthAll").addEventListener("click", () => {
+      runAccountBatch("health-check", accountList().map(account => account.index), "全部账号").catch(error => setNotice("accountNotice", error.message, "error"));
+    });
+
+    $("resetAll").addEventListener("click", () => {
+      runAccountBatch("reset-health", accountList().map(account => account.index), "全部账号").catch(error => setNotice("accountNotice", error.message, "error"));
+    });
+
+    $("refreshAllQuotas").addEventListener("click", () => refreshAllQuotas());
+
+    async function readFileAsDataUrl(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(reader.error || new Error("Unable to read image"));
+        reader.readAsDataURL(file);
+      });
+    }
+
+    $("referenceImage").addEventListener("change", async () => {
+      const file = $("referenceImage").files && $("referenceImage").files[0];
+      if (!file) {
+        state.referenceImageData = null;
+        state.uploadedReferenceImage = null;
+        return;
+      }
+      const data = await readFileAsDataUrl(file);
+      state.referenceImageData = { data, file_name: file.name, mime_type: file.type, size: file.size };
+      $("videoStatus").textContent = "Reference image selected";
+    });
+
+    async function pollVideo(id) {
+      const startedAt = Date.now();
+      const deadlineAt = startedAt + 600000;
+      let nextPoolRefreshAt = 0;
+      while (Date.now() < deadlineAt) {
+        const task = await requestJson(`/v1/video/generations/${id}`, { headers: headers() });
+        $("videoStatus").textContent = `Task ${task.status}`;
+        if (task.status === "succeeded") return task;
+        if (task.status === "failed") throw new Error(task.error?.message || "Generation failed");
+        const now = Date.now();
+        if (now >= nextPoolRefreshAt) {
+          nextPoolRefreshAt = now + 15000;
+          await loadPool().catch(() => undefined);
+        }
+        const elapsed = now - startedAt;
+        const delay = elapsed < 60000 ? 5000 : (elapsed < 300000 ? 10000 : 20000);
+        await new Promise(resolve => setTimeout(resolve, Math.min(delay, Math.max(1000, deadlineAt - Date.now()))));
+      }
+      throw new Error("Timed out waiting for video");
+    }
+
+    $("generate").addEventListener("click", async () => {
+      $("generate").disabled = true;
+      $("download").hidden = true;
+      $("videoStatus").textContent = "Submitting";
+      try {
+        const created = await requestJson("/v1/video/generations", {
+          method: "POST",
+          headers: headers(),
+          body: JSON.stringify({
+            model: $("model").value,
+            prompt: $("prompt").value,
+            duration: Number($("duration").value),
+            aspect_ratio: $("ratio").value,
+            resolution: $("resolution").value,
+            poll_interval: 5,
+            poll_timeout: 600,
+            reference_image: state.uploadedReferenceImage || state.referenceImageData,
+          }),
+        });
+        $("taskId").textContent = created.id;
+        const completed = await pollVideo(created.id);
+        const url = completed.data[0].url;
+        $("download").href = url;
+        $("download").hidden = false;
+        $("videoStatus").textContent = "Succeeded";
+      } catch (error) {
+        $("videoStatus").textContent = error.message;
+      } finally {
+        $("generate").disabled = false;
+        await loadPool().catch(() => undefined);
+      }
+    });
+
+    async function loadModels() {
+      try {
+        const models = await requestJson("/v1/models", { headers: headers() });
+        const ids = [...new Set(models.data.map(item => item.id).filter(id => id.includes("video") || id.includes("seedance")))];
+        if (ids.length) $("model").innerHTML = ids.map(id => `<option value="${id}">${id}</option>`).join("");
+        const params = models.data.find(item => item.video_parameters)?.video_parameters;
+        if (params) {
+          if (Array.isArray(params.durations) && params.durations.length) {
+            $("duration").innerHTML = params.durations.map(value => `<option value="${value}">${value}s</option>`).join("");
+          }
+          if (Array.isArray(params.ratios) && params.ratios.length) {
+            $("ratio").innerHTML = params.ratios.map(item => `<option value="${item.value}">${item.label}</option>`).join("");
+          }
+          if (Array.isArray(params.resolutions) && params.resolutions.length) {
+            $("resolution").innerHTML = params.resolutions.map(value => `<option value="${value}">${value}</option>`).join("");
+          }
+        }
+      } catch {}
+    }
+
+    loadPool().catch(error => setNotice("accountNotice", error.message, "error"));
+    loadApiKeys().catch(error => setNotice("configNotice", error.message, "error"));
+    loadPluginConfig().catch(error => setNotice("pluginNotice", error.message, "error"));
+    loadModels();
+  </script>
+</body>
+</html>

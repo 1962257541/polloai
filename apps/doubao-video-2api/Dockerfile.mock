@@ -1,0 +1,21 @@
+# Mock 模式专用精简镜像：跳过 Playwright 浏览器二进制与 X11 依赖，仅装 Python 依赖。
+# 仅用于 VIDEO_PROVIDER=mock 验证对接链路；切 doubao_web 真实模式请用标准 Dockerfile（含 chromium）。
+FROM python:3.10-slim-bookworm
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+WORKDIR /app
+
+# numpy(OpenBLAS) 运行所需的最小系统库；imageio-ffmpeg 自带静态 ffmpeg(含 libx264)，无需系统 ffmpeg
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt
+
+COPY . .
+
+EXPOSE 8000
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

@@ -1,0 +1,10 @@
+.env
+.env.local
+.env.*.local
+.generated/
+.pytest_cache/
+__pycache__/
+*.py[cod]
+*.log
+uvicorn-*.out.log
+uvicorn-*.err.log

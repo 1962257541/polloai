@@ -1,0 +1,17 @@
+# /requirements.txt
+fastapi
+python-multipart
+uvicorn
+pydantic-settings
+python-dotenv
+cloudscraper
+cachetools
+httpx
+loguru
+playwright==1.44.0
+playwright-stealth==2.0.3
+pytest
+pytest-asyncio
+imageio
+imageio-ffmpeg
+numpy

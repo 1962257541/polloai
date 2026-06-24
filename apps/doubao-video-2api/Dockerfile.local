@@ -1,0 +1,23 @@
+FROM flow2api:headed
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV BROWSER_EXECUTABLE_PATH=/usr/bin/google-chrome-unstable
+WORKDIR /app
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates wget \
+    && wget -q -O /tmp/google-chrome.deb \
+        https://dl.google.com/linux/direct/google-chrome-unstable_current_amd64.deb \
+    && apt-get install -y --no-install-recommends /tmp/google-chrome.deb \
+    && rm -f /tmp/google-chrome.deb \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.container.txt .
+RUN pip install --no-cache-dir -r requirements.container.txt
+
+COPY . .
+RUN chmod +x /app/docker-entrypoint.sh
+
+EXPOSE 8000
+CMD ["/app/docker-entrypoint.sh"]

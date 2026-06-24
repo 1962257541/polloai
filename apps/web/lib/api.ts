@@ -2,7 +2,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:3001/api/
 
 export type UserRole = "admin" | "salesperson";
 export type ImageApiType = "openai-images" | "gemini-native";
-export type ApiProvider = "yunwu" | "apimart";
+export type ApiProvider = "yunwu" | "apimart" | "doubao";
 
 export type AuthPayload = {
   token: string;
