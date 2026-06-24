@@ -51,6 +51,7 @@ export interface CreateVideoInput {
   imageUrls?: string[];
   aspectRatio?: string;
   size?: string;
+  resolution?: string;
   seconds?: number;
   apiKey: string;
   apiUrl?: string;

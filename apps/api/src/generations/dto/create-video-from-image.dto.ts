@@ -44,6 +44,10 @@ export class CreateVideoFromImageDto {
   size?: "1280x720" | "720x1280";
 
   @IsOptional()
+  @IsIn(["480p", "720p", "1080p"])
+  resolution?: "480p" | "720p" | "1080p";
+
+  @IsOptional()
   @Transform(({ value }) => (value !== undefined && value !== "" ? Number(value) : undefined))
   @IsInt()
   @Min(1)

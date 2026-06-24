@@ -325,6 +325,7 @@ export class GenerationWorkerService implements OnModuleInit, OnModuleDestroy {
       imageUrls,
       aspectRatio: params.aspectRatio,
       size: params.size,
+      resolution: params.resolution,
       // 用 ?? 而非 ||，避免未来 0 等假值边界
       seconds: params.durationSec ?? this.env.geminiVideoSeconds,
       apiKey,

@@ -168,6 +168,7 @@ export const api = {
       imageUrls?: string[];
       aspectRatio?: string;
       size?: string;
+      resolution?: string;
       durationSec?: number;
     },
     files?: File[],
@@ -179,6 +180,7 @@ export const api = {
     if (payload.imageUrls) payload.imageUrls.forEach((url) => form.append("imageUrls", url));
     if (payload.aspectRatio) form.append("aspectRatio", payload.aspectRatio);
     if (payload.size) form.append("size", payload.size);
+    if (payload.resolution) form.append("resolution", payload.resolution);
     if (payload.durationSec) form.append("durationSec", String(payload.durationSec));
     if (files) files.forEach((file) => form.append("images", file));
 

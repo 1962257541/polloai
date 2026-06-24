@@ -100,11 +100,13 @@ export class ApimartService implements GenerationProvider {
     const references = this.mergeUrls(input.imageUrls, input.imageUrl);
     const aspectRatio = input.aspectRatio || (input.size === "720x1280" ? "9:16" : "16:9");
     const duration = this.normalizeDuration(input.seconds);
+    const resolution = this.normalizeResolution(input.resolution);
 
     const body: JsonRecord = {
       model: input.model,
       prompt: input.prompt,
       aspect_ratio: aspectRatio,
+      ...(resolution ? { resolution } : {}),
       ...(duration !== undefined ? { duration } : {}),
       // generation_type 交给 apib.ai 按图片数量自动判定（2→frame、3→reference）；单图不强制，
       // 强制 frame 会因"双帧插值需首尾两帧"而被拒
@@ -294,6 +296,13 @@ export class ApimartService implements GenerationProvider {
   private normalizeDuration(seconds?: number): number | undefined {
     if (seconds === undefined || seconds === null) return undefined;
     return Math.min(Math.max(Math.round(seconds), 1), 15);
+  }
+
+  // seedance 2.0 仅接受 480p/720p/1080p（4k 暂不开放）；非法值返回 undefined，由 apib.ai 用默认 720p
+  private normalizeResolution(resolution?: string): string | undefined {
+    if (!resolution) return undefined;
+    const value = resolution.trim().toLowerCase();
+    return ["480p", "720p", "1080p"].includes(value) ? value : undefined;
   }
 
   private normalizeImageMime(

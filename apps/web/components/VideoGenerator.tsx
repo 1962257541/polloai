@@ -22,6 +22,12 @@ const SIZE_OPTIONS = [
   { value: "720x1280", label: "9:16", aspectRatio: "9:16" as const },
 ];
 
+const RESOLUTION_OPTIONS = [
+  { value: "480p", label: "480p" },
+  { value: "720p", label: "720p" },
+  { value: "1080p", label: "1080p" },
+];
+
 type GeneratorTab = "single" | "batch";
 
 interface VideoGeneratorProps {
@@ -48,6 +54,7 @@ export default function VideoGenerator({ onCreated }: VideoGeneratorProps) {
   const [imageUrl, setImageUrl] = useState("");
   const [selectedMaterials, setSelectedMaterials] = useState<Material[]>([]);
   const [size, setSize] = useState("1280x720");
+  const [resolution, setResolution] = useState("720p");
   const [duration, setDuration] = useState(5);
   const [availableModels, setAvailableModels] = useState<string[]>([]);
   const [selectedModel, setSelectedModel] = useState("");
@@ -59,6 +66,7 @@ export default function VideoGenerator({ onCreated }: VideoGeneratorProps) {
   const [batchPrompt, setBatchPrompt] = useState("");
   const [batchMaterials, setBatchMaterials] = useState<Material[]>([]);
   const [batchSize, setBatchSize] = useState("1280x720");
+  const [batchResolution, setBatchResolution] = useState("720p");
   const [batchDuration, setBatchDuration] = useState(5);
   const [batchSubmitting, setBatchSubmitting] = useState(false);
   const [batchResult, setBatchResult] = useState("");
@@ -159,6 +167,7 @@ export default function VideoGenerator({ onCreated }: VideoGeneratorProps) {
         imageUrls,
         aspectRatio: sizeToAspectRatio(size),
         size,
+        resolution,
         durationSec: duration,
       });
       onCreated();
@@ -196,6 +205,7 @@ export default function VideoGenerator({ onCreated }: VideoGeneratorProps) {
             imageUrl: material.url,
             aspectRatio: sizeToAspectRatio(batchSize),
             size: batchSize,
+            resolution: batchResolution,
             durationSec: batchDuration,
           });
           succeeded++;
@@ -252,6 +262,35 @@ export default function VideoGenerator({ onCreated }: VideoGeneratorProps) {
       </label>
       <div style={{ display: "flex", gap: 8 }}>
         {SIZE_OPTIONS.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            onClick={() => onChange(option.value)}
+            style={{
+              padding: "6px 14px",
+              borderRadius: 20,
+              border: `1px solid ${value === option.value ? "var(--accent)" : "var(--border)"}`,
+              background: value === option.value ? "var(--accent-glow)" : "transparent",
+              color: value === option.value ? "var(--accent)" : "var(--text-secondary)",
+              fontSize: "0.8rem",
+              cursor: "pointer",
+              fontFamily: "inherit",
+            }}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
+  const renderResolutionSelect = (value: string, onChange: (v: string) => void) => (
+    <div>
+      <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "inherit", color: "var(--text-muted)", letterSpacing: "0.08em", marginBottom: 8 }}>
+        RESOLUTION
+      </label>
+      <div style={{ display: "flex", gap: 8 }}>
+        {RESOLUTION_OPTIONS.map((option) => (
           <button
             key={option.value}
             type="button"
@@ -446,6 +485,7 @@ export default function VideoGenerator({ onCreated }: VideoGeneratorProps) {
               </div>
 
               {renderSizeSelect(size, setSize)}
+              {renderResolutionSelect(resolution, setResolution)}
               {renderDurationSelect(duration, setDuration)}
 
               {error && (
@@ -483,6 +523,7 @@ export default function VideoGenerator({ onCreated }: VideoGeneratorProps) {
               )}
 
               {renderSizeSelect(batchSize, setBatchSize)}
+              {renderResolutionSelect(batchResolution, setBatchResolution)}
               {renderDurationSelect(batchDuration, setBatchDuration)}
 
               {batchSubmitting && batchProgress.total > 0 && (

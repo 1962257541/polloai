@@ -24,6 +24,10 @@ export type ImageQuality = (typeof imageQualityValues)[number];
 export const videoQualityValues = ["standard", "high"] as const;
 export type VideoQuality = (typeof videoQualityValues)[number];
 
+// 视频分辨率（apib.ai seedance 2.0 的 resolution 参数；其他供应商忽略）
+export const videoResolutionValues = ["480p", "720p", "1080p"] as const;
+export type VideoResolution = (typeof videoResolutionValues)[number];
+
 export const imageApiTypeValues = ["openai-images", "gemini-native"] as const;
 export type ImageApiType = (typeof imageApiTypeValues)[number];
 
@@ -52,6 +56,7 @@ export const imageToVideoSchema = z.object({
   imageUrls: z.array(z.string().url()).max(9).optional(),
   aspectRatio: z.enum(aspectRatioValues).default("16:9"),
   size: z.enum(["1280x720", "720x1280"]).default("1280x720"),
+  resolution: z.enum(videoResolutionValues).default("720p"),
   durationSec: z.number().int().min(1).max(15).default(5),
   quality: z.enum(videoQualityValues).default("standard"),
 });
