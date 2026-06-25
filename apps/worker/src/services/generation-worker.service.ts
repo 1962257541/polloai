@@ -540,10 +540,13 @@ export class GenerationWorkerService implements OnModuleInit, OnModuleDestroy {
       const state = String(status?.status || "").toLowerCase();
 
       if (["failed", "error", "video_generation_failed", "video_upsampling_failed"].includes(state)) {
-        if (!this.extractVideoFailureDetail(status)) {
-          throw new RetryableGenerationError(`Video generation failed: ${JSON.stringify(status)}`);
+        const friendly = this.friendlyVideoFailure(status);
+        // 额度不足/登录失效/需验证这类重试也无济于事，直接判失败（避免空耗额度）；
+        // 仅当反代没给出任何明确原因时才作为可重试错误。
+        if (this.extractVideoFailureDetail(status)) {
+          throw new Error(friendly);
         }
-        throw new Error(`Video generation failed: ${JSON.stringify(status)}`);
+        throw new RetryableGenerationError(friendly);
       }
 
       if (state === "completed") {
@@ -637,8 +640,48 @@ export class GenerationWorkerService implements OnModuleInit, OnModuleDestroy {
   }
 
   private extractVideoFailureDetail(status: any) {
-    const candidates = [status?.error, status?.message, status?.detail];
+    // 反代的 error 可能是对象 {message,type,code}，也可能是字符串；都要能提取出消息
+    const err = status?.error;
+    const candidates = [
+      typeof err === "string" ? err : err?.message ?? err?.detail,
+      status?.message,
+      status?.detail,
+    ];
     return candidates.find((value) => typeof value === "string" && value.trim()) as string | undefined;
+  }
+
+  /**
+   * 把豆包反代的视频失败原因归一为简洁、面向用户的中文提示。
+   * 命中已知场景（额度不足/频率限制/每日上限/需验证）时只给一句话，
+   * 不把上游的整段 JSON（params、long_form 等）暴露给用户。
+   */
+  private friendlyVideoFailure(status: any): string {
+    const detail = this.extractVideoFailureDetail(status) ?? "";
+    const code = String(status?.error?.code ?? status?.code ?? "");
+    const haystack = `${code} ${detail}`.toLowerCase();
+
+    // 额度不足（无可用额度 / 每日上限 / 账号池忙）
+    if (
+      code === "credential_pool_busy" ||
+      code === "710082020" ||
+      /quota|额度|credit|生成次数|已达上限|daily limit|generation limit/.test(haystack)
+    ) {
+      return "视频额度不足，请稍后再试或更换账号。";
+    }
+    // 频率过高 / 需要浏览器验证
+    if (
+      code === "710022002" ||
+      code === "710022004" ||
+      /too frequently|rate limit|频繁|verify|verification|验证/.test(haystack)
+    ) {
+      return "请求过于频繁或账号需要验证，请稍后再试。";
+    }
+    // 登录态失效
+    if (/login invalid|登录态|710012001/.test(haystack)) {
+      return "豆包账号登录态已失效，请更新账号 Cookie。";
+    }
+    // 其余情况：用提取到的简洁 detail；没有就给通用提示（不 dump 整个对象）
+    return detail.trim() || "视频生成失败，请稍后重试。";
   }
 
   private withResponseText(parameters: unknown, responseText: string) {
