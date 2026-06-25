@@ -24,24 +24,27 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     # 清理 apt 缓存以减小镜像体积
     && rm -rf /var/lib/apt/lists/*
 
+# 关键修复：固定 Playwright 浏览器到全局路径，避免运行时按 $HOME（可能是
+# /root 或未设）去找而报 "Executable doesn't exist"。装和跑都用同一路径，
+# 且放在所有用户可读的 /ms-playwright 下，appuser 运行时也能访问。
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+
 # 安装 Python 依赖
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
+# 以 root 安装 Chromium 到全局路径，并放开读/执行权限给非 root 用户
+RUN playwright install chromium && \
+    chmod -R a+rx /ms-playwright
+
 # 复制应用代码
 COPY . .
 
-# 创建并切换到非 root 用户
-# 这一步很关键，我们先创建用户，然后以该用户身份安装浏览器
+# 创建并切换到非 root 用户运行
 RUN useradd --create-home appuser && \
     chown -R appuser:appuser /app
 USER appuser
-
-# 核心修复：以 appuser 的身份安装 Chromium 浏览器
-# 这可以确保浏览器安装在 /home/appuser/.cache/ms-playwright/ 目录下，
-# 与应用运行时查找的路径一致，从而解决 "Executable doesn't exist" 错误。
-RUN playwright install chromium
 
 # 暴露端口并启动
 # 监听平台注入的 $PORT（Zeabur/Railway 等会注入），本地无该变量时回退 8000。
