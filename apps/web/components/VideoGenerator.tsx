@@ -555,8 +555,8 @@ export default function VideoGenerator({ onCreated }: VideoGeneratorProps) {
       {/* 提示词输入区 — 渲染到中间预览栏底部（与文字生图布局一致） */}
       {promptHost &&
         createPortal(
-          <div style={{ borderTop: "1px solid var(--border)", padding: "16px 20px", background: "var(--bg-surface)" }}>
-            <div style={{ display: "flex", gap: 10, alignItems: "stretch" }}>
+          <div style={{ borderTop: "1px solid var(--border)", padding: "16px 20px", background: "var(--bg-surface)", flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+            <div style={{ display: "flex", gap: 10, alignItems: "stretch", flex: 1, minHeight: 0 }}>
               <textarea
                 className="input-field"
                 value={isSingle ? prompt : batchPrompt}
@@ -572,8 +572,7 @@ export default function VideoGenerator({ onCreated }: VideoGeneratorProps) {
                     ? "描述视频动作和镜头效果... (Enter 发送，Shift+Enter 换行)"
                     : "描述视频动作和镜头效果，将应用于所有选中的素材... (Enter 发送，Shift+Enter 换行)"
                 }
-                rows={6}
-                style={{ flex: 1, resize: "vertical", minHeight: 160 }}
+                style={{ flex: 1, resize: "none", minHeight: 120, height: "100%" }}
                 disabled={promptSubmitting}
               />
               <button
@@ -582,7 +581,7 @@ export default function VideoGenerator({ onCreated }: VideoGeneratorProps) {
                 onClick={() => void (isSingle ? handleSingleSubmit() : handleBatchSubmit())}
                 disabled={promptSubmitDisabled}
                 title={isSingle ? "生成视频" : `批量生成视频（${batchMaterials.length} 个任务）`}
-                style={{ minWidth: 64, flexShrink: 0, alignSelf: "stretch", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
+                style={{ minWidth: 64, height: 48, flexShrink: 0, alignSelf: "flex-end", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
               >
                 {promptSubmitting ? (
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" style={{ animation: "spin 1s linear infinite" }}>

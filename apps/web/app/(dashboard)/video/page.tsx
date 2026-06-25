@@ -215,7 +215,7 @@ export default function VideoPage() {
         >
           <div
             style={{
-              flex: 1,
+              flex: 2,
               minHeight: 0,
               display: "flex",
               alignItems: "center",
@@ -258,8 +258,12 @@ export default function VideoPage() {
             )}
           </div>
 
-          {/* VideoGenerator 通过 portal 把提示词输入区渲染到这里 */}
-          <div id="video-prompt-slot" style={{ flexShrink: 0 }} />
+          {/* VideoGenerator 通过 portal 把提示词输入区渲染到这里。
+              与预览区平分中间列高度（各 flex:1），让输入框撑满下方空间 */}
+          <div
+            id="video-prompt-slot"
+            style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}
+          />
         </div>
 
         {/* 右：历史列表 */}
