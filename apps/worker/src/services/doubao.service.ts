@@ -72,7 +72,7 @@ export class DoubaoService implements GenerationProvider {
       size,
       // 反代 OpenAI schema 用 resolution_name(720p/1080p)，内部转 resolution
       ...(resolution ? { resolution_name: resolution } : {}),
-      // 豆包反代接受 input_reference: [{ image_url }]（当前仅用第一张作参考图）
+      // 豆包反代接受 input_reference: [{ image_url }]，多张参考图全部透传（反代会逐张上传并拼进豆包 ref_images）
       ...(references.length > 0 ? { input_reference: references.map((url) => ({ image_url: url })) } : {}),
     };
 

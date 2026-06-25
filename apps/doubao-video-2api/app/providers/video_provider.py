@@ -3960,13 +3960,31 @@ class VideoProvider:
         request_data: Dict[str, Any],
         cookie: Optional[str] = None,
     ) -> Dict[str, Any]:
-        reference_image = self._extract_reference_image(request_data)
-        if not reference_image or reference_image.get("file_key"):
+        references = self._extract_reference_images(request_data)
+        if not references:
             return request_data
 
-        uploaded = await self._upload_reference_image_to_doubao(reference_image, cookie=cookie)
+        # 逐张确保已上传到豆包（已有 file_key 的直接复用），全部转成 attachmentStates，
+        # 下游 _prepare_reference_attachment_states 据此构造豆包多图 ref_images。
+        uploaded_list: list[Dict[str, Any]] = []
+        for reference in references:
+            if reference.get("file_key"):
+                uploaded_list.append(reference)
+            else:
+                uploaded_list.append(
+                    await self._upload_reference_image_to_doubao(reference, cookie=cookie)
+                )
+
+        attachment_states = [
+            self._normalize_attachment_state(item, index)
+            for index, item in enumerate(uploaded_list)
+        ]
+
         updated_request = dict(request_data)
-        updated_request["reference_image"] = uploaded
+        updated_request["attachmentStates"] = attachment_states
+        # 保留单数 reference_image 以兼容 meta / mock / 旧逻辑（用第一张）
+        updated_request["reference_image"] = uploaded_list[0]
+        updated_request.pop("images", None)
         task["reference_image"] = self._extract_reference_image(updated_request)
         task["reference_image_meta"] = self._reference_image_meta(task["reference_image"])
         return updated_request
@@ -5390,6 +5408,28 @@ class VideoProvider:
             status_code=400,
             detail="reference_image must be a data:image/... base64 string, an image URL/path, or a Doubao uploaded fileKey object.",
         )
+
+    def _extract_reference_images(self, request_data: Dict[str, Any]) -> list[Dict[str, Any]]:
+        """提取全部参考图（图生视频可多图）。
+
+        优先用 images 列表（OpenAI input_reference[] 归一化结果），逐项复用
+        _extract_reference_image 的单项解析；列表缺失时回退到单张 reference_image。
+        豆包 ref_images 是数组，全部参考图都应贯穿到上传与请求构造。
+        """
+        images = request_data.get("images")
+        if isinstance(images, list) and images:
+            parsed: list[Dict[str, Any]] = []
+            for item in images:
+                # 每项当作独立 request_data，复用已有单项解析（兼容 url/data/fileKey/dict）
+                candidate = item if isinstance(item, dict) else {"url": item}
+                reference = self._extract_reference_image(candidate)
+                if reference:
+                    parsed.append(reference)
+            if parsed:
+                return parsed
+
+        single = self._extract_reference_image(request_data)
+        return [single] if single else []
 
     def _parse_reference_image_path(self, candidate: Dict[str, Any]) -> Dict[str, Any]:
         path = Path(str(candidate.get("path"))).expanduser()

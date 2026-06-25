@@ -39,7 +39,7 @@ VIDEO_GENERATION_REQUEST_SCHEMA: dict[str, Any] = {
         "input_reference[]": {
             "type": "array",
             "title": "参考图",
-            "description": "图生视频参考图，最多 7 张；当前会使用第一张作为豆包视频参考图。",
+            "description": "图生视频参考图，最多 7 张；全部参考图都会上传并传给豆包 ref_images。",
             "items": {"type": "string", "format": "binary"},
         },
         "duration": {
