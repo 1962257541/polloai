@@ -44,5 +44,7 @@ USER appuser
 RUN playwright install chromium
 
 # 暴露端口并启动
+# 监听平台注入的 $PORT（Zeabur/Railway 等会注入），本地无该变量时回退 8000。
+# 用 shell 形式 CMD 才能对 $PORT 做环境变量展开。
 EXPOSE 8000
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+CMD uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1
