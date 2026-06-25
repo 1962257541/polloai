@@ -572,8 +572,8 @@ export default function VideoGenerator({ onCreated }: VideoGeneratorProps) {
                     ? "描述视频动作和镜头效果... (Enter 发送，Shift+Enter 换行)"
                     : "描述视频动作和镜头效果，将应用于所有选中的素材... (Enter 发送，Shift+Enter 换行)"
                 }
-                rows={3}
-                style={{ flex: 1, resize: "vertical", minHeight: 76 }}
+                rows={6}
+                style={{ flex: 1, resize: "vertical", minHeight: 160 }}
                 disabled={promptSubmitting}
               />
               <button
