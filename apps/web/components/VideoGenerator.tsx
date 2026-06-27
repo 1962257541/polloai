@@ -170,6 +170,7 @@ export default function VideoGenerator({ onCreated }: VideoGeneratorProps) {
         resolution,
         durationSec: duration,
       });
+      setPrompt("");
       onCreated();
     } catch (requestError) {
       setError((requestError as Error).message);
@@ -217,6 +218,7 @@ export default function VideoGenerator({ onCreated }: VideoGeneratorProps) {
 
       setBatchResult(`已提交 ${succeeded}/${batchMaterials.length} 条任务。`);
       if (errors.length > 0) setBatchError(errors.slice(0, 3).join("；"));
+      if (succeeded > 0) setBatchPrompt("");
       if (succeeded > 1) onCreated();
     } finally {
       setBatchSubmitting(false);

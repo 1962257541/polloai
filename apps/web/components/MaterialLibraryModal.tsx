@@ -61,6 +61,12 @@ export default function MaterialLibraryModal({
   const [message, setMessage] = useState("");
   const [selection, setSelection] = useState<string[]>([]);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  // 拖拽排序：dragId 为正在拖动项，dragOverId 为悬停目标项；
+  // dragHappenedRef 用于在拖放后抑制紧随的 click 误触选中
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
+  // 拖拽源 id 用 ref 同步保存，避免 onDrop 读到旧 state 闭包（不依赖渲染时机）
+  const dragIdRef = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const token = getToken() ?? "";
 
@@ -137,6 +143,20 @@ export default function MaterialLibraryModal({
     });
   };
 
+  // 将 sourceId 移动到 targetId 的位置（网格顺序即生成时的图片序号）
+  const reorderItems = (sourceId: string, targetId: string) => {
+    if (sourceId === targetId) return;
+    setItems((prev) => {
+      const from = prev.findIndex((m) => m.id === sourceId);
+      const to = prev.findIndex((m) => m.id === targetId);
+      if (from === -1 || to === -1) return prev;
+      const next = [...prev];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
+  };
+
   const handleDeleteMaterial = async (e: React.MouseEvent, material: Material) => {
     e.stopPropagation();
     if (!token) return;
@@ -210,7 +230,7 @@ export default function MaterialLibraryModal({
             </h3>
             <p style={{ margin: "6px 0 0", fontSize: "0.78rem", color: "var(--text-muted)" }}>
               {mode === "batch" ? "多选图片后统一生成视频。" : "选择一张图片用于生成视频。"}
-              支持 Ctrl+V 粘贴上传。
+              支持 Ctrl+V 粘贴上传，可拖动图片调整顺序。
             </p>
           </div>
           <button type="button" className="btn-ghost" onClick={onClose}>关闭</button>
@@ -313,12 +333,36 @@ export default function MaterialLibraryModal({
                     key={material.id}
                     role="button"
                     tabIndex={0}
+                    draggable
                     onClick={() => toggleSelection(material.id)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {
                         e.preventDefault();
                         toggleSelection(material.id);
                       }
+                    }}
+                    onDragStart={(e) => {
+                      dragIdRef.current = material.id;
+                      setDragId(material.id);
+                      e.dataTransfer.effectAllowed = "move";
+                    }}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = "move";
+                      if (dragOverId !== material.id) setDragOverId(material.id);
+                    }}
+                    onDragLeave={() => setDragOverId((cur) => (cur === material.id ? null : cur))}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      if (dragIdRef.current) reorderItems(dragIdRef.current, material.id);
+                      dragIdRef.current = null;
+                      setDragId(null);
+                      setDragOverId(null);
+                    }}
+                    onDragEnd={() => {
+                      dragIdRef.current = null;
+                      setDragId(null);
+                      setDragOverId(null);
                     }}
                     onMouseEnter={() => setHoveredId(material.id)}
                     onMouseLeave={() => setHoveredId(null)}
@@ -328,10 +372,16 @@ export default function MaterialLibraryModal({
                       borderRadius: 12,
                       padding: 0,
                       overflow: "hidden",
-                      cursor: "pointer",
+                      cursor: "grab",
                       textAlign: "left",
                       position: "relative",
                       outline: "none",
+                      opacity: dragId === material.id ? 0.4 : 1,
+                      boxShadow:
+                        dragOverId === material.id && dragId !== material.id
+                          ? "inset 0 0 0 2px var(--accent)"
+                          : undefined,
+                      transition: "opacity 0.12s, box-shadow 0.12s",
                     }}
                   >
                     {/* 选中角标 */}
@@ -425,6 +475,7 @@ export default function MaterialLibraryModal({
                         src={material.url}
                         alt={material.name}
                         loading="lazy"
+                        draggable={false}
                         style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
                       />
                     </div>
