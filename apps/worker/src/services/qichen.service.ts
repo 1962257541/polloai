@@ -136,14 +136,14 @@ export class QichenService implements GenerationProvider {
       const id = data?.id ?? data?.raw?.id;
       if (!id) throw new Error("七辰视频结果缺少下载地址: " + JSON.stringify(data).slice(0, 500));
       const base = this.apiBase(apiUrl);
-      return (await this.downloadByUrl(base + "/videos/" + encodeURIComponent(id) + "/content", undefined, 180_000)).buffer;
+      return (await this.downloadByUrl(base + "/videos/" + encodeURIComponent(id) + "/content", undefined, this.env.videoDownloadTimeoutMs)).buffer;
     }
     try {
-      return (await this.downloadByUrl(url, undefined, 180_000)).buffer;
+      return (await this.downloadByUrl(url, undefined, this.env.videoDownloadTimeoutMs)).buffer;
     } catch (error) {
       const statusText = error instanceof Error ? error.message : String(error);
       if (!/(401|403|unauthorized|forbidden)/i.test(statusText)) throw error;
-      return (await this.downloadByUrl(url, apiKey, 180_000)).buffer;
+      return (await this.downloadByUrl(url, apiKey, this.env.videoDownloadTimeoutMs)).buffer;
     }
   }
 

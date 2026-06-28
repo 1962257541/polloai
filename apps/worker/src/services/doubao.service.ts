@@ -122,7 +122,7 @@ export class DoubaoService implements GenerationProvider {
     }
     const base = this.apiBase(apiUrl);
     // ★ content 端点也挂了 verify_api_key，必须带 Bearer；跨域 302 跳上游 CDN 时 fetch 会自动剥离该头
-    const downloaded = await this.downloadByUrl(`${base}/v1/videos/${encodeURIComponent(id)}/content`, apiKey, 180_000);
+    const downloaded = await this.downloadByUrl(`${base}/v1/videos/${encodeURIComponent(id)}/content`, apiKey, this.env.videoDownloadTimeoutMs);
     return downloaded.buffer;
   }
 

@@ -124,7 +124,7 @@ export class VolcEngineService {
     const response = await fetch(videoUrl, {
       method: "GET",
       dispatcher: this.dispatcherFor(videoUrl),
-      signal: AbortSignal.timeout(120_000),
+      signal: AbortSignal.timeout(this.env.videoDownloadTimeoutMs),
     } as any);
     if (!response.ok) {
       const text = await response.text();

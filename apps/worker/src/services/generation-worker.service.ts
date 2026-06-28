@@ -1,5 +1,5 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
-import { Job, Worker } from "bullmq";
+import { Job, Queue, Worker } from "bullmq";
 import Redis from "ioredis";
 import { EnvService } from "./env.service";
 import { PrismaService } from "./prisma.service";
@@ -14,6 +14,12 @@ import { GenerationType } from "@packages/shared";
 
 const QUEUE_NAME = "generation-jobs";
 const CHANNEL = "generation-status";
+const DEFAULT_JOB_OPTIONS = {
+  attempts: 3,
+  backoff: { type: "exponential" as const, delay: 2000 },
+  removeOnComplete: 500,
+  removeOnFail: 500,
+};
 
 /** 入队任务负载：provider 决定走 yunwu(GeminiService) 还是 apimart(ApimartService) */
 type GenerationJobData = {
@@ -39,6 +45,7 @@ class RetryableGenerationError extends Error {
 @Injectable()
 export class GenerationWorkerService implements OnModuleInit, OnModuleDestroy {
   private worker?: Worker;
+  private readonly queue: Queue<GenerationJobData>;
   private readonly publisher: Redis;
 
   constructor(
@@ -51,6 +58,7 @@ export class GenerationWorkerService implements OnModuleInit, OnModuleDestroy {
     private readonly qichen: QichenService,
     private readonly volc: VolcEngineService,
   ) {
+    this.queue = new Queue(QUEUE_NAME, { connection: env.redisConnection });
     this.publisher = new Redis(env.redisUrl);
   }
 
@@ -63,8 +71,8 @@ export class GenerationWorkerService implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleInit() {
-    // 启动时将上次遗留的 queued/running 任务标记为 failed（服务重启导致的僵尸任务）
-    await this.markStalledTasksFailed();
+    // Requeue interrupted tasks instead of failing remote async jobs on restart.
+    await this.recoverInterruptedTasks();
 
     this.worker = new Worker(
       QUEUE_NAME,
@@ -86,22 +94,75 @@ export class GenerationWorkerService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  /** 将因服务重启而卡在 queued/running 状态的任务批量标记为 failed */
-  private async markStalledTasksFailed() {
+  private async recoverInterruptedTasks() {
     try {
-      const result = await this.prisma.generationTask.updateMany({
+      const tasks = await this.prisma.generationTask.findMany({
         where: { status: { in: ["queued", "running"] } },
-        data: {
-          status: "failed",
-          errorMessage: "服务重启，任务中断。请使用重试功能重新生成。",
-          finishedAt: new Date(),
+        include: {
+          user: {
+            select: {
+              apiKey: true,
+              apiUrl: true,
+              apiProvider: true,
+              imageApiType: true,
+            },
+          },
         },
       });
-      if (result.count > 0) {
-        console.log(`[Worker startup] Marked ${result.count} stalled task(s) as failed.`);
+
+      let recovered = 0;
+      for (const task of tasks) {
+        const existing = await this.queue.getJob(task.id);
+        if (existing) {
+          const state = await existing.getState();
+          if (!["completed", "failed", "unknown"].includes(state)) {
+            continue;
+          }
+
+          try {
+            await existing.remove();
+          } catch (error) {
+            console.warn(
+              `[Worker startup] Could not remove stale queue job ${task.id}: ${this.errorMessage(error)}`,
+            );
+            continue;
+          }
+        }
+
+        const provider =
+          task.type === "video_upscale"
+            ? undefined
+            : this.recoveryProvider(task.provider, task.user.apiProvider);
+        const apiKey = task.type === "video_upscale" ? "" : task.user.apiKey;
+        const apiUrl = task.type === "video_upscale" ? undefined : (task.user.apiUrl ?? undefined);
+
+        if (task.type !== "video_upscale" && (!apiKey || !apiUrl)) {
+          console.warn(`[Worker startup] Cannot recover task ${task.id}: missing API credentials`);
+          continue;
+        }
+
+        await this.queue.add(
+          "process-generation",
+          {
+            taskId: task.id,
+            apiKey: apiKey ?? "",
+            apiUrl,
+            imageApiType: task.user.imageApiType ?? undefined,
+            provider,
+          },
+          {
+            jobId: task.id,
+            ...DEFAULT_JOB_OPTIONS,
+          },
+        );
+        recovered += 1;
+      }
+
+      if (recovered > 0) {
+        console.log(`[Worker startup] Recovered ${recovered} interrupted task(s).`);
       }
     } catch (err) {
-      console.error("[Worker startup] Failed to mark stalled tasks:", err);
+      console.error("[Worker startup] Failed to recover interrupted tasks:", err);
     }
   }
 
@@ -109,6 +170,7 @@ export class GenerationWorkerService implements OnModuleInit, OnModuleDestroy {
     if (this.worker) {
       await this.worker.close();
     }
+    await this.queue.close();
     await this.publisher.quit();
   }
 
@@ -326,25 +388,39 @@ export class GenerationWorkerService implements OnModuleInit, OnModuleDestroy {
     console.log(
       `[handleImageToVideo] taskId=${taskId} images=${imageUrls.length} params.durationSec=${params.durationSec} (${typeof params.durationSec}), env default=${this.env.geminiVideoSeconds}`,
     );
-    const operation = await svc.createVideoFromImage({
-      model: task.model,
-      prompt: task.prompt,
-      imageUrls,
-      aspectRatio: params.aspectRatio,
-      size: params.size,
-      resolution: params.resolution,
-      // 用 ?? 而非 ||，避免未来 0 等假值边界
-      seconds: params.durationSec ?? this.env.geminiVideoSeconds,
-      apiKey,
-      apiUrl,
-    });
+    let providerJobId =
+      typeof task.providerJobId === "string" && task.providerJobId.trim()
+        ? task.providerJobId.trim()
+        : undefined;
 
-    await this.prisma.generationTask.update({
-      where: { id: taskId },
-      data: { providerJobId: operation.name },
-    });
+    if (providerJobId) {
+      console.log(`[handleImageToVideo] Resuming provider task ${providerJobId} for taskId=${taskId}`);
+    } else {
+      const operation = await svc.createVideoFromImage({
+        model: task.model,
+        prompt: task.prompt,
+        imageUrls,
+        aspectRatio: params.aspectRatio,
+        size: params.size,
+        resolution: params.resolution,
+        // Use ?? instead of || so future falsy boundary values are preserved.
+        seconds: params.durationSec ?? this.env.geminiVideoSeconds,
+        apiKey,
+        apiUrl,
+      });
 
-    const finalStatus = await this.pollVideoCompletion(taskId, operation.name, apiKey, apiUrl, provider);
+      providerJobId = operation.name;
+      await this.prisma.generationTask.update({
+        where: { id: taskId },
+        data: { providerJobId },
+      });
+    }
+
+    if (!providerJobId) {
+      throw new Error("Video provider task id is missing");
+    }
+
+    const finalStatus = await this.pollVideoCompletion(taskId, providerJobId, apiKey, apiUrl, provider);
     const buffer = await svc.downloadVideo(finalStatus, apiKey, apiUrl);
 
     const latest = await this.prisma.generationTask.findUnique({
@@ -617,6 +693,15 @@ export class GenerationWorkerService implements OnModuleInit, OnModuleDestroy {
     responseText?: string;
   }) {
     await this.publisher.publish(CHANNEL, JSON.stringify(event));
+  }
+
+  private recoveryProvider(taskProvider?: string | null, userProvider?: string | null) {
+    if (taskProvider && taskProvider !== "gemini") return taskProvider;
+    return userProvider ?? undefined;
+  }
+
+  private errorMessage(error: unknown) {
+    return error instanceof Error ? error.message : String(error);
   }
 
   private sleep(ms: number) {

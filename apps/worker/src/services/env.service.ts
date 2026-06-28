@@ -43,6 +43,7 @@ const envSchema = z.object({
   GEMINI_VIDEO_MODEL: z.string().default("veo-3.1-generate-preview"),
   GEMINI_VIDEO_SECONDS: z.coerce.number().int().min(1).max(15).default(5),
   GEMINI_VIDEO_RESOLUTION: z.string().default("720p"),
+  VIDEO_DOWNLOAD_TIMEOUT_MS: z.coerce.number().int().min(30_000).max(1_800_000).default(600_000),
   // 火山引擎 AI MediaKit 视频画质增强（Bearer Token 鉴权，REST 接口）
   VOLC_API_KEY: z.string().optional(),
   VOLC_HOST: z.string().default("mediakit.cn-beijing.volces.com"),
@@ -130,6 +131,10 @@ export class EnvService {
 
   get geminiVideoResolution() {
     return this.env.GEMINI_VIDEO_RESOLUTION;
+  }
+
+  get videoDownloadTimeoutMs() {
+    return this.env.VIDEO_DOWNLOAD_TIMEOUT_MS;
   }
 
   // ---- 火山引擎 AI MediaKit 画质增强 ----

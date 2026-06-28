@@ -157,7 +157,7 @@ export class ApimartService implements GenerationProvider {
     if (!url) {
       throw new Error(`APIMart 视频结果缺少下载地址: ${JSON.stringify(data).slice(0, 500)}`);
     }
-    const downloaded = await this.downloadByUrl(url, 120_000);
+    const downloaded = await this.downloadByUrl(url, this.env.videoDownloadTimeoutMs);
     return downloaded.buffer;
   }
 
