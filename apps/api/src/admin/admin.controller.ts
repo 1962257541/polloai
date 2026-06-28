@@ -24,6 +24,7 @@ import { JwtAuthGuard } from "../common/jwt-auth.guard";
 import { RolesGuard } from "../common/roles.guard";
 import { Roles } from "../common/roles.decorator";
 import { CurrentUser, JwtUser } from "../common/current-user.decorator";
+import { apiProviderValues } from "@packages/shared";
 
 class CreateSalespersonBody {
   @IsEmail()
@@ -50,7 +51,7 @@ class UpdateApiKeyBody {
 
   // 中转站供应商：yunwu（默认）| apimart（apib.ai）| doubao（自部署 doubao-video-2api 反代）
   @IsOptional()
-  @IsIn(["yunwu", "apimart", "doubao", "qichen"])
+  @IsIn(apiProviderValues)
   apiProvider?: string;
 }
 
