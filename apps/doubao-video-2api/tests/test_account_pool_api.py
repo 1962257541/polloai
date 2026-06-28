@@ -1,4 +1,5 @@
 import asyncio
+import json
 from types import SimpleNamespace
 
 import pytest
@@ -794,6 +795,59 @@ async def test_add_account_creates_runtime_pool_without_provider(monkeypatch):
         status = await client.get("/v1/account-pool")
         assert status.json()["enabled"] is True
         assert status.json()["account_count"] == 1
+
+
+@pytest.mark.asyncio
+async def test_add_account_persists_to_account_store_by_default(monkeypatch, tmp_path):
+    store_path = tmp_path / "accounts.json"
+    cookie = "sessionid=persisted; sid_guard=persisted"
+    monkeypatch.setattr(main, "provider", None)
+    monkeypatch.setattr(main, "video_provider", None)
+    monkeypatch.setattr(main, "runtime_credential_manager", None)
+    monkeypatch.setattr(main.settings, "DOUBAO_ACCOUNT_STORE_PATH", str(store_path))
+    monkeypatch.setattr(main.settings, "DOUBAO_COOKIES", [])
+    monkeypatch.setattr(main.settings, "DOUBAO_COOKIE_WEIGHTS", [])
+    monkeypatch.setattr(main.settings, "DOUBAO_COOKIE_MAX_CONCURRENCY", [])
+    monkeypatch.setattr(main.settings, "DOUBAO_COOKIE_DISABLED", [])
+
+    async def fake_register(self, registered_cookie):
+        assert registered_cookie == cookie
+        return {"profile_id": "persisted-profile", "created": True}
+
+    monkeypatch.setattr(PlaywrightManager, "register_account", fake_register)
+
+    transport = ASGITransport(app=main.app)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        created = await client.post(
+            "/v1/account-pool/accounts",
+            json={"cookie": cookie, "weight": 2, "max_concurrency": 3},
+        )
+        assert created.status_code == 200
+        payload = created.json()
+        assert payload["persisted"] is True
+        assert payload["store_index"] == 1
+        assert payload["persist_path"] == str(store_path)
+        assert cookie not in created.text
+
+        stored = json.loads(store_path.read_text(encoding="utf-8"))
+        assert stored["accounts"][0]["cookie"] == cookie
+        assert stored["accounts"][0]["weight"] == 2
+        assert stored["accounts"][0]["max_concurrency"] == 3
+
+        monkeypatch.setattr(main, "runtime_credential_manager", None)
+        monkeypatch.setattr(main.settings, "DOUBAO_COOKIES", [])
+        monkeypatch.setattr(main.settings, "DOUBAO_COOKIE_WEIGHTS", [])
+        monkeypatch.setattr(main.settings, "DOUBAO_COOKIE_MAX_CONCURRENCY", [])
+        monkeypatch.setattr(main.settings, "DOUBAO_COOKIE_DISABLED", [])
+
+        status = await client.get("/v1/account-pool")
+        assert status.status_code == 200
+        restored = status.json()
+        assert restored["enabled"] is True
+        assert restored["account_count"] == 1
+        assert restored["accounts"][0]["weight"] == 2
+        assert restored["accounts"][0]["max_concurrency"] == 3
+        assert cookie not in status.text
 
 
 @pytest.mark.asyncio

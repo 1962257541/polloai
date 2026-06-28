@@ -69,6 +69,7 @@ def _get_runtime_credential_manager() -> Optional[CredentialManager]:
         return video_provider.credential_manager
     if runtime_credential_manager:
         return runtime_credential_manager
+    settings.load_persisted_accounts()
     if settings.DOUBAO_COOKIES:
         manager = CredentialManager.shared()
         _set_runtime_credential_manager(manager)
@@ -184,6 +185,26 @@ def _env_unquote(value: str) -> str:
 
 def _persist_account_to_env(cookie: str, weight: int, max_concurrency: int, disabled: bool) -> int:
     return account_pool_routes._persist_account_to_env(cookie, weight, max_concurrency, disabled)
+
+
+def _persist_account_to_store(cookie: str, weight: int, max_concurrency: int, disabled: bool) -> int:
+    return account_pool_routes._persist_account_to_store(cookie, weight, max_concurrency, disabled)
+
+
+def _replace_or_append_account_store(
+    old_cookie: str,
+    new_cookie: str,
+    weight: int,
+    max_concurrency: int,
+    disabled: bool,
+) -> int:
+    return account_pool_routes._replace_or_append_account_store(
+        old_cookie,
+        new_cookie,
+        weight,
+        max_concurrency,
+        disabled,
+    )
 
 
 def _remove_account_from_env(cookie: str) -> Optional[int]:
@@ -398,6 +419,7 @@ async def _sync_plugin_cookie(cookie: str, *, persist: bool = True) -> dict[str,
     manager = _get_runtime_credential_manager()
     action = "unchanged"
     env_index = None
+    store_index = None
 
     if manager is None:
         manager = CredentialManager(
@@ -413,12 +435,13 @@ async def _sync_plugin_cookie(cookie: str, *, persist: bool = True) -> dict[str,
         account = manager.snapshot()["accounts"][0]
         action = "added"
         if persist:
-            env_index = _persist_account_to_env(
-                cookie,
-                int(account.get("weight") or settings.DOUBAO_ACCOUNT_DEFAULT_WEIGHT),
-                int(account.get("max_concurrency") or settings.DOUBAO_ACCOUNT_MAX_CONCURRENCY),
-                False,
-            )
+            weight = int(account.get("weight") or settings.DOUBAO_ACCOUNT_DEFAULT_WEIGHT)
+            max_concurrency = int(account.get("max_concurrency") or settings.DOUBAO_ACCOUNT_MAX_CONCURRENCY)
+            store_index = _persist_account_to_store(cookie, weight, max_concurrency, False)
+            try:
+                env_index = _persist_account_to_env(cookie, weight, max_concurrency, False)
+            except OSError as exc:
+                logger.warning(f"Unable to write legacy .env cookie store: {exc}")
         _append_settings_cookie(
             cookie,
             weight=int(account.get("weight") or settings.DOUBAO_ACCOUNT_DEFAULT_WEIGHT),
@@ -436,12 +459,13 @@ async def _sync_plugin_cookie(cookie: str, *, persist: bool = True) -> dict[str,
             )
             action = "added"
             if persist:
-                env_index = _persist_account_to_env(
-                    cookie,
-                    int(account.get("weight") or settings.DOUBAO_ACCOUNT_DEFAULT_WEIGHT),
-                    int(account.get("max_concurrency") or settings.DOUBAO_ACCOUNT_MAX_CONCURRENCY),
-                    False,
-                )
+                weight = int(account.get("weight") or settings.DOUBAO_ACCOUNT_DEFAULT_WEIGHT)
+                max_concurrency = int(account.get("max_concurrency") or settings.DOUBAO_ACCOUNT_MAX_CONCURRENCY)
+                store_index = _persist_account_to_store(cookie, weight, max_concurrency, False)
+                try:
+                    env_index = _persist_account_to_env(cookie, weight, max_concurrency, False)
+                except OSError as exc:
+                    logger.warning(f"Unable to write legacy .env cookie store: {exc}")
             _append_settings_cookie(
                 cookie,
                 weight=int(account.get("weight") or settings.DOUBAO_ACCOUNT_DEFAULT_WEIGHT),
@@ -454,7 +478,20 @@ async def _sync_plugin_cookie(cookie: str, *, persist: bool = True) -> dict[str,
             account = await manager.update_account_cookie(index, cookie)
             action = "updated"
             if persist:
-                env_index = _replace_or_append_plugin_env_cookie(old_cookie or "", cookie, account)
+                weight = int(account.get("weight") or settings.DOUBAO_ACCOUNT_DEFAULT_WEIGHT)
+                max_concurrency = int(account.get("max_concurrency") or settings.DOUBAO_ACCOUNT_MAX_CONCURRENCY)
+                disabled = str(account.get("status") or "").lower() == "disabled"
+                store_index = _replace_or_append_account_store(
+                    old_cookie or "",
+                    cookie,
+                    weight,
+                    max_concurrency,
+                    disabled,
+                )
+                try:
+                    env_index = _replace_or_append_plugin_env_cookie(old_cookie or "", cookie, account)
+                except OSError as exc:
+                    logger.warning(f"Unable to write legacy .env cookie store: {exc}")
             _replace_settings_cookie(old_cookie or "", cookie)
 
     await _activate_runtime_credential_manager(manager)
@@ -468,6 +505,8 @@ async def _sync_plugin_cookie(cookie: str, *, persist: bool = True) -> dict[str,
         "success": True,
         "action": action,
         "persisted": bool(persist),
+        "store_index": store_index,
+        "persist_path": str(account_pool_routes._account_store_path()) if persist else None,
         "env_index": env_index,
         "account": account,
         "account_count": manager.snapshot().get("account_count"),

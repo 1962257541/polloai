@@ -50,7 +50,7 @@ class UpdateApiKeyBody {
 
   // 中转站供应商：yunwu（默认）| apimart（apib.ai）| doubao（自部署 doubao-video-2api 反代）
   @IsOptional()
-  @IsIn(["yunwu", "apimart", "doubao"])
+  @IsIn(["yunwu", "apimart", "doubao", "qichen"])
   apiProvider?: string;
 }
 

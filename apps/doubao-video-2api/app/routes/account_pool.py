@@ -1,6 +1,8 @@
 import asyncio
+import json
 import os
 import re
+import time
 from pathlib import Path
 from typing import Any, Awaitable, Callable, Optional
 
@@ -83,6 +85,7 @@ def _account_pool_manager():
         return video_provider.credential_manager
     if runtime_credential_manager:
         return runtime_credential_manager
+    settings.load_persisted_accounts()
     if settings.DOUBAO_COOKIES:
         runtime_credential_manager = CredentialManager.from_settings()
         _runtime_manager_setter(runtime_credential_manager)
@@ -199,7 +202,15 @@ async def _finish_manual_verification(
     browser_profile = None
     if cookie_header:
         try:
+            old_cookie = await manager.get_cookie(account_index)
             account = await manager.update_account_cookie(account_index, cookie_header)
+            _replace_account_store_if_present(
+                old_cookie,
+                cookie_header,
+                int(account.get("weight") or settings.DOUBAO_ACCOUNT_DEFAULT_WEIGHT),
+                int(account.get("max_concurrency") or settings.DOUBAO_ACCOUNT_MAX_CONCURRENCY),
+                str(account.get("status") or "").lower() == "disabled",
+            )
         except (IndexError, ValueError) as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         browser_profile = await PlaywrightManager().register_account(cookie_header)
@@ -420,7 +431,7 @@ def _new_account_payload(data: dict[str, Any]) -> dict[str, Any]:
             "max_concurrency",
         ),
         "disabled": _bool_value(data.get("disabled"), False),
-        "persist": _bool_value(data.get("persist"), False),
+        "persist": _bool_value(data.get("persist"), True),
     }
 
 
@@ -460,7 +471,7 @@ def _bulk_account_payload(data: dict[str, Any]) -> dict[str, Any]:
             "max_concurrency",
         ),
         "disabled": _bool_value(data.get("disabled"), False),
-        "persist": _bool_value(data.get("persist"), False),
+        "persist": _bool_value(data.get("persist"), True),
     }
 
 
@@ -525,6 +536,167 @@ def _remove_account_from_env(cookie: str) -> Optional[int]:
     return found_index
 
 
+def _account_store_path() -> Path:
+    return Path(settings.DOUBAO_ACCOUNT_STORE_PATH)
+
+
+def _load_persisted_account_records() -> list[dict[str, Any]]:
+    path = _account_store_path()
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return []
+    except (json.JSONDecodeError, OSError):
+        return []
+
+    records = payload.get("accounts") if isinstance(payload, dict) else payload
+    if not isinstance(records, list):
+        return []
+    return [dict(record) for record in records if isinstance(record, dict)]
+
+
+def _save_persisted_account_records(records: list[dict[str, Any]]) -> None:
+    path = _account_store_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps({"version": 1, "accounts": records}, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+
+def _persisted_record_identity(record: dict[str, Any]) -> str:
+    identity = str(record.get("identity") or "").strip()
+    if identity:
+        return identity
+    return credential_identity(normalize_doubao_cookie(record.get("cookie") or record.get("credential")))
+
+
+def _persisted_account_record(cookie: str, weight: int, max_concurrency: int, disabled: bool) -> dict[str, Any]:
+    identity = credential_identity(cookie)
+    now = time.time()
+    return {
+        "identity": identity,
+        "cookie": cookie,
+        "weight": max(1, int(weight or 1)),
+        "max_concurrency": max(1, int(max_concurrency or 1)),
+        "disabled": bool(disabled),
+        "updated_at": now,
+    }
+
+
+def _persist_account_to_store(cookie: str, weight: int, max_concurrency: int, disabled: bool) -> int:
+    cookie = normalize_doubao_cookie(cookie)
+    if not cookie:
+        raise ValueError("Credential cookie cannot be empty.")
+    records = _load_persisted_account_records()
+    record = _persisted_account_record(cookie, weight, max_concurrency, disabled)
+    target_identity = record["identity"]
+    for index, existing in enumerate(records):
+        if _persisted_record_identity(existing) != target_identity:
+            continue
+        records[index] = {
+            **existing,
+            **record,
+            "created_at": existing.get("created_at") or record["updated_at"],
+        }
+        _save_persisted_account_records(records)
+        return index + 1
+
+    records.append({**record, "created_at": record["updated_at"]})
+    _save_persisted_account_records(records)
+    return len(records)
+
+
+def _remove_account_from_store(cookie: str) -> Optional[int]:
+    target_identity = credential_identity(cookie)
+    if not target_identity:
+        return None
+    records = _load_persisted_account_records()
+    for index, existing in enumerate(records):
+        if _persisted_record_identity(existing) != target_identity:
+            continue
+        records.pop(index)
+        _save_persisted_account_records(records)
+        return index + 1
+    return None
+
+
+def _replace_or_append_account_store(
+    old_cookie: str,
+    new_cookie: str,
+    weight: int,
+    max_concurrency: int,
+    disabled: bool,
+) -> int:
+    new_cookie = normalize_doubao_cookie(new_cookie)
+    if not new_cookie:
+        raise ValueError("Credential cookie cannot be empty.")
+    old_identity = credential_identity(old_cookie)
+    new_record = _persisted_account_record(new_cookie, weight, max_concurrency, disabled)
+    records = _load_persisted_account_records()
+    for index, existing in enumerate(records):
+        identity = _persisted_record_identity(existing)
+        if identity not in {old_identity, new_record["identity"]}:
+            continue
+        records[index] = {
+            **existing,
+            **new_record,
+            "created_at": existing.get("created_at") or new_record["updated_at"],
+        }
+        _save_persisted_account_records(records)
+        return index + 1
+    records.append({**new_record, "created_at": new_record["updated_at"]})
+    _save_persisted_account_records(records)
+    return len(records)
+
+
+def _replace_account_store_if_present(
+    old_cookie: str,
+    new_cookie: str,
+    weight: int,
+    max_concurrency: int,
+    disabled: bool,
+) -> Optional[int]:
+    old_identity = credential_identity(old_cookie)
+    new_record = _persisted_account_record(normalize_doubao_cookie(new_cookie), weight, max_concurrency, disabled)
+    records = _load_persisted_account_records()
+    for index, existing in enumerate(records):
+        identity = _persisted_record_identity(existing)
+        if identity not in {old_identity, new_record["identity"]}:
+            continue
+        records[index] = {
+            **existing,
+            **new_record,
+            "created_at": existing.get("created_at") or new_record["updated_at"],
+        }
+        _save_persisted_account_records(records)
+        return index + 1
+    return None
+
+
+def _update_account_store_record(cookie: str, account: dict[str, Any]) -> Optional[int]:
+    target_identity = credential_identity(cookie)
+    if not target_identity:
+        return None
+    records = _load_persisted_account_records()
+    for index, existing in enumerate(records):
+        if _persisted_record_identity(existing) != target_identity:
+            continue
+        records[index] = {
+            **existing,
+            "weight": max(1, int(account.get("weight") or existing.get("weight") or 1)),
+            "max_concurrency": max(
+                1,
+                int(account.get("max_concurrency") or existing.get("max_concurrency") or 1),
+            ),
+            "disabled": str(account.get("status") or "").lower() == "disabled",
+            "updated_at": time.time(),
+        }
+        _save_persisted_account_records(records)
+        return index + 1
+    return None
+
+
 def _account_index(index: int) -> int:
     if index < 0:
         raise HTTPException(status_code=400, detail="Account index must be non-negative.")
@@ -534,8 +706,8 @@ def _account_index(index: int) -> int:
 def _verification_snapshot_path(filename: str) -> Path:
     if Path(filename).name != filename or not filename.lower().endswith(".png"):
         raise HTTPException(status_code=404, detail="Verification snapshot not found.")
-    path = (Path(".generated/verification-snapshots") / filename).resolve()
-    root = Path(".generated/verification-snapshots").resolve()
+    path = (Path(settings.DOUBAO_VERIFICATION_SNAPSHOT_DIR) / filename).resolve()
+    root = Path(settings.DOUBAO_VERIFICATION_SNAPSHOT_DIR).resolve()
     if root not in path.parents:
         raise HTTPException(status_code=404, detail="Verification snapshot not found.")
     if not path.is_file():
@@ -628,17 +800,17 @@ async def create_account(request: Request):
     if manager and manager.contains_credential(data["cookie"]):
         raise HTTPException(status_code=400, detail="Credential cookie already exists.")
 
-    env_index = None
+    store_index = None
     if data["persist"]:
         try:
-            env_index = _persist_account_to_env(
+            store_index = _persist_account_to_store(
                 data["cookie"],
                 data["weight"],
                 data["max_concurrency"],
                 data["disabled"],
             )
-        except OSError as exc:
-            raise HTTPException(status_code=500, detail=f"Unable to write .env: {exc}") from exc
+        except (OSError, ValueError) as exc:
+            raise HTTPException(status_code=500, detail=f"Unable to write account store: {exc}") from exc
 
     if manager is None:
         manager = CredentialManager(
@@ -673,7 +845,9 @@ async def create_account(request: Request):
             manager,
             account=account,
             persisted=data["persist"],
-            env_index=env_index,
+            store_index=store_index,
+            persist_path=str(_account_store_path()) if data["persist"] else None,
+            env_index=None,
             browser_profile=browser_profile,
             quota_refresh_result=quota_refresh,
         )
@@ -703,21 +877,22 @@ async def create_accounts_bulk(request: Request):
         pending = data["cookies"][1:]
         start_index = 1
         first_account = manager.snapshot()["accounts"][0]
-        added = [{"account": first_account, "persisted": False, "env_index": None}]
+        added = [{"account": first_account, "persisted": False, "store_index": None, "env_index": None}]
         skipped = []
         failed = []
         if data["persist"]:
             try:
-                env_index = _persist_account_to_env(
+                store_index = _persist_account_to_store(
                     first,
                     data["weight"],
                     data["max_concurrency"],
                     data["disabled"],
                 )
                 added[0]["persisted"] = True
-                added[0]["env_index"] = env_index
-            except OSError as exc:
-                failed.append({"index": 0, "message": f"Unable to write .env: {exc}"})
+                added[0]["store_index"] = store_index
+                added[0]["persist_path"] = str(_account_store_path())
+            except (OSError, ValueError) as exc:
+                failed.append({"index": 0, "message": f"Unable to write account store: {exc}"})
         added[0]["browser_profile"] = await PlaywrightManager().register_account(first)
     else:
         pending = data["cookies"]
@@ -731,19 +906,19 @@ async def create_accounts_bulk(request: Request):
             skipped.append({"index": offset, "reason": "duplicate"})
             continue
 
-        env_index = None
+        store_index = None
         persisted = False
         if data["persist"]:
             try:
-                env_index = _persist_account_to_env(
+                store_index = _persist_account_to_store(
                     cookie,
                     data["weight"],
                     data["max_concurrency"],
                     data["disabled"],
                 )
                 persisted = True
-            except OSError as exc:
-                failed.append({"index": offset, "message": f"Unable to write .env: {exc}"})
+            except (OSError, ValueError) as exc:
+                failed.append({"index": offset, "message": f"Unable to write account store: {exc}"})
                 continue
 
         try:
@@ -758,7 +933,9 @@ async def create_accounts_bulk(request: Request):
                 {
                     "account": account,
                     "persisted": persisted,
-                    "env_index": env_index,
+                    "store_index": store_index,
+                    "persist_path": str(_account_store_path()) if persisted else None,
+                    "env_index": None,
                     "browser_profile": browser_profile,
                 }
             )
@@ -798,16 +975,21 @@ async def create_accounts_bulk(request: Request):
 async def update_account(index: int, request: Request):
     manager = _account_pool_manager()
     data = await request.json()
+    account_index = _account_index(index)
     try:
+        cookie = await manager.get_cookie(account_index)
         account = await manager.update_account(
-            _account_index(index),
+            account_index,
             weight=data.get("weight"),
             max_concurrency=data.get("max_concurrency"),
             disabled=data.get("disabled"),
         )
+        store_index = _update_account_store_record(cookie, account)
     except IndexError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    return JSONResponse(content={"object": "account", "data": account})
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail=f"Unable to write account store: {exc}") from exc
+    return JSONResponse(content={"object": "account", "data": account, "store_index": store_index})
 
 
 @router.delete("/account-pool/accounts/{index}", response_class=JSONResponse)
@@ -816,6 +998,7 @@ async def delete_account(index: int):
     try:
         cookie = await manager.get_cookie(_account_index(index))
         account = await manager.remove_account(_account_index(index))
+        store_index = _remove_account_from_store(cookie)
         env_index = _remove_account_from_env(cookie)
         browser_profile_deleted = await PlaywrightManager().remove_account_profile(cookie)
     except IndexError as exc:
@@ -823,12 +1006,13 @@ async def delete_account(index: int):
     except RuntimeError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     except OSError as exc:
-        raise HTTPException(status_code=500, detail=f"Unable to write .env: {exc}") from exc
+        raise HTTPException(status_code=500, detail=f"Unable to write account store: {exc}") from exc
     return JSONResponse(
         content=_account_pool_payload(
             manager,
             object_name="account_deleted",
             data=account,
+            store_index=store_index,
             env_index=env_index,
             browser_profile_deleted=browser_profile_deleted,
         )

@@ -9,3 +9,4 @@ __pycache__
 uvicorn-*.out.log
 uvicorn-*.err.log
 tests
+data/

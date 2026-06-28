@@ -666,7 +666,7 @@ class PlaywrightManager:
 
         if snapshot:
             with suppress(Exception):
-                snapshot_dir = Path(".generated/verification-trigger-snapshots")
+                snapshot_dir = Path(settings.DOUBAO_VERIFICATION_TRIGGER_SNAPSHOT_DIR)
                 snapshot_dir.mkdir(parents=True, exist_ok=True)
                 safe_prefix = "".join(ch if ch.isalnum() or ch in "-_" else "-" for ch in snapshot_prefix)[:80]
                 name_parts = [part for part in (safe_prefix, phase, time.strftime("%Y%m%d-%H%M%S")) if part]

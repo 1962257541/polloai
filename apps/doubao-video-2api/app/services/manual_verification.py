@@ -11,6 +11,7 @@ from urllib.parse import parse_qs, urlparse
 from loguru import logger
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
+from app.core.config import settings
 from app.services.doubao_context_template import (
     build_context_template,
     context_summary_for_public,
@@ -136,8 +137,8 @@ class ManualVerificationManager:
             cls._shared = cls()
         return cls._shared
 
-    def __init__(self, snapshot_dir: str | Path = ".generated/verification-snapshots") -> None:
-        self.snapshot_dir = Path(snapshot_dir)
+    def __init__(self, snapshot_dir: str | Path | None = None) -> None:
+        self.snapshot_dir = Path(snapshot_dir or settings.DOUBAO_VERIFICATION_SNAPSHOT_DIR)
         self._records: dict[int, ManualVerificationRecord] = {}
         self._lock = asyncio.Lock()
 

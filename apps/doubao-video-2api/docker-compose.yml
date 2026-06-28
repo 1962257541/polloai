@@ -23,9 +23,11 @@ services:
     restart: unless-stopped
     env_file:
       - .env
+    environment:
+      DOUBAO_PERSIST_DIR: /data/doubao-video-2api
     volumes:
       - ./.env:/app/.env
-      - ./.generated:/app/.generated
+      - ./.generated:/data/doubao-video-2api
     networks:
       - doubao-net
 

@@ -1,17 +1,61 @@
 # /app/core/config.py
+import json
 import os
 import re
 import uuid
+from pathlib import Path
 from dotenv import dotenv_values
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import model_validator
 from typing import Any, Optional, List, Dict
+from urllib.parse import unquote
 
 
 COOKIE_ENV_WRAPPER_RE = re.compile(
     r"^\s*DOUBAO_COOKIE_\d+\s*=\s*([\"']?)(.*)\1\s*$",
     re.I | re.S,
 )
+PRIMARY_COOKIE_IDENTITY_KEYS = ("sessionid", "sessionid_ss", "sid_tt", "sid_guard")
+SECONDARY_COOKIE_IDENTITY_KEYS = ("uid_tt", "uid_tt_ss", "passport_user_id", "user_unique_id", "login_user_id")
+VOLATILE_COOKIE_KEYS = {"mstoken", "s_v_web_id", "web_id", "tea_uuid", "ttwid"}
+
+
+def _persist_path(name: str) -> str:
+    return str(Path(os.getenv("DOUBAO_PERSIST_DIR", ".generated")) / name)
+
+
+def _cookie_pairs(cookie: str) -> Dict[str, str]:
+    pairs: Dict[str, str] = {}
+    for item in (cookie or "").split(";"):
+        if "=" not in item:
+            continue
+        key, value = item.split("=", 1)
+        key = key.strip().lower()
+        value = value.strip().strip('"')
+        if key:
+            pairs[key] = unquote(value)
+    return pairs
+
+
+def _cookie_identity(cookie: str) -> str:
+    pairs = _cookie_pairs(cookie)
+    if not pairs:
+        return f"raw:{cookie}" if cookie else ""
+    for key in PRIMARY_COOKIE_IDENTITY_KEYS:
+        value = pairs.get(key)
+        if value:
+            return f"cookie:{key}={value}"
+    secondary = [(key, pairs[key]) for key in SECONDARY_COOKIE_IDENTITY_KEYS if pairs.get(key)]
+    if secondary:
+        return "cookie:" + "|".join(f"{key}={value}" for key, value in secondary)
+    stable_pairs = [
+        (key, value)
+        for key, value in sorted(pairs.items())
+        if key not in VOLATILE_COOKIE_KEYS and value
+    ]
+    if stable_pairs:
+        return "cookie:" + "|".join(f"{key}={value}" for key, value in stable_pairs)
+    return f"raw:{cookie}"
 
 
 def normalize_doubao_cookie(value: Any) -> str:
@@ -50,8 +94,10 @@ class Settings(BaseSettings):
     DOUBAO_ACCOUNT_FAILURE_THRESHOLD: int = 3
     DOUBAO_ACCOUNT_COOLDOWN_SECONDS: float = 300
     DOUBAO_ACCOUNT_ACQUIRE_TIMEOUT: float = 30
-    DOUBAO_DISABLED_CREDENTIAL_STORE_PATH: str = ".generated/disabled_credentials.json"
-    DOUBAO_VIDEO_QUOTA_STORE_PATH: str = ".generated/video_quotas.json"
+    DOUBAO_PERSIST_DIR: str = os.getenv("DOUBAO_PERSIST_DIR", ".generated")
+    DOUBAO_ACCOUNT_STORE_PATH: str = _persist_path("accounts.json")
+    DOUBAO_DISABLED_CREDENTIAL_STORE_PATH: str = _persist_path("disabled_credentials.json")
+    DOUBAO_VIDEO_QUOTA_STORE_PATH: str = _persist_path("video_quotas.json")
     DOUBAO_QUOTA_ENDPOINT: Optional[str] = "https://www.doubao.com/commerce/benefit_supply/credit/get_credit_num_optional_tasks"
     DOUBAO_QUOTA_METHOD: str = "POST"
     DOUBAO_QUOTA_SIGNED: bool = True
@@ -72,7 +118,7 @@ class Settings(BaseSettings):
     DOUBAO_FP: Optional[str] = None
     DOUBAO_TEA_UUID: Optional[str] = None
     DOUBAO_WEB_ID: Optional[str] = None
-    DOUBAO_BROWSER_PROFILE_DIR: str = ".generated/browser-profiles"
+    DOUBAO_BROWSER_PROFILE_DIR: str = _persist_path("browser-profiles")
     DOUBAO_BROWSER_MAX_ACTIVE_CONTEXTS: int = 5
     DOUBAO_BROWSER_IDLE_TIMEOUT_SECONDS: float = 120
     DOUBAO_BROWSER_CLEANUP_INTERVAL_SECONDS: float = 60
@@ -106,7 +152,12 @@ class Settings(BaseSettings):
 
     # --- Video API configuration ---
     VIDEO_PROVIDER: str = "doubao_web"
-    VIDEO_OUTPUT_DIR: str = ".generated/videos"
+    VIDEO_OUTPUT_DIR: str = _persist_path("videos")
+    DOUBAO_COOKIE_PLUGIN_CONFIG_PATH: str = _persist_path("doubao_cookie_plugin.json")
+    API_KEY_STORE_PATH: str = _persist_path("api_keys.json")
+    DOUBAO_VERIFICATION_SNAPSHOT_DIR: str = _persist_path("verification-snapshots")
+    DOUBAO_VERIFICATION_TRIGGER_SNAPSHOT_DIR: str = _persist_path("verification-trigger-snapshots")
+    DOUBAO_CONTEXT_TEMPLATE_DIR: str = _persist_path("context-templates")
     VIDEO_TASK_DELAY_SECONDS: float = 0.25
     VIDEO_TASK_RETENTION_SECONDS: float = 3600
     VIDEO_TASK_MAX_RETAINED: int = 500
@@ -223,6 +274,8 @@ class Settings(BaseSettings):
                     self.DOUBAO_COOKIE_DISABLED.append(self._truthy(disabled))
         
         # --- 核心变更: 验证设备指纹是否已配置 ---
+        self.load_persisted_accounts()
+
         if self.ENABLE_CHAT_PROVIDER and not all([self.DOUBAO_DEVICE_ID, self.DOUBAO_FP, self.DOUBAO_TEA_UUID, self.DOUBAO_WEB_ID]):
             raise ValueError("必须在 .env 文件中配置完整的设备指纹参数 (DOUBAO_DEVICE_ID, DOUBAO_FP, DOUBAO_TEA_UUID, DOUBAO_WEB_ID)")
         if self.VIDEO_PROVIDER not in {"mock", "doubao_web"}:
@@ -419,6 +472,58 @@ class Settings(BaseSettings):
         except (TypeError, ValueError):
             parsed = default
         return max(1.0, parsed)
+
+    def load_persisted_accounts(self) -> None:
+        try:
+            payload = json.loads(Path(self.DOUBAO_ACCOUNT_STORE_PATH).read_text(encoding="utf-8"))
+        except FileNotFoundError:
+            return
+        except (json.JSONDecodeError, OSError):
+            return
+
+        records = payload.get("accounts") if isinstance(payload, dict) else payload
+        if not isinstance(records, list):
+            return
+
+        seen = {normalize_doubao_cookie(cookie) for cookie in self.DOUBAO_COOKIES}
+        identity_indexes = {
+            identity: index
+            for index, cookie in enumerate(self.DOUBAO_COOKIES)
+            if (identity := _cookie_identity(normalize_doubao_cookie(cookie)))
+        }
+        for record in records:
+            if not isinstance(record, dict):
+                continue
+            cookie = normalize_doubao_cookie(record.get("cookie") or record.get("credential"))
+            if not cookie:
+                continue
+            identity = str(record.get("identity") or _cookie_identity(cookie)).strip()
+            weight = self._positive_int(record.get("weight"), self.DOUBAO_ACCOUNT_DEFAULT_WEIGHT)
+            max_concurrency = self._positive_int(
+                record.get("max_concurrency"),
+                self.DOUBAO_ACCOUNT_MAX_CONCURRENCY,
+            )
+            disabled = self._truthy(record.get("disabled"))
+            if identity and identity in identity_indexes:
+                index = identity_indexes[identity]
+                self.DOUBAO_COOKIES[index] = cookie
+                if index < len(self.DOUBAO_COOKIE_WEIGHTS):
+                    self.DOUBAO_COOKIE_WEIGHTS[index] = weight
+                if index < len(self.DOUBAO_COOKIE_MAX_CONCURRENCY):
+                    self.DOUBAO_COOKIE_MAX_CONCURRENCY[index] = max_concurrency
+                if index < len(self.DOUBAO_COOKIE_DISABLED):
+                    self.DOUBAO_COOKIE_DISABLED[index] = disabled
+                seen.add(cookie)
+                continue
+            if cookie in seen:
+                continue
+            seen.add(cookie)
+            if identity:
+                identity_indexes[identity] = len(self.DOUBAO_COOKIES)
+            self.DOUBAO_COOKIES.append(cookie)
+            self.DOUBAO_COOKIE_WEIGHTS.append(weight)
+            self.DOUBAO_COOKIE_MAX_CONCURRENCY.append(max_concurrency)
+            self.DOUBAO_COOKIE_DISABLED.append(disabled)
 
     @staticmethod
     def _truthy(value: Any) -> bool:

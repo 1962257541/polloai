@@ -5,6 +5,7 @@ import { StorageService } from "./services/storage.service";
 import { GeminiService } from "./services/gemini.service";
 import { ApimartService } from "./services/apimart.service";
 import { DoubaoService } from "./services/doubao.service";
+import { QichenService } from "./services/qichen.service";
 import { VolcEngineService } from "./services/volcengine.service";
 import { GenerationWorkerService } from "./services/generation-worker.service";
 
@@ -16,6 +17,7 @@ import { GenerationWorkerService } from "./services/generation-worker.service";
     GeminiService,
     ApimartService,
     DoubaoService,
+    QichenService,
     VolcEngineService,
     GenerationWorkerService,
   ],

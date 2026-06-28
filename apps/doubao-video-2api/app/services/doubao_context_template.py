@@ -7,6 +7,8 @@ from pathlib import Path
 from typing import Any, Mapping
 from urllib.parse import parse_qs, urlencode, urlparse
 
+from app.core.config import settings
+
 
 SENSITIVE_HEADER_NAMES = {
     "authorization",
@@ -19,7 +21,7 @@ SENSITIVE_QUERY_KEYS = {"a_bogus", "x-bogus", "mstoken", "msToken"}
 
 
 def context_template_dir() -> Path:
-    return Path(".generated/context-templates")
+    return Path(settings.DOUBAO_CONTEXT_TEMPLATE_DIR)
 
 
 def latest_context_template_path(account_index: int) -> Path:

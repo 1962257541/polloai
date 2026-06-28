@@ -7,6 +7,7 @@ import { StorageService } from "./storage.service";
 import { GeminiService } from "./gemini.service";
 import { ApimartService } from "./apimart.service";
 import { DoubaoService } from "./doubao.service";
+import { QichenService } from "./qichen.service";
 import { GenerationProvider } from "./generation-provider";
 import { VolcEngineService } from "./volcengine.service";
 import { GenerationType } from "@packages/shared";
@@ -47,6 +48,7 @@ export class GenerationWorkerService implements OnModuleInit, OnModuleDestroy {
     private readonly gemini: GeminiService,
     private readonly apimart: ApimartService,
     private readonly doubao: DoubaoService,
+    private readonly qichen: QichenService,
     private readonly volc: VolcEngineService,
   ) {
     this.publisher = new Redis(env.redisUrl);
@@ -56,6 +58,7 @@ export class GenerationWorkerService implements OnModuleInit, OnModuleDestroy {
   private providerFor(provider?: string): GenerationProvider {
     if (provider === "apimart") return this.apimart;
     if (provider === "doubao") return this.doubao;
+    if (provider === "qichen") return this.qichen;
     return this.gemini;
   }
 

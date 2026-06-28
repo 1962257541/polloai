@@ -598,6 +598,7 @@ class CredentialManager:
 
     @classmethod
     def from_settings(cls) -> "CredentialManager":
+        settings.load_persisted_accounts()
         return cls(
             credentials=settings.DOUBAO_COOKIES,
             weights=settings.DOUBAO_COOKIE_WEIGHTS,

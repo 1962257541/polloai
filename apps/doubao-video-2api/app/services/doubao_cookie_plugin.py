@@ -8,12 +8,14 @@ from typing import Any, Optional
 
 from loguru import logger
 
+from app.core.config import settings
+
 
 PLUGIN_CONFIG_VERSION = 1
 
 
 def plugin_config_path() -> Path:
-    return Path(os.getenv("DOUBAO_COOKIE_PLUGIN_CONFIG_PATH", ".generated/doubao_cookie_plugin.json"))
+    return Path(os.getenv("DOUBAO_COOKIE_PLUGIN_CONFIG_PATH") or settings.DOUBAO_COOKIE_PLUGIN_CONFIG_PATH)
 
 
 def generate_connection_token() -> str:

@@ -8,6 +8,7 @@ FROM python:3.10-slim-bookworm
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+ENV DOUBAO_PERSIST_DIR=/data/doubao-video-2api
 WORKDIR /app
 
 # 关键修正: 一次性、完整地安装所有系统依赖
@@ -43,7 +44,9 @@ COPY . .
 
 # 创建并切换到非 root 用户运行
 RUN useradd --create-home appuser && \
-    chown -R appuser:appuser /app
+    mkdir -p /data/doubao-video-2api && \
+    chown -R appuser:appuser /app /data
+VOLUME ["/data/doubao-video-2api"]
 USER appuser
 
 # 暴露端口并启动

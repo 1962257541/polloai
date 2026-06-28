@@ -125,6 +125,8 @@ export class AdminService {
   // doubao-video-2api 反代仅暴露豆包 Seedance 一个视频模型（见其 VIDEO_MODEL_MAPPING）。
   private static readonly DOUBAO_MODEL_CATALOG = ["doubao-seedance-2-0"];
 
+  private static readonly QICHEN_MODEL_CATALOG = ["gpt-image-2", "sd2", "veo-omni-flash"];
+
   async listRemoteModels(targetUserId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: targetUserId },
@@ -147,6 +149,10 @@ export class AdminService {
     // doubao 反代无 /v1/models 目录，仅有 Seedance 一个视频模型，直接返回内置清单
     if (user.apiProvider === "doubao") {
       return { models: [...AdminService.DOUBAO_MODEL_CATALOG] };
+    }
+
+    if (user.apiProvider === "qichen") {
+      return { models: [...AdminService.QICHEN_MODEL_CATALOG] };
     }
 
     const response = await fetch(this.modelsUrl(user.apiUrl), {

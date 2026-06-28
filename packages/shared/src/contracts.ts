@@ -33,7 +33,7 @@ export type ImageApiType = (typeof imageApiTypeValues)[number];
 
 // 中转站供应商：yunwu（默认，原有同步/yunwu-video 范式）| apimart（apib.ai，异步任务制 /v1/tasks 轮询）
 // | doubao（自部署 doubao-video-2api 反代，豆包 Seedance 免费视频，异步任务 + 自带鉴权下载）
-export const apiProviderValues = ["yunwu", "apimart", "doubao"] as const;
+export const apiProviderValues = ["yunwu", "apimart", "doubao", "qichen"] as const;
 export type ApiProvider = (typeof apiProviderValues)[number];
 
 export const textToImageSchema = z.object({

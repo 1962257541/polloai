@@ -1325,9 +1325,9 @@
         <div class="config-row">
           <div>
             <div class="config-name">视频输出目录</div>
-            <div class="config-help">当前视频结果保存路径，由 VIDEO_OUTPUT_DIR 配置。</div>
+            <div class="config-help">当前视频结果保存路径，由 VIDEO_OUTPUT_DIR 配置；Docker 默认写入持久数据目录。</div>
           </div>
-          <div class="config-control"><input class="wide-input" value=".generated/videos" readonly /></div>
+          <div class="config-control"><input class="wide-input" value="persistent data/videos" readonly /></div>
         </div>
       </section>
     </section>
@@ -1366,10 +1366,10 @@
         </div>
         <div class="form-row">
           <div>
-            <div class="form-label">写入 .env</div>
-            <div class="form-help">保存到环境文件，重启后仍可加载。</div>
+            <div class="form-label">持久保存</div>
+            <div class="form-help">保存到数据目录，更新部署后仍可加载。</div>
           </div>
-          <button id="addPersist" class="switch on" type="button" aria-label="写入 .env"></button>
+          <button id="addPersist" class="switch on" type="button" aria-label="持久保存"></button>
         </div>
       </div>
       <div class="modal-actions">
@@ -1419,10 +1419,10 @@
         </div>
         <div class="form-row">
           <div>
-            <div class="form-label">写入 .env</div>
-            <div class="form-help">保存到环境文件，重启后仍可加载。</div>
+            <div class="form-label">持久保存</div>
+            <div class="form-help">保存到数据目录，更新部署后仍可加载。</div>
           </div>
-          <button id="bulkPersist" class="switch on" type="button" aria-label="写入 .env"></button>
+          <button id="bulkPersist" class="switch on" type="button" aria-label="持久保存"></button>
         </div>
       </div>
       <div class="modal-actions">
@@ -2688,7 +2688,7 @@
         const quota = data.account?.quota || {};
         setNotice("accountNotice", `账号 #${index} 棰濆害鍒锋柊锛?{data.message || quota.status || "完成"}`, quota.status === "error" ? "error" : "ok");
       } else if (action === "delete") {
-        const envText = result.env_index ? `，已移除 DOUBAO_COOKIE_${result.env_index}` : "";
+        const envText = result.store_index ? "，已移除持久记录" : (result.env_index ? `，已移除 DOUBAO_COOKIE_${result.env_index}` : "");
         setNotice("accountNotice", `账号 #${index} 已删闄?{envText}`, "ok");
       } else {
         setNotice("accountNotice", `账号 #${index} 操作已完成`, "ok");
@@ -2728,7 +2728,7 @@
         const quota = data.account?.quota || {};
         setNotice("accountNotice", `账号 #${index} 额度刷新：${data.message || quota.status || "完成"}`, quota.status === "error" ? "error" : "ok");
       } else if (action === "delete") {
-        const envText = result.env_index ? `，已移除 DOUBAO_COOKIE_${result.env_index}` : "";
+        const envText = result.store_index ? "，已移除持久记录" : (result.env_index ? `，已移除 DOUBAO_COOKIE_${result.env_index}` : "");
         setNotice("accountNotice", `账号 #${index} 已删除${envText}`, "ok");
       } else {
         setNotice("accountNotice", `账号 #${index} 操作已完成`, "ok");
@@ -2816,8 +2816,8 @@
         updateMetrics(pool);
         renderAccounts(pool);
         closeAddAccountModal();
-        const persistText = pool.persisted ? `，已写入 DOUBAO_COOKIE_${pool.env_index}` : "，仅当前进程生效";
-        setNotice("accountNotice", `账号宸叉坊鍔?{persistText}`, "ok");
+        const persistText = pool.persisted ? "，已持久保存" : "，仅当前进程生效";
+        setNotice("accountNotice", `账号已添加${persistText}`, "ok");
       } catch (error) {
         setNotice("accountNotice", error.message, "error");
       } finally {
@@ -2878,7 +2878,7 @@
         updateMetrics(pool);
         renderAccounts(pool);
         closeAddAccountModal();
-        const persistText = pool.persisted ? `，已写入 DOUBAO_COOKIE_${pool.env_index}` : "，仅当前进程生效";
+        const persistText = pool.persisted ? "，已持久保存" : "，仅当前进程生效";
         setNotice("accountNotice", `账号已添加${persistText}`, "ok");
       } catch (error) {
         setNotice("accountNotice", error.message, "error");

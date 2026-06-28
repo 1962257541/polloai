@@ -11,6 +11,8 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 from loguru import logger
 
+from app.core.config import settings
+
 
 router = APIRouter(prefix="/v1", tags=["admin"])
 
@@ -20,7 +22,7 @@ api_key_records_cache_path: Optional[Path] = None
 
 
 def _api_key_store_path() -> Path:
-    return Path(os.getenv("API_KEY_STORE_PATH", ".generated/api_keys.json"))
+    return Path(os.getenv("API_KEY_STORE_PATH") or settings.API_KEY_STORE_PATH)
 
 
 def _api_key_digest(secret: str) -> str:
