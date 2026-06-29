@@ -103,6 +103,8 @@ export interface SalespersonInfo {
   name?: string | null;
   role: UserRole;
   hasApiKey: boolean;
+  effectiveHasApiKey?: boolean;
+  usesAdminApiKey?: boolean;
   hasApiUrl: boolean;
   apiUrl?: string | null;
   apiProvider?: ApiProvider | null;

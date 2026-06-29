@@ -1,5 +1,4 @@
 import asyncio
-import json
 import os
 import re
 import time
@@ -9,6 +8,7 @@ from typing import Any, Awaitable, Callable, Optional
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 
+from app.core.account_store import account_store_location, load_account_records, save_account_records
 from app.core.config import normalize_doubao_cookie, settings
 from app.services.credential_manager import CredentialManager, credential_identity
 from app.services.doubao_context_template import context_summary_for_public, load_latest_context_template
@@ -122,6 +122,7 @@ def _account_pool_payload(
     return {
         "object": object_name,
         "enabled": True,
+        "persistence": _account_store_location(),
         "browser_pool": PlaywrightManager().pool_snapshot(),
         "frontend_queues": frontend_queue_status() if callable(frontend_queue_status) else {},
         "quota_refresh": _quota_refresh_status(),
@@ -540,27 +541,38 @@ def _account_store_path() -> Path:
     return Path(settings.DOUBAO_ACCOUNT_STORE_PATH)
 
 
-def _load_persisted_account_records() -> list[dict[str, Any]]:
-    path = _account_store_path()
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except FileNotFoundError:
-        return []
-    except (json.JSONDecodeError, OSError):
-        return []
+def _account_store_location() -> dict[str, Any]:
+    return account_store_location(
+        file_path=settings.DOUBAO_ACCOUNT_STORE_PATH,
+        backend=settings.DOUBAO_ACCOUNT_STORE_BACKEND,
+        database_url=settings.DATABASE_URL,
+        store_key=settings.DOUBAO_ACCOUNT_STORE_DB_KEY,
+    )
 
-    records = payload.get("accounts") if isinstance(payload, dict) else payload
-    if not isinstance(records, list):
-        return []
-    return [dict(record) for record in records if isinstance(record, dict)]
+
+def _account_store_reference() -> str:
+    location = _account_store_location()
+    if location.get("backend") == "database":
+        return f"database:SystemConfig:{location.get('database_key')}"
+    return str(_account_store_path())
+
+
+def _load_persisted_account_records() -> list[dict[str, Any]]:
+    return load_account_records(
+        file_path=settings.DOUBAO_ACCOUNT_STORE_PATH,
+        backend=settings.DOUBAO_ACCOUNT_STORE_BACKEND,
+        database_url=settings.DATABASE_URL,
+        store_key=settings.DOUBAO_ACCOUNT_STORE_DB_KEY,
+    )
 
 
 def _save_persisted_account_records(records: list[dict[str, Any]]) -> None:
-    path = _account_store_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps({"version": 1, "accounts": records}, ensure_ascii=False, indent=2),
-        encoding="utf-8",
+    save_account_records(
+        records,
+        file_path=settings.DOUBAO_ACCOUNT_STORE_PATH,
+        backend=settings.DOUBAO_ACCOUNT_STORE_BACKEND,
+        database_url=settings.DATABASE_URL,
+        store_key=settings.DOUBAO_ACCOUNT_STORE_DB_KEY,
     )
 
 
@@ -846,7 +858,7 @@ async def create_account(request: Request):
             account=account,
             persisted=data["persist"],
             store_index=store_index,
-            persist_path=str(_account_store_path()) if data["persist"] else None,
+            persist_path=_account_store_reference() if data["persist"] else None,
             env_index=None,
             browser_profile=browser_profile,
             quota_refresh_result=quota_refresh,
@@ -890,7 +902,7 @@ async def create_accounts_bulk(request: Request):
                 )
                 added[0]["persisted"] = True
                 added[0]["store_index"] = store_index
-                added[0]["persist_path"] = str(_account_store_path())
+                added[0]["persist_path"] = _account_store_reference()
             except (OSError, ValueError) as exc:
                 failed.append({"index": 0, "message": f"Unable to write account store: {exc}"})
         added[0]["browser_profile"] = await PlaywrightManager().register_account(first)
@@ -934,7 +946,7 @@ async def create_accounts_bulk(request: Request):
                     "account": account,
                     "persisted": persisted,
                     "store_index": store_index,
-                    "persist_path": str(_account_store_path()) if persisted else None,
+                    "persist_path": _account_store_reference() if persisted else None,
                     "env_index": None,
                     "browser_profile": browser_profile,
                 }

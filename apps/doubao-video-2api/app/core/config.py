@@ -1,5 +1,4 @@
 # /app/core/config.py
-import json
 import os
 import re
 import uuid
@@ -9,6 +8,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import model_validator
 from typing import Any, Optional, List, Dict
 from urllib.parse import unquote
+
+from app.core.account_store import load_account_records, normalize_backend
 
 
 COOKIE_ENV_WRAPPER_RE = re.compile(
@@ -82,6 +83,7 @@ class Settings(BaseSettings):
     API_MASTER_KEY: Optional[str] = "1"
     NGINX_PORT: int = 8088
     ENABLE_CHAT_PROVIDER: bool = True
+    DATABASE_URL: Optional[str] = None
     
     # --- Doubao 凭证 ---
     DOUBAO_COOKIES: List[str] = []
@@ -96,6 +98,8 @@ class Settings(BaseSettings):
     DOUBAO_ACCOUNT_ACQUIRE_TIMEOUT: float = 30
     DOUBAO_PERSIST_DIR: str = os.getenv("DOUBAO_PERSIST_DIR", ".generated")
     DOUBAO_ACCOUNT_STORE_PATH: str = _persist_path("accounts.json")
+    DOUBAO_ACCOUNT_STORE_BACKEND: str = "auto"
+    DOUBAO_ACCOUNT_STORE_DB_KEY: str = "doubao-video-2api.account-pool.accounts"
     DOUBAO_DISABLED_CREDENTIAL_STORE_PATH: str = _persist_path("disabled_credentials.json")
     DOUBAO_VIDEO_QUOTA_STORE_PATH: str = _persist_path("video_quotas.json")
     DOUBAO_QUOTA_ENDPOINT: Optional[str] = "https://www.doubao.com/commerce/benefit_supply/credit/get_credit_num_optional_tasks"
@@ -280,6 +284,7 @@ class Settings(BaseSettings):
             raise ValueError("必须在 .env 文件中配置完整的设备指纹参数 (DOUBAO_DEVICE_ID, DOUBAO_FP, DOUBAO_TEA_UUID, DOUBAO_WEB_ID)")
         if self.VIDEO_PROVIDER not in {"mock", "doubao_web"}:
             raise ValueError("VIDEO_PROVIDER currently supports 'mock' or 'doubao_web'.")
+        self.DOUBAO_ACCOUNT_STORE_BACKEND = normalize_backend(self.DOUBAO_ACCOUNT_STORE_BACKEND)
         self.DOUBAO_QUOTA_METHOD = str(self.DOUBAO_QUOTA_METHOD or "GET").upper()
         if self.DOUBAO_QUOTA_METHOD not in {"GET", "POST"}:
             raise ValueError("DOUBAO_QUOTA_METHOD currently supports 'GET' or 'POST'.")
@@ -474,16 +479,12 @@ class Settings(BaseSettings):
         return max(1.0, parsed)
 
     def load_persisted_accounts(self) -> None:
-        try:
-            payload = json.loads(Path(self.DOUBAO_ACCOUNT_STORE_PATH).read_text(encoding="utf-8"))
-        except FileNotFoundError:
-            return
-        except (json.JSONDecodeError, OSError):
-            return
-
-        records = payload.get("accounts") if isinstance(payload, dict) else payload
-        if not isinstance(records, list):
-            return
+        records = load_account_records(
+            file_path=self.DOUBAO_ACCOUNT_STORE_PATH,
+            backend=self.DOUBAO_ACCOUNT_STORE_BACKEND,
+            database_url=self.DATABASE_URL,
+            store_key=self.DOUBAO_ACCOUNT_STORE_DB_KEY,
+        )
 
         seen = {normalize_doubao_cookie(cookie) for cookie in self.DOUBAO_COOKIES}
         identity_indexes = {

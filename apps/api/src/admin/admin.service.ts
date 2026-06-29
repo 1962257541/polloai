@@ -14,22 +14,25 @@ export class AdminService {
   constructor(private readonly prisma: PrismaService) {}
 
   async listSalespersons(): Promise<SalespersonInfo[]> {
-    const users = await this.prisma.user.findMany({
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        role: true,
-        apiKey: true,
-        apiUrl: true,
-        apiProvider: true,
-        imageModel: true,
-        imageModels: true,
-        videoModel: true,
-        videoModels: true,
-      },
-      orderBy: { createdAt: "asc" },
-    });
+    const [users, adminFallback] = await Promise.all([
+      this.prisma.user.findMany({
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+          apiKey: true,
+          apiUrl: true,
+          apiProvider: true,
+          imageModel: true,
+          imageModels: true,
+          videoModel: true,
+          videoModels: true,
+        },
+        orderBy: { createdAt: "asc" },
+      }),
+      this.findAdminApiFallback(),
+    ]);
 
     return users.map((u) => ({
       id: u.id,
@@ -37,9 +40,11 @@ export class AdminService {
       name: u.name,
       role: u.role,
       hasApiKey: Boolean(u.apiKey),
+      effectiveHasApiKey: Boolean(u.apiKey || (u.role !== "admin" && adminFallback?.apiKey)),
+      usesAdminApiKey: Boolean(!u.apiKey && u.role !== "admin" && adminFallback?.apiKey),
       hasApiUrl: Boolean(u.apiUrl),
       apiUrl: u.apiUrl,
-      apiProvider: u.apiProvider as ApiProvider,
+      apiProvider: (u.apiUrl ? u.apiProvider : (adminFallback?.apiProvider ?? u.apiProvider)) as ApiProvider,
       imageModel: u.imageModel,
       imageModels: this.normalizeConfiguredModels(u.imageModels, u.imageModel),
       videoModel: u.videoModel,
@@ -83,7 +88,7 @@ export class AdminService {
   async updateApiConfig(
     targetUserId: string,
     apiKey: string | undefined,
-    apiUrl: string,
+    apiUrl?: string,
     apiProvider?: string,
   ) {
     const user = await this.prisma.user.findUnique({ where: { id: targetUserId } });
@@ -91,11 +96,18 @@ export class AdminService {
       throw new NotFoundException("User not found");
     }
 
+    const normalizedApiUrl = apiUrl === undefined ? undefined : apiUrl.trim() || null;
+    const nextApiKey = apiKey || user.apiKey;
+    const nextApiUrl = normalizedApiUrl === undefined ? user.apiUrl : normalizedApiUrl;
+    if (user.role === "admin" && (!nextApiKey || !nextApiUrl)) {
+      throw new BadRequestException("Admin API key and API URL must be configured");
+    }
+
     await this.prisma.user.update({
       where: { id: targetUserId },
       data: {
         ...(apiKey ? { apiKey } : {}),
-        apiUrl,
+        ...(normalizedApiUrl !== undefined ? { apiUrl: normalizedApiUrl } : {}),
         ...(apiProvider ? { apiProvider } : {}),
       },
     });
@@ -130,36 +142,37 @@ export class AdminService {
   async listRemoteModels(targetUserId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: targetUserId },
-      select: { apiKey: true, apiUrl: true, apiProvider: true },
+      select: { id: true, role: true, apiKey: true, apiUrl: true, apiProvider: true },
     });
 
     if (!user) {
       throw new NotFoundException("User not found");
     }
 
-    if (!user.apiKey || !user.apiUrl) {
-      throw new BadRequestException("API key and API URL must be configured before loading models");
+    const apiConfig = await this.resolveEffectiveApiConfig(user);
+    if (!apiConfig.apiKey || !apiConfig.apiUrl) {
+      throw new BadRequestException("API key and API URL must be configured on this account or the admin account before loading models");
     }
 
     // apimart 没有远端模型目录接口，直接返回内置候选清单
-    if (user.apiProvider === "apimart") {
+    if (apiConfig.apiProvider === "apimart") {
       return { models: [...AdminService.APIMART_MODEL_CATALOG].sort((a, b) => a.localeCompare(b)) };
     }
 
     // doubao 反代无 /v1/models 目录，仅有 Seedance 一个视频模型，直接返回内置清单
-    if (user.apiProvider === "doubao") {
+    if (apiConfig.apiProvider === "doubao") {
       return { models: [...AdminService.DOUBAO_MODEL_CATALOG] };
     }
 
-    if (user.apiProvider === "qichen") {
+    if (apiConfig.apiProvider === "qichen") {
       return { models: [...AdminService.QICHEN_MODEL_CATALOG] };
     }
 
-    const response = await fetch(this.modelsUrl(user.apiUrl), {
+    const response = await fetch(this.modelsUrl(apiConfig.apiUrl), {
       method: "GET",
       headers: {
         Accept: "application/json",
-        Authorization: `Bearer ${user.apiKey}`,
+        Authorization: `Bearer ${apiConfig.apiKey}`,
       },
     });
 
@@ -228,18 +241,59 @@ export class AdminService {
       throw new NotFoundException("User not found");
     }
 
+    const adminFallback = user.role === "admin" ? null : await this.findAdminApiFallback();
+    const imageModels = this.normalizeConfiguredModels(user.imageModels, user.imageModel);
+    const videoModels = this.normalizeConfiguredModels(user.videoModels, user.videoModel);
+    const fallbackImageModels = this.normalizeConfiguredModels(adminFallback?.imageModels, adminFallback?.imageModel);
+    const fallbackVideoModels = this.normalizeConfiguredModels(adminFallback?.videoModels, adminFallback?.videoModel);
+
     return {
       id: user.id,
       email: user.email,
       name: user.name,
       role: user.role,
       hasApiKey: Boolean(user.apiKey),
+      effectiveHasApiKey: Boolean(user.apiKey || (user.role !== "admin" && adminFallback?.apiKey)),
+      usesAdminApiKey: Boolean(!user.apiKey && user.role !== "admin" && adminFallback?.apiKey),
       hasApiUrl: Boolean(user.apiUrl),
-      apiProvider: user.apiProvider,
+      apiProvider: user.apiUrl ? user.apiProvider : (adminFallback?.apiProvider ?? user.apiProvider),
       imageModel: user.imageModel,
-      imageModels: this.normalizeConfiguredModels(user.imageModels, user.imageModel),
+      imageModels: imageModels.length ? imageModels : fallbackImageModels,
       videoModel: user.videoModel,
-      videoModels: this.normalizeConfiguredModels(user.videoModels, user.videoModel),
+      videoModels: videoModels.length ? videoModels : fallbackVideoModels,
+    };
+  }
+
+  private async findAdminApiFallback() {
+    return this.prisma.user.findFirst({
+      where: {
+        role: "admin",
+        apiKey: { not: null },
+      },
+      orderBy: { createdAt: "asc" },
+      select: {
+        apiKey: true,
+        apiUrl: true,
+        apiProvider: true,
+        imageModel: true,
+        imageModels: true,
+        videoModel: true,
+        videoModels: true,
+      },
+    });
+  }
+
+  private async resolveEffectiveApiConfig(user: {
+    role: string;
+    apiKey: string | null;
+    apiUrl: string | null;
+    apiProvider: string;
+  }) {
+    const adminFallback = user.role === "admin" ? null : await this.findAdminApiFallback();
+    return {
+      apiKey: user.apiKey || adminFallback?.apiKey || null,
+      apiUrl: user.apiUrl || adminFallback?.apiUrl || null,
+      apiProvider: user.apiUrl ? user.apiProvider : (adminFallback?.apiProvider ?? user.apiProvider),
     };
   }
 

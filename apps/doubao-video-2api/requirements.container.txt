@@ -13,3 +13,4 @@ pytest-asyncio
 imageio
 imageio-ffmpeg
 numpy
+psycopg[binary]

@@ -74,14 +74,19 @@ export class GenerationsService {
 
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { apiKey: true, apiUrl: true, apiProvider: true, imageModel: true, imageModels: true },
+      select: { role: true, apiKey: true, apiUrl: true, apiProvider: true, imageModel: true, imageModels: true },
     });
 
-    if (!user?.apiKey || !user?.apiUrl) {
-      throw new BadRequestException("API Key 和 API URL 未配置，请先到账号设置中配置。");
+    if (!user) {
+      throw new NotFoundException("User not found");
     }
 
-    const availableModels = this.normalizeConfiguredModels(user.imageModels, user.imageModel);
+    const apiConfig = await this.resolveEffectiveApiConfig(user, "image");
+    if (!apiConfig.apiKey || !apiConfig.apiUrl) {
+      throw new BadRequestException("API Key 和 API URL 未配置，请先在当前账号或管理员账号中配置。");
+    }
+
+    const availableModels = apiConfig.models;
     if (parsed.model && !availableModels.includes(parsed.model)) {
       throw new BadRequestException("Selected image model is not enabled for this account");
     }
@@ -97,7 +102,7 @@ export class GenerationsService {
           userId,
           type: "text_to_image",
           status: "queued",
-          provider: user.apiProvider || "yunwu",
+          provider: apiConfig.apiProvider,
           model: imageModel,
           prompt: parsed.prompt,
           negativePrompt: parsed.negativePrompt,
@@ -125,10 +130,10 @@ export class GenerationsService {
 
     await this.enqueueTaskOrFail(
       task.id,
-      user.apiKey,
-      user.apiUrl ?? undefined,
+      apiConfig.apiKey,
+      apiConfig.apiUrl,
       parsed.imageApiType ?? "gemini-native",
-      user.apiProvider,
+      apiConfig.apiProvider,
     );
 
     await this.notificationsService.publish({
@@ -191,14 +196,19 @@ export class GenerationsService {
 
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { apiKey: true, apiUrl: true, apiProvider: true, videoModel: true, videoModels: true },
+      select: { role: true, apiKey: true, apiUrl: true, apiProvider: true, videoModel: true, videoModels: true },
     });
 
-    if (!user?.apiKey || !user?.apiUrl) {
-      throw new BadRequestException("API Key 和 API URL 未配置，请先到账号设置中配置。");
+    if (!user) {
+      throw new NotFoundException("User not found");
     }
 
-    const availableModels = this.normalizeConfiguredModels(user.videoModels, user.videoModel);
+    const apiConfig = await this.resolveEffectiveApiConfig(user, "video");
+    if (!apiConfig.apiKey || !apiConfig.apiUrl) {
+      throw new BadRequestException("API Key 和 API URL 未配置，请先在当前账号或管理员账号中配置。");
+    }
+
+    const availableModels = apiConfig.models;
     if (parsed.model && !availableModels.includes(parsed.model)) {
       throw new BadRequestException("Selected video model is not enabled for this account");
     }
@@ -217,7 +227,7 @@ export class GenerationsService {
           userId,
           type: "image_to_video",
           status: "queued",
-          provider: user.apiProvider || "yunwu",
+          provider: apiConfig.apiProvider,
           model: videoModel,
           prompt: parsed.prompt,
           negativePrompt: parsed.negativePrompt,
@@ -245,10 +255,10 @@ export class GenerationsService {
 
     await this.enqueueTaskOrFail(
       task.id,
-      user.apiKey,
-      user.apiUrl ?? undefined,
+      apiConfig.apiKey,
+      apiConfig.apiUrl,
       undefined,
-      user.apiProvider,
+      apiConfig.apiProvider,
     );
 
     await this.notificationsService.publish({
@@ -589,6 +599,54 @@ export class GenerationsService {
 
     const { count } = await this.prisma.generationTask.deleteMany({ where });
     return { deleted: count };
+  }
+
+  private async findAdminApiFallback() {
+    return this.prisma.user.findFirst({
+      where: {
+        role: "admin",
+        apiKey: { not: null },
+      },
+      orderBy: { createdAt: "asc" },
+      select: {
+        apiKey: true,
+        apiUrl: true,
+        apiProvider: true,
+        imageModel: true,
+        imageModels: true,
+        videoModel: true,
+        videoModels: true,
+      },
+    });
+  }
+
+  private async resolveEffectiveApiConfig(
+    user: {
+      role: string;
+      apiKey: string | null;
+      apiUrl: string | null;
+      apiProvider: string;
+      imageModel?: string | null;
+      imageModels?: string[] | null;
+      videoModel?: string | null;
+      videoModels?: string[] | null;
+    },
+    kind: "image" | "video",
+  ) {
+    const adminFallback = user.role === "admin" ? null : await this.findAdminApiFallback();
+    const ownModels = kind === "image"
+      ? this.normalizeConfiguredModels(user.imageModels, user.imageModel)
+      : this.normalizeConfiguredModels(user.videoModels, user.videoModel);
+    const fallbackModels = kind === "image"
+      ? this.normalizeConfiguredModels(adminFallback?.imageModels, adminFallback?.imageModel)
+      : this.normalizeConfiguredModels(adminFallback?.videoModels, adminFallback?.videoModel);
+
+    return {
+      apiKey: user.apiKey || adminFallback?.apiKey || null,
+      apiUrl: user.apiUrl || adminFallback?.apiUrl || null,
+      apiProvider: user.apiUrl ? user.apiProvider : (adminFallback?.apiProvider ?? user.apiProvider ?? "yunwu"),
+      models: ownModels.length ? ownModels : fallbackModels,
+    };
   }
 
   private async enqueueTaskOrFail(

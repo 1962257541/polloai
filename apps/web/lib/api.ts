@@ -20,6 +20,8 @@ export type SalespersonInfo = {
   name?: string | null;
   role: UserRole;
   hasApiKey: boolean;
+  effectiveHasApiKey?: boolean;
+  usesAdminApiKey?: boolean;
   hasApiUrl: boolean;
   apiUrl?: string | null;
   apiProvider?: ApiProvider | null;
@@ -35,6 +37,8 @@ export type MyInfo = {
   name?: string | null;
   role: UserRole;
   hasApiKey: boolean;
+  effectiveHasApiKey?: boolean;
+  usesAdminApiKey?: boolean;
   hasApiUrl: boolean;
   apiProvider?: ApiProvider | null;
   imageModel?: string | null;
@@ -279,14 +283,14 @@ export const api = {
     token: string,
     userId: string,
     apiKey: string | undefined,
-    apiUrl: string,
+    apiUrl: string | undefined,
     apiProvider?: ApiProvider,
   ) =>
     request(
       `/admin/salespersons/${userId}/apikey`,
       {
         method: "PUT",
-        body: JSON.stringify({ ...(apiKey ? { apiKey } : {}), apiUrl, ...(apiProvider ? { apiProvider } : {}) }),
+        body: JSON.stringify({ ...(apiKey ? { apiKey } : {}), ...(apiUrl ? { apiUrl } : {}), ...(apiProvider ? { apiProvider } : {}) }),
       },
       token,
     ),
@@ -294,14 +298,14 @@ export const api = {
   updateMyApiConfig: (
     token: string,
     apiKey: string | undefined,
-    apiUrl: string,
+    apiUrl: string | undefined,
     apiProvider?: ApiProvider,
   ) =>
     request(
       "/admin/me/apikey",
       {
         method: "PUT",
-        body: JSON.stringify({ ...(apiKey ? { apiKey } : {}), apiUrl, ...(apiProvider ? { apiProvider } : {}) }),
+        body: JSON.stringify({ ...(apiKey ? { apiKey } : {}), ...(apiUrl ? { apiUrl } : {}), ...(apiProvider ? { apiProvider } : {}) }),
       },
       token,
     ),

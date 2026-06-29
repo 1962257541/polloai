@@ -9,6 +9,7 @@ interface ModalState {
   type: "create" | "apikey" | "delete";
   userId?: string;
   userEmail?: string;
+  userRole?: "admin" | "salesperson";
   existingHasKey?: boolean;
 }
 
@@ -80,12 +81,13 @@ export default function SalespersonManage() {
 
   const handleSetApiKey = async () => {
     const token = getToken();
-    if (!token || !modal?.userId || (!apiKeyInput && !modal.existingHasKey) || !apiUrlInput) return;
+    if (!token || !modal?.userId) return;
+    if (modal.userRole === "admin" && ((!apiKeyInput && !modal.existingHasKey) || !apiUrlInput)) return;
 
     try {
       setSubmitting(true);
       setError("");
-      await api.updateSalespersonApiConfig(token, modal.userId, apiKeyInput || undefined, apiUrlInput, apiProviderInput);
+      await api.updateSalespersonApiConfig(token, modal.userId, apiKeyInput || undefined, apiUrlInput || undefined, apiProviderInput);
       resetModalState();
       await load();
     } catch (e) {
@@ -180,6 +182,8 @@ export default function SalespersonManage() {
               <span>
                 {user.hasApiKey && user.hasApiUrl ? (
                   <span className="badge-success">已配置</span>
+                ) : user.usesAdminApiKey ? (
+                  <span className="badge-muted">管理员 Key</span>
                 ) : user.hasApiKey ? (
                   <span className="badge-muted">仅 Key</span>
                 ) : (
@@ -198,6 +202,7 @@ export default function SalespersonManage() {
                       type: "apikey",
                       userId: user.id,
                       userEmail: user.email,
+                      userRole: user.role,
                       existingHasKey: user.hasApiKey,
                     });
                   }}
@@ -318,19 +323,25 @@ export default function SalespersonManage() {
                     </div>
                     <div>
                       <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "inherit", color: "var(--text-muted)", marginBottom: 6, letterSpacing: "0.05em" }}>
-                        API KEY *
+                        API KEY {modal.userRole === "admin" ? "*" : "（可选）"}
                       </label>
                       <input
                         className="input-field"
                         type="password"
                         value={apiKeyInput}
                         onChange={(e) => setApiKeyInput(e.target.value)}
-                        placeholder={modal.existingHasKey ? "已配置，重新输入即覆盖" : "sk-..."}
+                        placeholder={
+                          modal.existingHasKey
+                            ? "已配置，重新输入即覆盖"
+                            : modal.userRole === "admin"
+                              ? "sk-..."
+                              : "留空则使用管理员账号 API Key"
+                        }
                       />
                     </div>
                     <div>
                       <label style={{ display: "block", fontSize: "0.7rem", fontFamily: "inherit", color: "var(--text-muted)", marginBottom: 6, letterSpacing: "0.05em" }}>
-                        BASE URL *
+                        BASE URL {modal.userRole === "admin" ? "*" : "（可选）"}
                       </label>
                       <input
                         className="input-field"
@@ -351,7 +362,7 @@ export default function SalespersonManage() {
                         {apiProviderInput === "apimart"
                           ? "apib.ai 请填 https://api.apib.ai/v1，图片/视频走异步任务制"
                           : apiProviderInput === "doubao"
-                            ? "豆包反代填服务地址（例如 http://doubao-2api:8088）；API KEY 填该服务的 API_MASTER_KEY；仅支持视频"
+                            ? "豆包反代填服务地址（例如 http://doubao-2api:8088）；销售账号 API KEY 可留空使用管理员 Key；仅支持视频"
                             : apiProviderInput === "qichen"
                               ? "七辰 API 填 https://api.qichen001.asia/v1；图片模型 gpt-image-2，视频模型 sd2 或 veo-omni-flash"
                               : "yunwu 等保持原有地址格式"}
@@ -365,7 +376,10 @@ export default function SalespersonManage() {
                       <button
                         className="btn-primary"
                         onClick={handleSetApiKey}
-                        disabled={submitting || (!apiKeyInput && !modal.existingHasKey) || !apiUrlInput}
+                        disabled={
+                          submitting ||
+                          (modal.userRole === "admin" && ((!apiKeyInput && !modal.existingHasKey) || !apiUrlInput))
+                        }
                         type="button"
                       >
                         {submitting ? "保存中..." : "保存"}
